@@ -1,0 +1,13 @@
+.calendar-page .calendar-item-color{
+ background:var(--calendar-fill)!important;
+ color:var(--calendar-text)!important;
+ border-color:var(--calendar-color)!important;
+}
+.calendar-page .calendar-event.calendar-item-color{border-left:3px solid var(--calendar-color)}
+.calendar-page .calendar-item-color.calendar-reminder{border:1px dashed var(--calendar-color);border-left-width:3px}
+.calendar-page .calendar-item-color.calendar-scheduled-event{border:1px solid var(--calendar-color)!important;border-left-width:3px!important}
+.calendar-page .calendar-item-color.unassigned{border-left-style:dashed}
+.calendar-page .untimed .calendar-item-color{border-left-width:3px}
+
+.calendar-page .calendar-event.calendar-tiny{border:0!important;border-left:0!important;background:var(--calendar-color)!important}
+.calendar-page .calendar-event.calendar-reminder.calendar-tiny{border-top:2px dashed var(--calendar-color)!important;background:var(--calendar-fill)!important}

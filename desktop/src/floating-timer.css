@@ -1,0 +1,42 @@
+html.floating-timer-root,body.floating-timer-body{background:transparent;min-width:0;overflow:hidden;color:var(--ink)}
+.floating-timer-body #root{height:100vh;padding:6px;overflow:hidden}
+.floating-timer{background:var(--surface);border:1px solid var(--line);border-radius:14px;box-shadow:0 2px 5px #172a4626;max-height:100%;display:flex;flex-direction:column;font-size:13px;user-select:none;overflow:hidden}
+.floating-timer.loading{height:52px;justify-content:center;padding:12px;color:var(--muted)}
+.floating-strip{display:flex;align-items:center;height:50px;flex-shrink:0;padding:0 8px 0 6px;gap:2px}
+.floating-grip{width:18px;height:36px;display:grid;place-items:center;color:var(--line-strong);-webkit-app-region:drag;cursor:move;flex-shrink:0}
+.floating-grip svg{width:18px;height:18px}
+.floating-toggle{display:flex;align-items:center;gap:8px;min-width:0;flex:1;padding:4px 3px;border:0;background:transparent;border-radius:6px;-webkit-app-region:no-drag;height:40px;text-align:left}
+.floating-toggle:hover{background:var(--surface-alt)}
+.floating-toggle>svg:last-child{width:20px;height:20px;margin-left:6px}
+.floating-toggle .floating-status{width:14px;height:14px;color:var(--accent)}
+.floating-title{flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-weight:550;font-size:13px}
+.floating-readout{display:flex;align-items:center;gap:8px;border-left:1px solid var(--line);padding-left:12px;flex-shrink:0}
+.floating-readout>span{font-size:13px;color:var(--muted)}
+.floating-readout time{font-size:26px;font-weight:650;font-variant-numeric:tabular-nums;letter-spacing:-.6px;line-height:1.2;min-width:72px;text-align:right}
+.floating-readout time.ready-label{font-size:17px;letter-spacing:0}
+.floating-timer.paused .floating-status,.floating-timer.overtime .floating-status{color:var(--warning)}
+.floating-timer.rest .floating-status{color:var(--reminder)}
+.floating-timer.overtime .floating-readout>span{color:var(--warning)}
+.floating-controls{border-top:1px solid var(--line);padding:12px;overflow-y:auto;min-height:0;scrollbar-width:thin}
+.floating-controls h1{font-size:15px;letter-spacing:0;line-height:1.5;margin:0 0 5px;overflow-wrap:anywhere;font-weight:600}
+.floating-meta{color:var(--muted);font-size:12px;line-height:1.6;margin:0 0 10px;overflow-wrap:anywhere}
+.floating-actions{display:flex;gap:8px;margin:6px 0 8px;flex-wrap:wrap}
+.floating-controls button{display:inline-flex;align-items:center;justify-content:center;gap:5px;font-size:13px;min-height:32px;border:1px solid var(--line-strong);background:var(--surface);border-radius:5px;padding:5px 10px}
+.floating-controls button:hover:not(:disabled){background:var(--surface-hover)}
+.floating-actions button{flex:1;white-space:nowrap}
+.floating-controls .is-primary,.floating-controls .floating-rest-action{background:var(--accent);color:white;border-color:var(--accent)}
+.floating-controls .is-primary:hover:not(:disabled),.floating-controls .floating-rest-action:hover:not(:disabled){background:var(--accent-hover)}
+.floating-rest-action{width:100%}
+.floating-hint{color:var(--muted);font-size:12px;margin:8px 0 0;line-height:1.6}
+.floating-controls .floating-text{color:var(--accent);border:0;padding:5px 0;font-size:12px;display:flex}
+.floating-switcher{margin-top:12px;padding-top:9px;border-top:1px solid var(--line)}
+.floating-switcher p{margin:0 0 5px;color:var(--muted);font-size:12px}
+.floating-switcher>div{max-height:160px;overflow-y:auto}
+.floating-switcher button{width:100%;justify-content:space-between;border-color:transparent;text-align:left;padding:6px;gap:10px}
+.floating-switcher button span{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0}
+.floating-switcher button small{color:var(--muted);font-variant-numeric:tabular-nums;flex-shrink:0}
+.floating-switcher button[aria-pressed=true]{color:var(--accent);background:var(--accent-soft)}
+.floating-controls footer{border-top:1px solid var(--line);margin-top:12px;padding-top:6px;display:flex;justify-content:space-between;gap:8px}
+.floating-controls footer button{color:var(--muted);border:0;font-size:12px;padding:5px 2px}
+.floating-error{color:var(--danger);font-size:12px;margin:8px 0;line-height:1.6}
+@media(prefers-reduced-motion:reduce){.floating-timer button{transition:none}}

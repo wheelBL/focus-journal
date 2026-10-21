@@ -1,0 +1,10 @@
+.local-api-form{display:grid;gap:12px;max-width:580px}
+.local-api-enable{display:flex;gap:7px;align-items:center;font-size:13px}.local-api-enable input{width:15px;height:15px;margin:0}
+.local-api-form>.secondary{justify-self:start}.local-api-form .form-grid{margin:0}
+.local-api-connection{display:grid;gap:12px;margin-top:16px;max-width:700px}
+.local-api-connection>strong{font-size:12px;font-weight:500;color:var(--accent)}
+.local-api-connection input{font:12px Consolas,monospace;width:100%;min-width:0}
+.local-api-connection .actions{flex-wrap:wrap}.local-api-connection .secondary{font-size:12px;min-height:30px}
+.local-api-guide{margin-top:16px;font-size:12px}.local-api-guide summary{color:var(--accent);cursor:pointer}
+.local-api-guide pre{white-space:pre-wrap;overflow-wrap:anywhere;background:var(--surface-alt);border:1px solid var(--line);padding:12px;border-radius:4px;font-size:12px;line-height:1.7}
+#settings-api p[role=alert]{color:var(--danger,#a43b35)}#settings-api p[role=status]{color:var(--success,#18714f)}

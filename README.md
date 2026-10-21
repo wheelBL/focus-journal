@@ -1,0 +1,106 @@
+# 专注记 · Focus Journal
+
+Windows 11 上的本地工作日志，把 **估计 → 实践 → 复盘 → 调整** 串成每天的工作流程。
+
+任务树负责理清事情，番茄计时帮助开始，日历记录真实投入，今日与回顾回答“今天推进了什么”。界面为中文，采用 TypeScript + React + Electron + SQLite。
+
+## 下载与运行
+
+在 [Releases](https://github.com/wheelBL/focus-journal/releases/latest) 下载 **专注记-0.21.0-Windows-x64.zip**，解压整个文件夹，双击 **专注记.exe**。无需安装 Node.js。
+
+- 系统：Windows 11 x64。
+- 更新：先在旧版托盘中选择“退出专注记”，再运行新版。数据保存在用户数据目录中，升级数据结构前自动备份。
+- 关闭主窗口后继续在托盘运行；完全退出请使用托盘菜单或设置中的“保存并退出”。
+- 发布包目前未做 Windows 代码签名。校验值随 Releases 中的 `SHA256SUMS.txt` 提供。
+- 不要只移动 EXE，必须保留同目录的运行库、`resources` 和许可证文件。
+
+## 主要能力
+
+- **统一事项树**：任意嵌套，项目为可选标记；行内编辑、拖拽调整层级、自动排序、标签、筛选与保存视图。
+- **子弹笔记式快速记录**：普通事项、`- ` 笔记、`o ` 事件；支持日期、标签、估计和已有项目路径的语义识别。全局 `Ctrl+Alt+Space` 随时记录。
+- **从计时开始**：直接计时，或先开始再补充事项；暂停、恢复、手动补记和校正均保留真实时间。支持多个事项独立计时。
+- **完整专注与休息**：默认 25 分钟专注、5 分钟休息；到点发声并显示持续置顶卡片，计时继续，直到主动结束。休息结束后自行确认继续。
+- **屏边计时签**：主窗口最小化或收至托盘时仍可看到时间；点击展开操作，可拖动、隐藏、切换计时器。
+- **执行首页与日历**：今日重点、继续计时、今日进展和时间线；日/周/月回顾，拖选添加提醒、事件或投入。同一事项保持同色，真实重叠独立排布。
+- **重复与复盘**：日/周/月/年重复，固定日历或完成后间隔；事项审视、估计历史、期间成果和投入汇总。
+- **本地数据与扩展**：SQLite 持久化、备份/恢复、回收站、可选 GitCode 快照同步，以及默认关闭的本机 AI 控制 API。
+
+屏边计时签（截图使用示例数据）：
+
+![收起的屏边计时签](docs/images/timer-compact.png)
+
+![展开操作](docs/images/timer-expanded.png)
+
+## 第一次使用
+
+1. 在事项页右键创建事项，或直接用快速记录输入名称。估计可以暂时不填。
+2. 添加过程中按 `Tab` 缩进，`Shift+Tab` 提升一级，`Enter` 保存并继续，`Ctrl+Enter` 保存结束。
+3. 将今天要推进的事情加入“今日重点”，从今日或事项行开始计时；也可以先计时，结束后再命名。
+4. 到时自行选择继续、稍后提醒或结束并休息。结束本次计时不会自动完成事项。
+5. 在日历补记遗漏投入，在回顾中比较估计与实际，记录下次如何调整。
+
+**日期语义**：“计划开始”是打算开始的日期，不会覆盖真实开始时间。“10 月 23 日前”不包含当天，表示在 10 月 23 日 00:00 前完成；也支持精确到分钟的截止时间。
+
+## 本地开发
+
+需要 **Node.js 24.x、npm、Git**。Windows 打包需要 Windows x64。Electron 版本固定在锁文件中，安装依赖时需要网络下载运行时。
+
+```powershell
+cd desktop
+npm ci
+npm run build
+npm run desktop
+```
+
+隔离示例数据启动（不使用个人数据；关闭窗口会退出）：
+
+```powershell
+cd desktop
+npm run build
+npx electron . --demo --data-dir ./qa-data/development
+```
+
+浏览器预览需要两个终端，在 `desktop` 下分别执行 `npm run preview:api` 和 `npm run dev`。预览只使用 `qa-data` 中的示例数据；原生托盘、全局快捷键和窗口提醒需在 Electron 中验证。
+
+## 测试与打包
+
+在 `desktop` 下执行：
+
+```powershell
+npm test
+npm run test:ui
+npm run test:api
+npm run test:sync
+npm run test:sites
+npm run build
+node scripts/package-windows.mjs --versioned
+```
+
+输出为 `desktop/release/win-0.21.0/专注记.exe`。本地 API 与同步测试使用回环 HTTP 服务，需要环境允许监听 `127.0.0.1`；同步测试还需要 Git。第三方组件许可证会在打包时生成并复制到产物中。
+
+自动测试覆盖业务规则、组件交互、本机 API、同步与预览 Worker。原生窗口检查脚本位于 `desktop/scripts/check-*.ts`，使用隔离配置，结束时必须正常退出测试实例。`check-local-api.ts` 另需 Python 3，可通过 `PYTHON` 环境变量指定路径。
+
+## 代码与文档
+
+| 路径 | 职责 |
+| --- | --- |
+| `desktop/core/` | 领域模型、统一命令、计时与 SQLite |
+| `desktop/electron/` | 主进程、受限 IPC、托盘、提醒、本机 API 和同步 |
+| `desktop/src/` | React 页面、任务树、日历、计时签与样式 |
+| `desktop/tests/` | 业务及组件自动测试 |
+| `desktop/scripts/` | 构建、Windows 打包、隔离验证 |
+| `desktop/tools/journal-api.py` | 本机 AI API 命令行客户端 |
+
+- [架构说明](docs/architecture.md)
+- [本机 AI 与同步 API](desktop/docs/local-api.md)
+- [快速记录语法](desktop/docs/semantic-capture.md)
+- [事项规则](desktop/docs/scenario-rules.md) · [事项审视](desktop/docs/item-review-rules.md)
+- [0.21.0 发布说明](docs/releases/0.21.0.md)
+
+## 数据与发布范围
+
+个人数据库、备份、设备密钥、测试输出和内部设计截图不进入本仓库。截图仅使用示例数据。
+
+应用可离线使用。GitCode 同步需自行配置仓库和令牌，使用整份日志快照；发生分歧时由用户选择，不自动覆盖。令牌由 Windows 加密保存在设备配置中，不进入日志导出。本机 API 仅监听回环地址，默认关闭、默认只读，启用后须使用独立密钥。
+
+目前尚未为本项目源码选择开源许可证。依赖组件各自的许可证与署名见 [THIRD_PARTY_NOTICES.txt](THIRD_PARTY_NOTICES.txt)；Electron / Chromium 的说明随 Windows 包附带。

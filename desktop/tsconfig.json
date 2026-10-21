@@ -1,0 +1,43 @@
+{
+  "compilerOptions": {
+    "target": "ES2023",
+    "lib": [
+      "ES2023",
+      "DOM",
+      "DOM.Iterable"
+    ],
+    "module": "ESNext",
+    "moduleResolution": "Bundler",
+    "resolveJsonModule": true,
+    "jsx": "react-jsx",
+    "strict": true,
+    "noEmit": true,
+    "esModuleInterop": true,
+    "skipLibCheck": true,
+    "allowImportingTsExtensions": true,
+    "types": [
+      "node",
+      "vite/client"
+    ]
+  },
+  "include": [
+    "src",
+    "core",
+    "electron",
+    "scripts/preview-api.ts",
+    "tests/core.test.ts",
+    "tests/outline.test.ts",
+    "tests/items.test.ts",
+    "tests/interaction-harness.tsx",
+    "tests/timers.test.ts",
+    "tests/reminders.test.ts",
+    "tests/deadlines.test.ts",
+    "tests/sync.test.ts",
+    "tests/git-transport.test.ts",
+    "tests/scenarios.test.ts",
+    "tests/item-reviews.test.ts",
+    "tests/local-api.test.ts",
+    "tests/local-api-sync.test.ts",
+    "tests/calendar-execution.test.ts"
+  ]
+}

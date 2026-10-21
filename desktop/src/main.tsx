@@ -1,0 +1,14 @@
+import CapturePanel from './CapturePanel';
+import FloatingTimerPanel from './FloatingTimerPanel';
+import React from 'react';
+import { createRoot } from 'react-dom/client';
+import App from './App.tsx';
+import './styles.css';
+import ReminderPanel from './ReminderPanel';
+import './responsive.css';
+import './design-tokens.css';
+import './workbench.css';
+const capture=new URLSearchParams(window.location.search).get('panel')==='capture';
+const reminder=new URLSearchParams(window.location.search).get('panel')==='reminder';
+const floating=new URLSearchParams(window.location.search).get('panel')==='floating-timer';
+createRoot(document.getElementById('root')!).render(<React.StrictMode>{floating?<FloatingTimerPanel/>:reminder?<ReminderPanel/>:capture?<CapturePanel/>:<App/>}</React.StrictMode>);

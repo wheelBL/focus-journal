@@ -1,0 +1,14 @@
+#rest-workspace:empty{display:none}
+.application.workbench:has(.break-bar){grid-template-rows:48px auto minmax(0,1fr)}
+.break-bar{display:flex;align-items:center;gap:12px;padding:10px 22px;border-bottom:1px solid var(--line);background:var(--accent-soft);color:var(--ink)}
+.break-bar>svg{flex-shrink:0;width:23px;height:23px;color:var(--accent)}
+.break-message{flex:1;min-width:0}
+.break-message strong{font-size:14px;display:flex;gap:15px;align-items:center}
+.break-message span{display:block;font-size:12px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-top:3px}
+.break-message time{font-size:23px;line-height:1;font-variant-numeric:tabular-nums;color:var(--accent)}
+.break-actions{display:flex;gap:6px;align-items:center;flex-shrink:0}
+.break-actions button,.stop-for-break{font-size:12px}
+.workbench .focus-actions .stop-for-break{white-space:normal}
+.assignment-rest-choice{margin-top:14px;font-size:12px}
+.reminder-rest-hint{font-size:12px;color:var(--muted);margin:8px 0 0}
+@media(max-width:760px){.break-bar{flex-wrap:wrap;padding:8px 12px;gap:7px}.break-message{flex-basis:calc(100% - 40px)}.break-actions{margin-left:30px;flex-wrap:wrap;flex-shrink:1}.break-actions button{min-height:28px;padding:4px 8px}}

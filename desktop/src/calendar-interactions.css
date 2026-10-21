@@ -1,0 +1,32 @@
+.calendar-create-modes{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:7px;margin-bottom:18px}
+.calendar-create-modes button{padding:10px 8px;border:1px solid var(--line);background:var(--surface-alt);border-radius:6px;text-align:left}
+.calendar-create-modes button.active{background:var(--accent-soft);border-color:var(--accent);color:var(--accent)}
+.calendar-create-modes strong,.calendar-create-modes small{display:block}.calendar-create-modes strong{font-size:13px}.calendar-create-modes small{font-size:11px;margin-top:4px;color:var(--muted)}
+.calendar-form-hint{font-size:12px;color:var(--muted);margin:0 0 14px}.calendar-create .form-grid{margin-bottom:0}
+.calendar-item-picker select{width:100%;padding:4px}.calendar-item-picker option{padding:6px;white-space:normal}.calendar-remind-choice{display:flex;gap:8px;align-items:center;font-size:13px;margin:8px 0 20px}
+.calendar-display-options{display:flex;align-items:center;gap:8px;flex-wrap:wrap}.calendar-display-options>button{font-size:11px;border:1px solid var(--line);border-radius:4px;padding:4px 7px;background:var(--surface-alt);color:var(--muted)}.calendar-display-options>button[aria-pressed=true]{border-color:var(--accent);background:var(--accent-soft);color:var(--accent)}
+.calendar-display-options label{display:flex;align-items:center;gap:5px;font-size:11px;color:var(--muted)}.calendar-display-options select{padding:3px;font-size:11px}
+.day-column{touch-action:pan-y}.day-column.is-selecting{user-select:none;cursor:crosshair}
+.calendar-selection{position:absolute;left:2px;right:2px;background:color-mix(in srgb,var(--accent) 18%,transparent);border:1px solid var(--accent);border-radius:4px;z-index:5;pointer-events:none;padding:2px 5px;color:var(--accent);overflow:hidden;min-height:12px}
+.calendar-selection strong,.calendar-selection span{display:block;font-size:11px;white-space:nowrap}
+.calendar-now-line{position:absolute;left:0;right:0;z-index:4;border-top:1px solid var(--danger);pointer-events:none}.calendar-now-line:before{content:"";position:absolute;left:-3px;top:-3px;width:5px;height:5px;background:var(--danger);border-radius:50%}
+.calendar-block-popover{display:flex;flex-direction:column;gap:12px}.calendar-block-popover h3{margin:0;font-size:17px}.calendar-block-popover p{margin:0;font-size:13px;color:var(--muted)}.calendar-block-popover .actions{margin-top:6px}
+.calendar-page .calendar-hours{min-height:0}.calendar-page .calendar-toolbar{margin-bottom:10px}
+@media(max-width:600px){.calendar-create-modes{gap:4px}.calendar-create-modes button{padding:8px 5px}.calendar-create-modes small{font-size:10px}.calendar-display-options{gap:5px}}
+
+.calendar-create .form-grid{grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}.calendar-create .field{margin-bottom:12px}
+@media(max-width:440px){.calendar-create .form-grid{grid-template-columns:minmax(0,1fr)}}
+
+/* Keep visual duration honest. Full-sized controls for tiny spans live outside the time grid. */
+.calendar-page .calendar-event.calendar-tiny{padding:0;border:0;border-radius:1px;min-height:0;overflow:hidden;box-shadow:none}
+.calendar-page .calendar-event.calendar-tiny>*{display:none}
+.calendar-page .calendar-event.calendar-tiny:focus-visible{outline:2px solid var(--accent,#356ac3);outline-offset:2px}
+.calendar-page .calendar-reminder.calendar-tiny{background:transparent;border-top:2px dashed var(--calendar-color);box-sizing:border-box}
+.calendar-compact-list{margin:0 0 10px;border:1px solid var(--line,#dfe5ec);border-radius:6px;padding:8px 10px;font-size:12px}
+.calendar-compact-list summary{cursor:pointer}.calendar-compact-list summary span{color:var(--muted)}
+.calendar-compact-list>div{display:flex;flex-wrap:wrap;gap:6px;padding-top:8px;max-height:160px;overflow:auto}
+.calendar-compact-entry{display:flex;gap:8px;align-items:center;padding:5px 8px;border:1px solid var(--calendar-color);border-left:3px solid var(--calendar-color);border-radius:4px;max-width:100%;min-height:32px}
+.calendar-compact-entry strong{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:240px}.calendar-compact-entry span{font-size:11px;white-space:nowrap}
+.calendar-delete-confirm{padding:12px;border:1px solid #dcbcb7;background:#fff8f6;border-radius:6px}
+.calendar-trash-list{max-height:55vh;overflow:auto}.calendar-trash-list article{display:flex;gap:16px;justify-content:space-between;align-items:center;padding:12px 0;border-bottom:1px solid var(--line)}
+.calendar-trash-list article p{font-size:12px;margin:4px 0}

@@ -1,0 +1,37 @@
+/* Stable 32px geometry for virtualization; hierarchy uses weight, rails and semantic markers. */
+.workbench .tree-name{position:relative}
+.tree-guides{position:absolute;left:32px;top:0;bottom:0;pointer-events:none;background:repeating-linear-gradient(to right,#d4deeb 0,#d4deeb 1px,transparent 1px,transparent 18px)}
+.workbench .outline-row.branch-row:not(.project) .tree-title>.editable-value{font-weight:550}
+.workbench .outline-row.item-note .tree-title>.editable-value{color:#566b67}
+.workbench .outline-row.item-note .note-marker{color:#397a69}
+.workbench .outline-row.item-event .note-marker{color:#7151a0}
+.workbench .outline-row.item-event .tree-title>.editable-value{color:#644888}
+.workbench .outline-row.muted-row .tree-title>.editable-value,.workbench .outline-row.completed .tree-title>.editable-value{color:#788494}
+.workbench .outline-row.completed .tree-title>.editable-value{text-decoration-color:#a7b1be}
+.workbench .tree-title>.branch-count{flex:none;color:#5c6e83;background:#e5ebf3;border-radius:4px;padding:0 4px;font-size:10px;line-height:17px;min-width:17px;text-align:center}
+.repeat-badge{display:inline-flex;flex:none;align-items:center;color:#5877a1}
+.repeat-badge svg{width:14px;height:14px}
+.branch-icon{display:inline-flex;flex:none;color:#57728d}
+.branch-icon svg{width:16px;height:16px}
+.tree-status{min-width:0;padding:0 5px;display:flex;align-items:center}
+.item-status{display:inline-flex;align-items:center;gap:4px;font-size:11px;line-height:22px;white-space:nowrap;color:#627187}
+.item-status svg{width:15px;height:15px;flex:none}
+.item-status.status-progress{color:#245fae}
+.item-status.status-running{color:#18714f;font-weight:600}
+.item-status.status-paused,.item-status.status-timer-paused,.item-status.status-blocked{color:#89631c}
+.item-status.status-done,.item-status.status-cancelled,.item-status.status-deleted{color:#7b8797}
+.item-status.status-event{color:#73539b}
+.item-status.status-note{color:#466f63}
+.workbench .outline-row.timing:not(.selected){background:#f1faf6;box-shadow:inset 3px 0 #3c9475}
+.workbench .outline-row.row-overdue:not(.selected):not(.timing){box-shadow:inset 2px 0 #c45852}
+.workbench .tree-deadline.overdue{font-weight:600}
+.tree-deadline{display:flex;align-items:center;gap:3px;min-width:0}
+.tree-deadline>.editable-value{min-width:0;overflow:hidden;text-overflow:ellipsis}
+.overdue-label{color:#a43b35;background:#fceceb;border-radius:3px;padding:1px 3px;flex:none;font-size:10px;font-weight:600}
+.child-overdue{color:#a34e35;font-size:11px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+@container outline (max-width:360px){.workbench .tree-title>.branch-count{display:none}}
+
+.workbench .tree-title .filter-row-reason{font-size:10px;font-weight:400;border:1px solid var(--line);border-radius:3px;padding:0 4px;color:var(--muted);line-height:18px}
+.closed-filter-hint{display:flex;align-items:center;gap:10px;padding:0 16px 6px;flex-wrap:wrap;color:var(--muted);font-size:11px}.closed-filter-hint .subtle{font-size:11px;min-height:24px;padding:2px 6px;color:var(--accent)}
+
+.filter-path-context{font-size:11px;color:var(--muted);line-height:18px;white-space:nowrap}

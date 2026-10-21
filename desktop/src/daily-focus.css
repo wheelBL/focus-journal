@@ -1,0 +1,21 @@
+.workbench .focus-pin[aria-pressed=true]{color:#8b5a0b;background:#fff3d6;border-radius:4px}
+.daily-focus-badge{display:inline-flex;align-items:center;gap:2px;flex:none;font-size:10px;line-height:18px;color:#8b5a0b;background:#fff3d6;border-radius:3px;padding:0 4px;font-weight:500}
+.daily-focus-badge svg{width:12px;height:12px;flex:none}
+.workbench .outline-row.daily-focus-row-mark:not(.selected):not(.timing){background:#fffdf5}
+.task-card.daily-focus-card{border-top:2px solid #c69027}
+.daily-focus-summary{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:0 0 8px;font-size:12px;border-bottom:1px solid var(--line)}
+.daily-focus-summary strong{font-weight:600}.daily-focus-summary>span{font-size:11px;color:var(--muted);white-space:nowrap}
+.daily-focus-row{display:flex;align-items:center;gap:7px;padding:7px 0;border-bottom:1px solid var(--line);min-width:0}
+.daily-focus-row .focus-pin-compact{flex:none;width:24px;height:26px;justify-content:center}
+.daily-focus-name{flex:1;min-width:0;border:0;background:transparent;text-align:left;padding:0;color:var(--ink);display:grid;gap:3px}
+.daily-focus-name>span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:13px}
+.daily-focus-name>small{font-size:10px;color:var(--muted)}
+.daily-focus-row>.subtle{font-size:11px;padding:3px 5px;min-height:28px;flex:none;color:var(--accent)}
+.daily-focus-row>.subtle svg{width:14px;height:14px}.daily-focus-row>.subtle:disabled{color:var(--muted)}
+.daily-focus-running{color:#18714f;font-size:11px;white-space:nowrap}
+.daily-focus-completed{font-size:11px;color:var(--muted);margin-top:8px}
+.daily-focus-completed>button{border:0;background:none;color:var(--muted);text-align:left;display:flex;gap:4px;align-items:center;padding:5px 0;font-size:12px}
+.daily-focus-completed svg{width:14px;height:14px;flex:none}
+.daily-focus-finished{color:#18714f;font-size:12px}
+.today-focus-list>.muted{font-size:12px;line-height:1.7}
+@container outline (max-width:520px){.daily-focus-badge>span{display:none}.daily-focus-badge{padding:2px}}

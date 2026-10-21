@@ -1,0 +1,26 @@
+.execution-home .page-header>div:first-child{margin-left:0}
+.today-execution-grid{display:grid;grid-template-columns:minmax(0,1.4fr) minmax(280px,1fr);gap:24px;align-items:start;margin-bottom:24px}
+.today-now,.today-plan{min-width:0;border:1px solid var(--line);border-radius:8px;padding:18px;background:var(--surface)}
+.today-now{border-top:3px solid var(--accent)}
+.today-execution-grid h2,.today-progress h2,.today-history h2{font-size:16px;margin:0 0 12px}
+.today-section-heading{display:flex;gap:12px;align-items:center;justify-content:space-between;flex-wrap:wrap;margin-bottom:8px}.today-section-heading h2{margin:0}.today-section-heading>span{font-size:12px}
+.today-now .task-card{padding:0}.today-now .task-title{font-size:18px}.today-now .project-crumb{font-size:12px}
+.today-now .task-plan{margin-left:0;padding:12px 14px}.today-now .task-plan dl{font-size:12px;grid-template-columns:70px 1fr;row-gap:6px;margin-bottom:12px}
+.today-now .focus-area{margin-left:0;padding:14px;grid-template-columns:minmax(0,1fr) auto}.today-now .big-timer{font-size:44px}
+.today-now .task-title-row{margin-bottom:10px}.today-next:not(:first-of-type){margin-top:16px;border-top:1px solid var(--line);padding-top:12px}
+.today-timer+.today-timer{border-top:1px solid var(--line);margin-top:14px;padding-top:14px}
+.today-plan .daily-focus-summary{margin:8px 0}.today-plan .daily-focus-name{min-width:0}.today-plan .daily-focus-row{min-width:0}.today-plan .daily-focus-name span{overflow-wrap:anywhere}
+.today-focus-picker{margin-top:12px;border-top:1px solid var(--line);padding-top:12px}.today-focus-picker>input{width:100%;font-size:12px}
+.today-candidate{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:6px 0}.today-candidate .task-link{font-size:13px;min-width:0;overflow-wrap:anywhere}
+.today-capture .capture{margin:16px 0 0;padding:10px}.today-capture .capture-hint{font-size:11px}
+.today-progress{margin:0 0 24px;padding:16px 18px;border:1px solid var(--line);border-radius:8px}
+.today-progress-stats{display:flex;gap:12px 24px;flex-wrap:wrap;padding:8px 0 12px;font-size:12px;color:var(--muted)}.today-progress-stats strong{color:var(--ink);font-variant-numeric:tabular-nums}
+.today-progress-row{display:grid;grid-template-columns:52px minmax(0,1fr) auto auto;gap:12px;align-items:center;padding:9px 0;border-top:1px solid var(--line)}
+.today-progress-row .task-link{font-size:13px;overflow-wrap:anywhere}.today-progress-row p{font-size:12px;color:var(--muted);margin:2px 0 0;white-space:pre-wrap;overflow-wrap:anywhere;max-height:66px;overflow:auto}.today-progress-row .subtle{font-size:12px;padding:4px 8px;min-height:28px}
+.progress-status{font-size:11px;color:var(--accent);background:var(--accent-soft);border-radius:4px;padding:3px 5px;text-align:center}.progress-status.done{color:#267247;background:#edf7f0}.progress-duration{font-size:12px;font-weight:500;white-space:nowrap}
+.today-history{border-top:1px solid var(--line);padding-top:18px}.today-history .entry-body{padding-top:12px;padding-bottom:14px}
+@media(min-width:1500px){.today-execution-grid{grid-template-columns:minmax(0,1.7fr) minmax(320px,1fr)}}
+@media(max-width:1050px){.today-execution-grid{grid-template-columns:minmax(0,1fr);gap:14px}.today-now .focus-area{grid-template-columns:minmax(0,1fr) auto}}
+@media(max-width:640px){.today-progress-row{grid-template-columns:48px minmax(0,1fr) auto;gap:8px}.today-progress-row>.subtle{grid-column:2/-1;justify-self:start}.today-now,.today-plan,.today-progress{padding:12px}.today-now .focus-area{grid-template-columns:minmax(0,1fr)}.today-now .focus-actions{flex-direction:row;flex-wrap:wrap}.today-now .task-title-row{flex-wrap:wrap}}
+
+.today-now .task-card:before{display:none}

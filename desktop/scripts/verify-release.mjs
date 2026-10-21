@@ -1,0 +1,15 @@
+import assert from 'node:assert/strict';
+import {readFileSync,writeFileSync} from 'node:fs';
+import path from 'node:path';
+import {createHash} from 'node:crypto';
+import {listPackage,extractFile} from '@electron/asar';
+const pkg=JSON.parse(readFileSync('package.json','utf8'));
+const production=path.resolve(`release/win-${pkg.version}/resources/app.asar`),qa=path.resolve(`release/qa-${pkg.version}/resources/app.asar`);
+const files=listPackage(production),code=files.filter(name=>/^[\\/]dist(?:[\\/]|-electron[\\/])/.test(name)&&/\.[a-z0-9]+$/.test(name));
+for(const name of code)assert.deepEqual(extractFile(production,path.normalize(name.slice(1))),extractFile(qa,path.normalize(name.slice(1))),`QA/production mismatch: ${name}`);
+assert.ok(code.length>=8);assert.equal(files.some(name=>/qa-start|\.sqlite|qa-data/.test(name)),false);
+const manifest=JSON.parse(extractFile(production,'package.json').toString());assert.equal(manifest.main,'dist-electron/main.cjs');assert.equal(manifest.version,pkg.version);
+const sha=createHash('sha256').update(readFileSync(production)).digest('hex'),info=JSON.parse(readFileSync(path.resolve(`release/win-${pkg.version}/build-info.json`),'utf8'));
+assert.equal(info.asarSha256,sha);assert.equal(info.qa,false);
+const result={version:pkg.version,production,productionMain:manifest.main,qaCodeFilesCompared:code.length,codeIdentical:true,qaEntryOrDatabaseInProduction:false,asarSha256:sha,checkedAt:new Date().toISOString()};
+writeFileSync(`qa-evidence/release-${pkg.version}/production-check.json`,JSON.stringify(result,null,2));console.log(JSON.stringify(result));
