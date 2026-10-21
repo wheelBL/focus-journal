@@ -6,7 +6,7 @@ Windows 11 上的本地工作日志，把 **估计 → 实践 → 复盘 → 调
 
 ## 下载与运行
 
-在 [Releases](https://github.com/wheelBL/focus-journal/releases/latest) 下载 **专注记-0.21.0-Windows-x64.zip**，解压整个文件夹，双击 **专注记.exe**。无需安装 Node.js。
+在 [Releases](https://github.com/wheelBL/focus-journal/releases/latest) 下载 **FocusJournal-0.21.0-Windows-x64.zip**，解压整个文件夹，双击 **专注记.exe**。无需安装 Node.js。
 
 - 系统：Windows 11 x64。
 - 更新：先在旧版托盘中选择“退出专注记”，再运行新版。数据保存在用户数据目录中，升级数据结构前自动备份。
@@ -48,6 +48,7 @@ Windows 11 上的本地工作日志，把 **估计 → 实践 → 复盘 → 调
 ```powershell
 cd desktop
 npm ci
+node node_modules/electron/install.js
 npm run build
 npm run desktop
 ```
@@ -71,8 +72,8 @@ npm test
 npm run test:ui
 npm run test:api
 npm run test:sync
-npm run test:sites
 npm run build
+npm run test:sites
 node scripts/package-windows.mjs --versioned
 ```
 
