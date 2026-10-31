@@ -10,9 +10,15 @@ Windows 11 与 macOS 上的本地工作日志，把 **估计 → 实践 → 复�
 
 ## 下载与运行
 
-当前 `main` 源码版本为 **0.30.0**。Windows 下载包以 Releases 中实际发布的版本为准。macOS 的 Apple Silicon（arm64）和 Intel（x64）ZIP / DMG 由 [macOS 构建工作流](https://github.com/wheelBL/focus-journal/actions/workflows/macos.yml) 生成，验证通过后可下载构建产物。
+当前版本为 **0.30.0**，源码和下载包见 [Releases](https://github.com/wheelBL/focus-journal/releases/tag/v0.30.0)。
 
-在 [Releases](https://github.com/wheelBL/focus-journal/releases/latest) 下载对应版本的 **FocusJournal-版本号-Windows-x64.zip**，解压整个文件夹，双击 **专注记.exe**。无需安装 Node.js。
+| 设备 | 下载 |
+| --- | --- |
+| Windows 11 x64 | [ZIP](https://github.com/wheelBL/focus-journal/releases/download/v0.30.0/FocusJournal-0.30.0-Windows-x64.zip) |
+| Mac，M 系列芯片 | [DMG](https://github.com/wheelBL/focus-journal/releases/download/v0.30.0/FocusJournal-0.30.0-macOS-arm64.dmg) · [ZIP](https://github.com/wheelBL/focus-journal/releases/download/v0.30.0/FocusJournal-0.30.0-macOS-arm64.zip) |
+| Mac，Intel 芯片 | [DMG](https://github.com/wheelBL/focus-journal/releases/download/v0.30.0/FocusJournal-0.30.0-macOS-x64.dmg) · [ZIP](https://github.com/wheelBL/focus-journal/releases/download/v0.30.0/FocusJournal-0.30.0-macOS-x64.zip) |
+
+Windows 解压整个文件夹，双击 **专注记.exe**；Mac 安装说明见下文。无需安装 Node.js。
 
 - 系统：Windows 11 x64；macOS 14 或更新系统，提供 Apple Silicon 与 Intel 两种包。macOS 原生启动测试使用 macOS 15。
 - 更新：先在旧版托盘中选择“退出专注记”，再运行新版。数据保存在用户数据目录中，升级数据结构前自动备份。
@@ -54,7 +60,7 @@ macOS 使用原生菜单、窗口红黄绿按钮、菜单栏图标和 Dock 恢�
 ## 第一次使用
 
 1. 在事项页右键创建事项，或直接用快速记录输入名称。估计可以暂时不填。
-2. 添加过程中按 `Tab` 缩进，`Shift+Tab` 提升一级，`Enter` 保存并继续，`Ctrl+Enter` 保存结束。
+2. 添加过程中按 `Tab` 缩进，`Shift+Tab` 提升一级，`Enter` 保存并继续，`Ctrl+Enter` 保存结束（Mac 为 `⌘Enter`）。
 3. 将今天要推进的事情加入“今日重点”，从今日或事项行开始计时；也可以先计时，结束后再命名。
 4. 到时自行选择继续、稍后提醒或结束并休息。结束本次计时不会自动完成事项。
 5. 在日历补记遗漏投入，在回顾中比较估计与实际，记录下次如何调整。
