@@ -6,6 +6,15 @@ import {estimateProgress} from '../core/item-state';
 import {periodEffort,periodEffortIndex,mergeEffortPeriods} from '../core/review';
 import {dayProgress,mergeDayProgress} from '../core/today';
 import {projectReview} from '../core/project-review';
+// These midnight fixtures explicitly use +08:00; runner defaults vary by platform.
+process.env.TZ='Asia/Shanghai';
+
+test('review day boundaries follow the current local timezone rather than a hard-coded offset',()=>{
+ const previous=process.env.TZ;
+ try{const session=timed('zones','a','2026-10-20T23:30:00+08:00','2026-10-21T00:30:00+08:00');
+  for(const [zone,minutes] of [['UTC',60],['Asia/Shanghai',30]] as const){process.env.TZ=zone;assert.equal(periodEffort([session],'2026-10-20','2026-10-20').cumulativeMs,minutes*60000);}
+ }finally{process.env.TZ=previous;}
+});
 
 function timed(id:string,taskId:string|null,start:string,end:string,status:Session['status']='ended',summary=''):Session{const durationMs=Date.parse(end)-Date.parse(start);return {id,taskId,date:start.slice(0,10),start,end:status==='ended'?end:null,status,durationMs,targetMinutes:25,segments:[{start,end,durationMs}],manual:false,summary,reminded:false,recovered:false,updatedAt:end};}
 
