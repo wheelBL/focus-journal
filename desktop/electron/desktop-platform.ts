@@ -1,4 +1,7 @@
-import type {BrowserWindowConstructorOptions,MenuItemConstructorOptions} from 'electron';
+import type {BrowserWindow,BrowserWindowConstructorOptions,MenuItemConstructorOptions} from 'electron';
+export function configureCompanionWindow(window:Pick<BrowserWindow,'setVisibleOnAllWorkspaces'>,platform:NodeJS.Platform){
+ if(platform==='darwin')window.setVisibleOnAllWorkspaces(true,{visibleOnFullScreen:true});
+}
 export function mainWindowChrome(platform:NodeJS.Platform):BrowserWindowConstructorOptions{
  return platform==='darwin'?{titleBarStyle:'hidden',trafficLightPosition:{x:14,y:14}}:{titleBarStyle:'hidden',titleBarOverlay:{color:'#2C323B',symbolColor:'#E4E9F1',height:44}};
 }

@@ -1,3 +1,4 @@
+import {configureCompanionWindow} from './desktop-platform';
 import {BrowserWindow,ipcMain,screen} from 'electron';
 import path from 'node:path';
 import {performance} from 'node:perf_hooks';
@@ -48,6 +49,7 @@ export class ReminderWindow{
  private async ensure(){
   if(this.disposed)return;if(this.loading)return this.loading;if(this.window&&!this.window.isDestroyed())return;
   const win=this.window=new BrowserWindow({width:520,height:370,show:false,title:'专注记 · 到时提醒',frame:false,resizable:false,minimizable:false,maximizable:false,skipTaskbar:true,alwaysOnTop:true,backgroundColor:'#FFFFFF',icon:this.icon,webPreferences:{preload:path.join(__dirname,'reminder-preload.cjs'),contextIsolation:true,nodeIntegration:false,sandbox:true,backgroundThrottling:false,autoplayPolicy:'no-user-gesture-required',focusOnNavigation:false}});
+  configureCompanionWindow(win,process.platform);
   win.webContents.setWindowOpenHandler(()=>({action:'deny'}));win.webContents.on('will-navigate',event=>event.preventDefault());
   win.on('page-title-updated',event=>event.preventDefault());
   win.on('close',event=>{if(this.disposed)return;event.preventDefault();try{if(this.mode)this.endPreview();else{this.service.execute({type:'reminder.snooze-all'});this.changed();}}catch(e){this.log('reminder-close-error',String(e));}});

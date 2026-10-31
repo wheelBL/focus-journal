@@ -1,13 +1,14 @@
 import {test} from 'node:test';
 import assert from 'node:assert/strict';
 import {primaryModifier,defaultCaptureShortcut,shortcutLabel} from '../core/desktop-platform';
-import {mainWindowChrome,applicationMenu} from '../electron/desktop-platform';
+import {mainWindowChrome,applicationMenu,configureCompanionWindow} from '../electron/desktop-platform';
 import {CaptureShortcut} from '../electron/capture-shortcut';
 import {macosConfig} from '../scripts/macos-config.mjs';
 test('platform conventions retain Windows control and isolate native macOS window chrome',()=>{
  assert.equal(primaryModifier({ctrlKey:true,metaKey:false},'win32'),true);assert.equal(primaryModifier({ctrlKey:true,metaKey:false},'darwin'),false);assert.equal(primaryModifier({ctrlKey:false,metaKey:true},'darwin'),true);
  assert.equal(shortcutLabel('Ctrl+Enter','darwin'),'⌘+Enter');assert.equal(shortcutLabel('Ctrl+Enter','win32'),'Ctrl+Enter');
  assert.equal(mainWindowChrome('darwin').titleBarOverlay,undefined);assert.deepEqual(mainWindowChrome('darwin').trafficLightPosition,{x:14,y:14});assert.ok(mainWindowChrome('win32').titleBarOverlay);
+ const spaces:unknown[]=[];const companion={setVisibleOnAllWorkspaces:(...args:unknown[])=>{spaces.push(args);}};configureCompanionWindow(companion,'win32');assert.equal(spaces.length,0);configureCompanionWindow(companion,'darwin');assert.deepEqual(spaces,[[true,{visibleOnFullScreen:true}]]);
  assert.equal(applicationMenu('win32','专注记'),null);assert.ok(applicationMenu('darwin','专注记')!.some(m=>m.label==='编辑'));
 });
 test('macOS default capture shortcut registers without breaking existing Windows customizations',()=>{

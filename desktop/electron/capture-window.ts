@@ -1,3 +1,4 @@
+import {configureCompanionWindow} from './desktop-platform';
 import {defaultCaptureShortcut} from '../core/desktop-platform';
 import {BrowserWindow,globalShortcut,ipcMain} from 'electron';
 import {existsSync,readFileSync} from 'node:fs';
@@ -23,6 +24,7 @@ export class CaptureWindow {
  open(){
   if(this.win&&!this.win.isDestroyed()){this.win.show();this.win.focus();this.win.webContents.send('capture:opened');return;}
   this.win=new BrowserWindow({title:'专注记 · 快速记录',width:660,height:440,minWidth:480,minHeight:300,show:false,frame:false,alwaysOnTop:true,skipTaskbar:true,icon:this.icon,backgroundColor:'#FFFFFF',webPreferences:{preload:path.join(__dirname,'capture-preload.cjs'),sandbox:true,contextIsolation:true,nodeIntegration:false}});
+  configureCompanionWindow(this.win,process.platform);
   const win=this.win;win.webContents.setWindowOpenHandler(()=>({action:'deny'}));win.webContents.on('will-navigate',e=>e.preventDefault());
   win.on('close',e=>{e.preventDefault();win.hide();});win.once('ready-to-show',()=>{win.show();win.focus();});
   void win.loadFile(path.join(__dirname,'../dist/client/index.html'),{query:{panel:'capture'}});
