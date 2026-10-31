@@ -18,7 +18,9 @@ test('Mac Command Enter saves multiline edits and Command N respects the current
 test('macOS Edit menu routes organizing and select all by editing context',async()=>{
  const h=await appDom({platform:'darwin'});let edit,off=false;const native=[];
  window.journal.onEditAction=cb=>{edit=cb;return()=>{off=true;};};window.journal.editText=async action=>{native.push(action);};
- try{const id=h.add('原有名称',null),other=h.add('另一事项',null);await h.mount();await h.click(h.label('事项'));await h.click(h.query(`[data-outline-id="${id}"]`));await h.command({type:'outline.patch',payload:{id,field:'title',value:'修改名称'}});await h.action(()=>edit('undo'));assert.equal(h.get(id).title,'原有名称');assert.equal(native.length,0);
+ try{const id=h.add('原有名称',null),other=h.add('另一事项',null);await h.mount();await h.click(h.label('事项'));await h.click(h.query(`[data-outline-id="${id}"]`));assert.equal(h.service.snapshot().undoLabel,null);
+ // The command finished in the main process, but its changed snapshot has not reached React yet.
+ await h.action(()=>h.service.execute({type:'outline.patch',payload:{id,field:'title',value:'修改名称'}}));await h.action(()=>edit('undo'));assert.equal(h.get(id).title,'原有名称');assert.equal(native.length,0);
  await h.action(()=>edit('selectAll'));for(const item of [id,other])assert.equal(h.query(`[data-outline-id="${item}"]`).classList.contains('batch-selected'),true);
  await h.click(h.label('事项说明：未填写'));await h.input(h.label('事项说明'),'仍在编辑');await h.action(()=>edit('undo'));await h.action(()=>edit('selectAll'));assert.deepEqual(native,['undo','selectAll']);assert.equal(h.label('事项说明').value,'仍在编辑');
  }finally{await h.close();}assert.equal(off,true);
