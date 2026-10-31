@@ -88,7 +88,7 @@ export async function startLocalApi(options:Options):Promise<RunningLocalApi>{
     let command:ReturnType<typeof controlCommand>;
     try{command=controlCommand(input,before);}catch(e){if(e instanceof ControlInputError)throw new HttpError(400,'invalid_command',e.message);throw e;}
     let after:Snapshot;
-    try{after=options.service.execute(command);}catch(e){
+    try{after=options.service.execute({...command,meta:{source:'api',entry:'api.command',version:options.version}});}catch(e){
      const message=e instanceof Error?e.message:'操作未保存。';
      if(/SQLITE|ENOENT|EACCES|EPERM|ENOSPC|[A-Za-z]:\\|\.sqlite|stack/i.test(message))throw new HttpError(500,'storage_error','操作未保存，请检查应用中的数据与磁盘状态。');
      throw new HttpError(422,'domain_error',message.slice(0,500));
@@ -117,7 +117,7 @@ export async function startLocalApi(options:Options):Promise<RunningLocalApi>{
      if(params.has('query'))f.query=params.get('query')!;
      if(params.has('scopeId'))f.scopeId=params.get('scopeId');
      if(saved&&['status','focus'].some(key=>params.has(key)))fail(400,'invalid_query','使用保存视图时不要同时覆盖状态或重点条件。');
-     if(!saved){const rules=[];const status=params.get('status')??'open';if(!['open','done','cancelled','all'].includes(status))fail(400,'invalid_query','status 应为 open、done、cancelled 或 all。');if(status!=='all')rules.push(condition('status','is',status));if(params.has('focus')){if(params.get('focus')!=='today')fail(400,'invalid_query','focus 仅支持 today。');rules.push(condition('focusDate','period','today'));}f=withRules(f,group(rules));}
+     if(!saved){const rules=[];const status=params.get('status')??'open';if(!['open','done','cancelled','handed-off','all'].includes(status))fail(400,'invalid_query','status 应为 open、done、cancelled、handed-off 或 all。');if(status!=='all')rules.push(condition('status','is',status));if(params.has('focus')){if(params.get('focus')!=='today')fail(400,'invalid_query','focus 仅支持 today。');rules.push(condition('focusDate','period','today'));}f=withRules(f,group(rules));}
      try{f=validateFilter(f,s.state);}catch{fail(400,'invalid_filter','范围或查询条件无效。');}data=summarize(s,f,params.get('offset'),params.get('limit'));
     }else if(/^\/v1\/items\/[^/]+$/.test(path)){
      listParams([]);let id:string;try{id=decodeURIComponent(path.slice('/v1/items/'.length));}catch{fail(400,'invalid_id','事项 ID 无效。');}

@@ -1,4 +1,7 @@
+import {UsageStore} from './usage-store';
+import {AiController} from './ai-controller';
 import {LocalApiController} from './local-api-controller';
+import {AppearanceController} from './appearance';
 import {CaptureWindow} from './capture-window';
 import {FloatingTimerWindow} from './floating-timer-window';
 import { app, BrowserWindow, ipcMain, Menu, Tray, nativeImage, Notification, dialog, shell, powerMonitor, safeStorage } from 'electron';
@@ -28,9 +31,10 @@ else {
   app.on('second-instance',(_event,argv)=>{if(argv.includes('--quit')){app.quit();return;}win?.show();win?.focus();});
   app.whenReady().then(()=>{
     const dataDir=app.getPath('userData');mkdirSync(dataDir,{recursive:true});
+    const appearance=new AppearanceController(path.join(dataDir,'appearance.json'),path.join(__dirname,'../dist/client/index.html'));
     const log=(event:string,details:unknown='')=>{try{appendFileSync(path.join(dataDir,'startup.log'),`${new Date().toISOString()} ${event} ${JSON.stringify(details)}\n`);}catch{/* Diagnostics must not interrupt the journal. */}};
     log('start',{version:app.getVersion(),electron:process.versions.electron,node:process.versions.node,packaged:app.isPackaged,demo});
-    service=new JournalService(new SqliteJournalStore(path.join(dataDir,'journal.sqlite')),undefined,demo);
+    service=new JournalService(new SqliteJournalStore(path.join(dataDir,'journal.sqlite')),undefined,demo,app.getVersion());
     if(treePrototype)service.seedTreeDemo();else if(demo)service.seedDemo();
     const backups=path.join(dataDir,'backups');mkdirSync(backups,{recursive:true});
     const dailyBackup=path.join(backups,`${localDate()}.json`);
@@ -38,6 +42,7 @@ else {
     Menu.setApplicationMenu(null);
     const icon=path.join(__dirname,'../assets/icon.png');
     win=new BrowserWindow({width:demo&&!treePrototype?1060:1440,height:demo&&!treePrototype?640:920,minWidth:900,minHeight:640,show:false,title:treePrototype?'专注记 · 任务树交互稿':'专注记',icon,backgroundColor:'#FFFFFF',titleBarStyle:'hidden',titleBarOverlay:{color:'#2C323B',symbolColor:'#E4E9F1',height:48},webPreferences:{preload:path.join(__dirname,'preload.cjs'),contextIsolation:true,nodeIntegration:false,sandbox:true}});
+    appearance.setMain(win);
     win.webContents.setWindowOpenHandler(()=>({action:'deny'}));
     win.webContents.on('render-process-gone',(_event,details)=>log('renderer-exit',details));
     win.webContents.on('did-fail-load',(_event,code,description)=>log('load-error',{code,description}));
@@ -51,7 +56,7 @@ else {
     const openSession=(id:string)=>{show();win?.webContents.send('journal:open-session',id);};
     tray=new Tray(nativeImage.createFromPath(icon));tray.setToolTip(demo?'专注记 · 测试工作区':'专注记 · 点击打开工作日志');tray.on('click',show);
     const performTimer=(command:Command)=>{try{
-      const result=service.execute(command);changed();
+      const result=service.execute({...command,meta:{source:'user',entry:'tray.timer'}});changed();
       if(result.focusReminder&&Notification.isSupported())new Notification({title:'专注提醒',body:result.focusReminder,icon}).show();
       if(command.type==='focus.stop'&&command.payload?.rest!==true){const record=result.state.sessions.find(r=>r.id===command.payload?.sessionId);if(record)openSession(record.id);else show();}else if(command.type==='focus.start-unassigned'||command.type.startsWith('break.')||command.payload?.rest===true)show();
     }catch(e){report(e);}};
@@ -70,6 +75,15 @@ else {
       backup:content=>atomicWrite(path.join(backups,`before-sync-${Date.now()}-${randomUUID()}.json`),content),
       changed:status=>{if(!win?.isDestroyed())win?.webContents.send('sync:changed',status);},journalChanged:changed});
     const trusted=(event:Electron.IpcMainInvokeEvent)=>{if(event.sender!==win?.webContents||event.senderFrame!==win.webContents.mainFrame)throw new Error('无效的应用请求。');};
+    const usage=new UsageStore(path.join(dataDir,'usage-records.json'),app.getVersion());
+    service.setOperationRecorder((operation,entry,result)=>usage.record({operation,entry,result,version:app.getVersion()}));
+    ipcMain.handle('usage:record',(event,value)=>{trusted(event);usage.record(value);});
+    ipcMain.handle('usage:snapshot',event=>{trusted(event);return usage.snapshot();});
+    ipcMain.handle('usage:configure',(event,value)=>{trusted(event);return usage.configure(value);});
+    ipcMain.handle('usage:clear',(event,kind)=>{trusted(event);return usage.clear(kind);});
+    ipcMain.handle('usage:feedback',(event,id,rating,note)=>{trusted(event);return usage.feedback(id,rating,note);});
+    ipcMain.handle('usage:export',async event=>{trusted(event);const choice=await dialog.showSaveDialog(win!,{title:'导出本机使用记录',defaultPath:'专注记使用记录.json'});if(choice.canceled||!choice.filePath)return null;writeFileSync(choice.filePath,JSON.stringify(usage.snapshot(),null,2));return choice.filePath;});
+    const ai=new AiController(path.join(dataDir,'ai-config.json'),win,path.join(__dirname,'../dist/client/index.html'),service,changed,usage);
     const localApi=new LocalApiController(service,path.join(dataDir,'local-api.json'),{encrypt:token=>{if(!safeStorage.isEncryptionAvailable())throw new Error('Encryption unavailable');return safeStorage.encryptString(token).toString('base64');},decrypt:cipher=>safeStorage.decryptString(Buffer.from(cipher,'base64'))},changed,app.getVersion(),sync);
     void localApi.initialize();
     ipcMain.handle('local-api:status',event=>{trusted(event);return localApi.status();});
@@ -85,7 +99,7 @@ else {
     ipcMain.handle('journal:clock',event=>{trusted(event);return service.clockSnapshot();});
     ipcMain.handle('journal:snapshot',event=>{trusted(event);return service.snapshot();});
     ipcMain.handle('journal:reminder-preview',(event,settings:unknown,mode:unknown)=>{trusted(event);return reminders.preview(settings,mode);});
-    ipcMain.handle('journal:command',(event,command:Command)=>{trusted(event);if(!command||typeof command.type!=='string')throw new Error('操作无效。');const result=service.execute(command);changed();return result;});
+    ipcMain.handle('journal:command',(event,command:Command)=>{trusted(event);if(!command||typeof command.type!=='string')throw new Error('操作无效。');const result=service.execute({...command,meta:{...command.meta,version:app.getVersion()}});changed();return result;});
     ipcMain.handle('journal:export',async(event,format:string)=>{
       trusted(event);if(!['json','csv'].includes(format))throw new Error('格式无效。');
       const choice=await dialog.showSaveDialog(win!,{title:format==='json'?'备份全部数据':'导出投入记录',defaultPath:path.join(app.getPath('documents'),`专注记-${localDate()}.${format}`),filters:[{name:format.toUpperCase(),extensions:[format]}]});
@@ -110,10 +124,10 @@ else {
     refreshTray();
     app.on('before-quit',event=>{
       if(closed)return;
-      try{localApi.dispose();sync.dispose();service.shutdown();closed=true;quitting=true;clearInterval(interval);floating.dispose();reminders.dispose();capture.dispose();tray?.destroy();log('shutdown');}
+      try{ai.dispose();usage.dispose();localApi.dispose();sync.dispose();service.shutdown();closed=true;quitting=true;clearInterval(interval);floating.dispose();reminders.dispose();capture.dispose();appearance.dispose();tray?.destroy();log('shutdown');}
       catch(e){event.preventDefault();report(e);}
     });
-    win.on('session-end',()=>{if(!closed){try{localApi.dispose();sync.dispose();service.shutdown();closed=true;clearInterval(interval);floating.dispose();reminders.dispose();capture.dispose();tray?.destroy();}catch{/* The last durable checkpoint remains recoverable. */}}});
+    win.on('session-end',()=>{if(!closed){try{ai.dispose();usage.dispose();localApi.dispose();sync.dispose();service.shutdown();closed=true;clearInterval(interval);floating.dispose();reminders.dispose();capture.dispose();appearance.dispose();tray?.destroy();}catch{/* The last durable checkpoint remains recoverable. */}}});
   }).catch(error=>{dialog.showErrorBox('专注记启动失败',String(error));quitting=true;app.quit();});
 }
 let lastError='';

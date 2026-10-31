@@ -1,3 +1,5 @@
 import {contextBridge,ipcRenderer} from 'electron';
 const invoke=async(channel:string,...args:unknown[])=>{try{return await ipcRenderer.invoke(channel,...args);}catch(e){throw new Error((e as Error).message.replace(/^Error invoking remote method '[^']+': (?:Error: )?/,''));}};
 contextBridge.exposeInMainWorld('journal',{snapshot:()=>invoke('capture:snapshot'),command:(command:unknown)=>invoke('capture:save',command),capture:{close:()=>invoke('capture:close')},onChanged:(callback:()=>void)=>{ipcRenderer.on('capture:opened',callback);return()=>ipcRenderer.removeListener('capture:opened',callback);}});
+import {exposeAppearance} from './appearance-preload';
+exposeAppearance();

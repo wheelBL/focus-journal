@@ -16,7 +16,7 @@ test('timed, manually added and reminder blocks share item color across views, n
   await h.click(h.button('月'));assert.equal(color(owned(a)[0]),initial);await h.click(h.button('日'));assert.ok(owned(a).every(e=>color(e)===initial));
   await h.command({type:'session.assign',payload:{id:free,taskId:a}});assert.equal(color(h.query(`[data-session-id="${free}"]`)),initial);
   await h.command({type:'outline.patch',payload:{id:a,field:'title',value:'改名后'}});await h.click(h.label('事项'));await h.click(h.label('日历'));assert.ok(owned(a).every(e=>color(e)===initial));
-  assert.match(h.query('.calendar-caption').textContent,/同一事项使用同一颜色/);
+  await h.click(h.query('.calendar-guide summary'));assert.match(h.query('.calendar-guide details').textContent,/同一事项使用同一颜色/);
  }finally{await h.close();}
 });
 

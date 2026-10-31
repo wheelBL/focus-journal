@@ -15,11 +15,11 @@ export function itemOrdering(index:OutlineIndex,sort:NonNullable<ItemFilter['sor
  const inserted=new Map([...index.nodes.keys()].map((id,i)=>[id,i]));
  const stable=(a:OutlineNode,b:OutlineNode)=>a.record.createdAt.localeCompare(b.record.createdAt)||inserted.get(a.id)!-inserted.get(b.id)!||a.id.localeCompare(b.id);
  const reasons=new Map<string,string>(),source=new Map<string,string>(),ranks=new Map<string,Rank>(),blocked=new Set<string>(),today=localDate(now),tomorrow=Date.parse(`${shiftDate(today,1)}T00:00:00`),instant=Date.parse(now);
- for(const n of index.ordered){const t=n.record as Task;if(t.deletedAt||t.archived||t.availability==='paused'||t.status&&t.status!=='open'||n.parentId&&blocked.has(n.parentId))blocked.add(n.id);}
+ for(const n of index.ordered){const t=n.record as Task;if(t.deletedAt||t.archived||t.availability==='paused'||t.status&&t.status!=='open'&&t.status!=='handed-off'||n.parentId&&blocked.has(n.parentId))blocked.add(n.id);}
  for(const n of [...index.ordered].reverse()){
   const t=n.record as Task,due=t.dueAt?deadlineTime(t.dueAt):Infinity,planned=t.plannedDate?Date.parse(`${t.plannedDate}T00:00:00`):Infinity;
-  const group=t.status&&t.status!=='open'?7:blocked.has(n.id)?5:isInformation(t)?6:isDailyFocus(t,today)?-1:due<instant?0:due<tomorrow||planned<tomorrow?1:Math.min(due,planned)<Infinity?2:3;
-  let rank:Rank=[group,due,planned];source.set(n.id,n.id);reasons.set(n.id,group===-1?'已加入今日重点':group===0?'截止已过':group===1?due<tomorrow?'今日截止':'计划已开始':group===2?'后续安排':group===3?'未设置日期':group===5?'此项或父级暂停 / 不可执行':group===6?'信息按创建顺序':'已经结束');
+  const group=t.status&&t.status!=='open'?7:blocked.has(n.id)?5:isInformation(t)?6:t.ownership?4:isDailyFocus(t,today)?-1:due<instant?0:due<tomorrow||planned<tomorrow?1:Math.min(due,planned)<Infinity?2:3;
+  let rank:Rank=[group,due,planned];source.set(n.id,n.id);reasons.set(n.id,group===-1?'已加入今日重点':group===0?'截止已过':group===1?due<tomorrow?'今日截止':'计划已开始':group===2?'后续安排':group===3?'未设置日期':group===4?'责任已交接':group===5?'此项或父级暂停 / 不可执行':group===6?'信息按创建顺序':'已经结束');
   if(branches&&!blocked.has(n.id))for(const child of index.children.get(n.id)??[]){const other=ranks.get(child.id)!;if(other[0]<5&&compareRank(other,rank)<0){rank=other;source.set(n.id,source.get(child.id)!);}}
   ranks.set(n.id,rank);
  }

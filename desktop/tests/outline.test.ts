@@ -14,7 +14,7 @@ function move(service:JournalService,id:string,targetId:string|null,position='in
 test('legacy tasks migrate without changing identity, dates, original estimate or project',()=>{
  const {store,clock}=setup();store.state.schemaVersion=1;store.state.projects[0].parentId=undefined;store.state.projects[0].order=undefined;
  store.state.tasks.push({id:'old',projectId:'inbox',title:'已有工作',outcome:'成果',nextAction:'下一步',estimateMinutes:50,plannedDate:'2026-10-19',status:'open',createdAt:new Date(clock.now()).toISOString(),startedAt:null,completedAt:null});
- const service=new JournalService(store,clock),t=service.snapshot().state.tasks.filter((t:{id:string})=>t.id!=='inbox')[0];assert.equal(t.parentId,'inbox');assert.equal(t.id,'old');assert.equal(t.estimateMinutes,50);assert.equal(t.plannedDate,'2026-10-19');assert.equal(store.state.schemaVersion,16);
+ const service=new JournalService(store,clock),t=service.snapshot().state.tasks.filter((t:{id:string})=>t.id!=='inbox')[0];assert.equal(t.parentId,'inbox');assert.equal(t.id,'old');assert.equal(t.estimateMinutes,50);assert.equal(t.plannedDate,'2026-10-19');assert.equal(store.state.schemaVersion,19);
 });
 test('moving a whole task branch updates project ownership and totals while timer and history keep IDs',()=>{
  const {service,clock}=setup(),a=create(service,'project','项目 A',null),b=create(service,'project','项目 B',null),parent=create(service,'task','父任务',a),child=create(service,'task','子任务',parent);
@@ -65,7 +65,7 @@ test('malformed hierarchy backup and mismatched project ownership cannot replace
 });
 test('SQLite roundtrip persists hierarchy and order with stable record identities',()=>{
  const store=new SqliteJournalStore(':memory:'),service=new JournalService(store,new Clock()),p=create(service,'project','项目',null),a=create(service,'task','A',p),b=create(service,'task','B',a);move(service,b,a,'before');
- const reloaded=new JournalService(store,new Clock()),index=outlineIndex(reloaded.snapshot().state);assert.deepEqual(index.children.get(p)!.map(n=>n.id),[b,a]);assert.equal(reloaded.snapshot().state.schemaVersion,16);store.close();
+ const reloaded=new JournalService(store,new Clock()),index=outlineIndex(reloaded.snapshot().state);assert.deepEqual(index.children.get(p)!.map(n=>n.id),[b,a]);assert.equal(reloaded.snapshot().state.schemaVersion,19);store.close();
 });
 test('a failed drag save leaves structure, derived ownership and undo unchanged',()=>{
  const {store,service}=setup(),p=create(service,'project','目标',null),t=create(service,'task','任务','inbox'),before=service.exportJson();store.fail=true;assert.throws(()=>move(service,t,p),/disk full/);assert.equal(service.exportJson(),before);store.fail=false;assert.throws(()=>service.execute({type:'outline.undo'}),/没有可以撤销/);

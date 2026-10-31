@@ -12,7 +12,7 @@ test('dragging a range links actual effort to an existing item and supports corr
   await h.click(h.button('补记投入已经做过的事'));assert.equal(h.label('实际开始').value,'2026-10-19T09:00');assert.equal(h.label('实际结束').value,'2026-10-19T10:00');
   await h.click(h.button('关联已有事项'));await h.input(h.label('查找事项'),'报告');await h.input(h.label('关联事项'),id);await h.input(h.label('这段时间的进展'),'完成初稿');await h.click(h.button('保存投入'));
   assert.equal(h.service.snapshot().state.sessions[0].durationMs,3600000);assert.equal(h.get(id).startedAt,new Date('2026-10-19T09:00').toISOString());assert.match(h.query('.toast').textContent,/实际开始和累计投入已更新/);
-  await h.click(h.query('.calendar-event[data-session-id]'));await h.click(h.button('校正这段投入'));const fields=h.query('dialog').querySelectorAll('input[type=datetime-local]');await h.input(fields[1],'2026-10-19T09:45');await h.input(h.query('dialog input[maxlength="2000"]'),'扣除休息');await h.click(h.button('保存记录'));assert.equal(h.service.snapshot().state.sessions[0].durationMs,2700000);assert.equal(h.service.snapshot().state.audit.length,1);
+  await h.click(h.query('.calendar-event[data-session-id]'));await h.click(h.button('校正这段投入'));await h.click(h.button('修改起止时间',h.query('dialog')));const fields=h.query('dialog').querySelectorAll('input[type=datetime-local]');await h.input(fields[1],'2026-10-19T09:45');await h.input(h.query('dialog input[maxlength="2000"]'),'扣除休息');await h.click(h.button('保存记录'));assert.equal(h.service.snapshot().state.sessions[0].durationMs,2700000);assert.equal(h.service.snapshot().state.audit.length,1);
  }finally{await h.close();}
 });
 test('range reminder can use an existing item and event creation keeps duration without effort',async()=>{

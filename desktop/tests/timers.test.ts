@@ -89,8 +89,8 @@ test('schema 4 upgrade backs up exact projects, views, tags and history before s
   const {service,clock,ids}=setup();service.execute({type:'tag.attach',payload:{id:ids[0],name:'工作'}});service.execute({type:'outline.patch',payload:{id:ids[0],field:'isProject',value:true}});
   service.execute({type:'view.save',payload:{name:'已有视图',filter:emptyFilter()}});service.execute({type:'session.manual',payload:{taskId:ids[0],date:'2026-10-18',minutes:25,summary:'已有投入'}});
   const legacy=structuredClone(service.snapshot().state);legacy.schemaVersion=4;const file=path.join(dir,'journal.sqlite'),oldStore=new SqliteJournalStore(file);oldStore.save(legacy);oldStore.close();
-  const upgraded=new JournalService(new SqliteJournalStore(file),clock);assert.deepEqual(upgraded.snapshot().state,{...legacy,schemaVersion:16});upgraded.shutdown();
-  const files=readdirSync(path.join(dir,'backups'));assert.equal(files.length,1);assert.match(files[0],/before-schema-4-to-16/);
+  const upgraded=new JournalService(new SqliteJournalStore(file),clock);assert.deepEqual(upgraded.snapshot().state,{...legacy,schemaVersion:19});upgraded.shutdown();
+  const files=readdirSync(path.join(dir,'backups'));assert.equal(files.length,1);assert.match(files[0],/before-schema-4-to-19/);
   const db=new DatabaseSync(path.join(dir,'backups',files[0]),{readOnly:true});try{assert.equal((db.prepare('PRAGMA user_version').get() as {user_version:number}).user_version,4);assert.equal(db.prepare("SELECT data FROM records WHERE kind='sessions'").all().length,1);}finally{db.close();}
  }finally{rmSync(dir,{recursive:true,force:true});}
 });

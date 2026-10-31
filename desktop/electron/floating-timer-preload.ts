@@ -4,3 +4,5 @@ contextBridge.exposeInMainWorld('floatingTimer',{
  snapshot:()=>invoke('floating-timer:snapshot'),action:(action:unknown,id:unknown)=>invoke('floating-timer:action',action,id),
  onChanged:(callback:(value:unknown)=>void)=>{const listener=(_event:unknown,value:unknown)=>callback(value);ipcRenderer.on('floating-timer:changed',listener);return()=>ipcRenderer.removeListener('floating-timer:changed',listener);}
 });
+import {exposeAppearance} from './appearance-preload';
+exposeAppearance();

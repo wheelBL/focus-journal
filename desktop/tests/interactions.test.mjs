@@ -9,7 +9,7 @@ import {JournalService} from '../core/service.ts';
 import {emptyState} from '../core/types.ts';
 
 // In-process DOM tests exercise the real React events and service without launching Electron.
-const dom=new JSDOM('<!doctype html><html><body><div id="root"></div></body></html>',{url:'http://localhost',pretendToBeVisual:true});
+const dom=new JSDOM('<!doctype html><html><body><div id="workspace-sidebar"></div><div id="root"></div></body></html>',{url:'http://localhost',pretendToBeVisual:true});
 for(const key of ['window','document','HTMLElement','HTMLInputElement','HTMLSelectElement','HTMLTextAreaElement','Event','MouseEvent','KeyboardEvent','CustomEvent'])globalThis[key]=dom.window[key];
 globalThis.IS_REACT_ACT_ENVIRONMENT=true;
 globalThis.requestAnimationFrame=callback=>setTimeout(callback,0);globalThis.cancelAnimationFrame=clearTimeout;
@@ -32,6 +32,9 @@ const context=el=>action(()=>el.dispatchEvent(new MouseEvent('contextmenu',{bubb
 const input=(el,value)=>action(()=>{const proto=el instanceof HTMLSelectElement?HTMLSelectElement.prototype:el instanceof HTMLTextAreaElement?HTMLTextAreaElement.prototype:HTMLInputElement.prototype;Object.getOwnPropertyDescriptor(proto,'value').set.call(el,value);el.dispatchEvent(new Event(el instanceof HTMLSelectElement?'change':'input',{bubbles:true}));});
 const key=(el,k,extra={})=>action(()=>{const e=new KeyboardEvent('keydown',{key:k,bubbles:true,cancelable:true,...extra});el.dispatchEvent(e);if(k==='Enter'&&!e.defaultPrevented&&el.form&&!extra.isComposing)el.form.requestSubmit();});
 const submit=el=>action(()=>el.requestSubmit());
+const viewOptions=async()=>{const trigger=label('视图选项');if(trigger.getAttribute('aria-expanded')!=='true')await click(trigger);const panel=query('.filter-controls .action-popover-panel');assert.equal(panel.hidden,false);return panel;};
+const viewAction=async name=>{const panel=await viewOptions();await click(button(name,panel));};
+const savedView=async name=>click(button(name,query('[aria-label="事项视图"]')));
 
 test('real tree interactions: context creation, keyboard, inline edit, tags, filters, views, timer and undo',async t=>{
  const clock=new Clock(),service=new JournalService(new Store(),clock),messages=[];
@@ -68,10 +71,10 @@ test('real tree interactions: context creation, keyboard, inline edit, tags, fil
   await click(button('清除筛选'));assert.ok(row('原有子项'));
  });
  await t.test('filter controls persist dynamic saved views; selected edited item survives query changes',async()=>{
-  await click(button('筛选'));await input(label('筛选计划开始'),'today');await click(button('保存视图'));await input(label('常用视图名称'),'今日计划');await submit(label('常用视图名称').form);assert.deepEqual(service.snapshot().state.views[0].filter.rules.children,[{kind:'condition',field:'status',op:'is-not',value:'done'},{kind:'condition',field:'status',op:'is-not',value:'cancelled'},{kind:'condition',field:'plannedDate',op:'period',value:'today'}]);
-  await click(button('清除筛选'));await input(label('常用视图'),service.snapshot().state.views[0].id);assert.equal(label('筛选计划开始').value,'today');await click(button('清除筛选'));
+  await click(button('筛选'));await input(label('筛选计划开始'),'today');await viewAction('保存视图');await input(label('常用视图名称'),'今日计划');await submit(label('常用视图名称').form);assert.deepEqual(service.snapshot().state.views[0].filter.rules.children,[{kind:'condition',field:'status',op:'is-not',value:'done'},{kind:'condition',field:'status',op:'is-not',value:'cancelled'},{kind:'condition',field:'plannedDate',op:'period',value:'today'}]);
+  await click(button('清除筛选'));await savedView(service.snapshot().state.views[0].name);assert.equal(label('筛选计划开始').value,'today');await click(button('清除筛选'));
   await input(label('在事项树中搜索'),'原有');await click(row('原有子项'));await key(row('原有子项'),'F2');await input(label('名称 原有子项'),'改了名称');await key(label('名称 原有子项'),'Enter');assert.ok(row('改了名称'));assert.ok(document.querySelector('.retained-notice'));
-  await click(button('清除筛选'));await click(label('折叠全部'));assert.ok(!document.querySelector('[role=treeitem][aria-label="改了名称"]'));await click(label('展开全部'));assert.ok(row('改了名称'));
+  await click(button('清除筛选'));await viewOptions();await click(label('折叠全部'));assert.ok(!document.querySelector('[role=treeitem][aria-label="改了名称"]'));await viewOptions();await click(label('展开全部'));assert.ok(row('改了名称'));
  });
  await t.test('project markers can time directly; a parent with open descendants cannot be completed',async()=>{
   await context(row('另一事项'));await click(button('标记为项目'));assert.equal(service.snapshot().state.tasks.find(t=>t.id===other).isProject,true);
@@ -101,38 +104,38 @@ test('real tree interactions: context creation, keyboard, inline edit, tags, fil
   await click(label('关闭'));await click(label('撤销整理操作'));assert.equal(service.snapshot().state.tags.length,1);assert.equal(service.snapshot().state.tasks.find(t=>t.id===other).tagIds.length,1);
  });
  await t.test('quick weekly view includes overdue; common/advanced switch is lossless; save, update, copy and rename work',async()=>{
-  await click(button('清除筛选'));await input(label('筛选状态'),'open');await input(label('筛选截止时间'),'through-week');
-  assert.ok(row('上周到期'));assert.ok(row('周日截止'));assert.ok(row('父事项'));assert.ok(!document.querySelector('[role=treeitem][aria-label="下周一截止"]'));assert.ok(!document.querySelector('[role=treeitem][aria-label="已经完成，已完成"]'));assert.match(query('.match-count').textContent,/匹配 2 个/);
-  await click(button('保存视图'));await input(label('常用视图名称'),'本周需完成');await submit(label('常用视图名称').form);const weekly=service.snapshot().state.views.find(v=>v.name==='本周需完成'),original=structuredClone(weekly.filter);
+  assert.equal([...document.querySelectorAll('.filter-controls button')].some(b=>b.textContent.trim()==='清除筛选'),false);await input(label('筛选状态'),'open');await input(label('筛选截止时间'),'through-week');
+  assert.ok(row('上周到期'));assert.ok(row('周日截止'));assert.ok(row('父事项'));assert.ok(!document.querySelector('[role=treeitem][aria-label="下周一截止"]'));assert.ok(!document.querySelector('[role=treeitem][aria-label="已经完成，已完成"]'));assert.match(query('.tree-page-header h1').textContent,/2 个事项/);
+  await viewAction('保存视图');await input(label('常用视图名称'),'本周需完成');await submit(label('常用视图名称').form);const weekly=service.snapshot().state.views.find(v=>v.name==='本周需完成'),original=structuredClone(weekly.filter);
   await click(button('高级条件'));assert.equal(label('条件 2 起点日期方式').value,'next-week');await click(button('常用筛选'));assert.equal(label('筛选截止时间').value,'through-week');assert.deepEqual(service.snapshot().state.views.find(v=>v.id===weekly.id).filter,original);
   await input(label('筛选截止时间'),'this-week');assert.ok(!document.querySelector('[role=treeitem][aria-label="上周到期"]'));assert.ok(button('更新当前视图'));assert.deepEqual(service.snapshot().state.views.find(v=>v.id===weekly.id).filter,original);
   // An unrelated service snapshot must not overwrite unsaved filter changes.
   await click(row('周日截止'));await input(label('自定义标签'),'视图草稿');await key(label('自定义标签'),'Enter');assert.equal(label('筛选截止时间').value,'this-week');
   await click(button('更新当前视图'));assert.equal(service.snapshot().state.views.find(v=>v.id===weekly.id).filter.rules.children.find(c=>c.field==='dueAt').value,'this-week');
-  await input(label('筛选截止时间'),'through-week');await click(button('另存为新视图'));await input(label('常用视图名称'),'含逾期');await submit(label('常用视图名称').form);assert.equal(service.snapshot().state.views.find(v=>v.id===weekly.id).filter.rules.children.find(c=>c.field==='dueAt').value,'this-week');
-  await click(button('管理当前视图'));await click(button('重命名视图'));await input(label('常用视图名称'),'本周全部待办');await submit(label('常用视图名称').form);assert.ok(service.snapshot().state.views.some(v=>v.name==='本周全部待办'));
-  await click(button('清除筛选'));await input(label('常用视图'),service.snapshot().state.views.find(v=>v.name==='本周全部待办').id);assert.equal(label('筛选截止时间').value,'through-week');assert.equal(label('筛选状态').value,'open');
+  await input(label('筛选截止时间'),'through-week');await viewAction('另存为新视图');await input(label('常用视图名称'),'含逾期');await submit(label('常用视图名称').form);assert.equal(service.snapshot().state.views.find(v=>v.id===weekly.id).filter.rules.children.find(c=>c.field==='dueAt').value,'this-week');
+  await viewAction('重命名视图');await input(label('常用视图名称'),'本周全部待办');await submit(label('常用视图名称').form);assert.ok(service.snapshot().state.views.some(v=>v.name==='本周全部待办'));
+  await click(button('清除筛选'));await savedView('本周全部待办');assert.equal(label('筛选截止时间').value,'through-week');assert.equal(label('筛选状态').value,'open');
  });
  await t.test('advanced nested OR remains intact in common mode and reloading a saved view; deleting a view keeps tasks',async()=>{
-  await click(button('清除筛选'));await click(label('显示已完成'));await click(button('高级条件'));await click(button('添加条件'));await click(button('添加条件组'));
+  await click(button('清除筛选'));await viewOptions();await click(label('显示已完成'));await key(label('显示已完成'),'Escape');await click(button('高级条件'));await click(button('添加条件'));await click(button('添加条件组'));
   await input(label('条件 2.1 字段'),'dueAt');await input(label('条件 2.1 判断'),'before');await input(label('条件 2.1 起点日期方式'),'now');
   const nested=query('.condition-group .condition-group');await click(button('添加条件',nested));await input(label('条件 2.2 字段'),'tags');await input(label('条件 2.2 判断'),'any');await click(label('条件 2.2 标签 合并目标'));
   assert.ok(row('上周到期'));assert.ok(row('另一事项'));assert.ok(!document.querySelector('[role=treeitem][aria-label="周日截止"]'));assert.ok(!document.querySelector('[role=treeitem][aria-label="下周一截止"]'));
-  await click(button('保存视图'));await input(label('常用视图名称'),'逾期或标签');await submit(label('常用视图名称').form);const saved=service.snapshot().state.views.find(v=>v.name==='逾期或标签'),rules=structuredClone(saved.filter.rules);
-  await click(button('常用筛选'));assert.equal(query('.quick-fields').disabled,true);assert.ok(row('上周到期'));await click(button('清除筛选'));await input(label('常用视图'),saved.id);await click(button('高级条件'));assert.equal(label('条件组 2 组合').value,'any');assert.deepEqual(service.snapshot().state.views.find(v=>v.id===saved.id).filter.rules,rules);
-  const count=service.snapshot().state.tasks.filter(t=>t.id!=='inbox').length;await click(button('管理当前视图'));await click(button('删除视图'));await click(button('移除视图'));assert.equal(service.snapshot().state.tasks.filter(t=>t.id!=='inbox').length,count);assert.ok(!service.snapshot().state.views.some(v=>v.id===saved.id));
+  await viewAction('保存视图');await input(label('常用视图名称'),'逾期或标签');await submit(label('常用视图名称').form);const saved=service.snapshot().state.views.find(v=>v.name==='逾期或标签'),rules=structuredClone(saved.filter.rules);
+  await click(button('常用筛选'));assert.equal(query('.quick-fields').disabled,true);assert.ok(row('上周到期'));await click(button('清除筛选'));await savedView(saved.name);await click(button('高级条件'));assert.equal(label('条件组 2 组合').value,'any');assert.deepEqual(service.snapshot().state.views.find(v=>v.id===saved.id).filter.rules,rules);
+  const count=service.snapshot().state.tasks.filter(t=>t.id!=='inbox').length;await viewAction('删除视图');await click(button('移除视图'));assert.equal(service.snapshot().state.tasks.filter(t=>t.id!=='inbox').length,count);assert.ok(!service.snapshot().state.views.some(v=>v.id===saved.id));
   await click(button('清除筛选'));await click(button('常用筛选'));
  });
  await t.test('custom date ranges retain fixed dates; sorting stays within the hierarchy; invalid ranges show errors',async()=>{
   await input(label('筛选截止时间'),'range');await input(label('截止时间范围起点'),'2026-10-18');await input(label('截止时间范围终点'),'2026-10-25');await input(label('筛选状态'),'open');
   assert.ok(row('上周到期'));assert.ok(row('周日截止'));await input(label('视图排序'),'due');const rows=[...document.querySelectorAll('[role=treeitem]')].map(r=>r.getAttribute('aria-label'));assert.deepEqual(rows,['父事项','上周到期','周日截止']);
-  await input(label('截止时间范围终点'),'2026-10-01');await click(button('保存视图'));await input(label('常用视图名称'),'无效范围');await submit(label('常用视图名称').form);assert.match(query('.filter-error').textContent,/条件无效/);assert.ok(!service.snapshot().state.views.some(v=>v.name==='无效范围'));await click(button('取消'));await click(button('清除筛选'));
+  await input(label('截止时间范围终点'),'2026-10-01');await viewAction('保存视图');await input(label('常用视图名称'),'无效范围');await submit(label('常用视图名称').form);assert.match(query('.filter-error').textContent,/条件无效/);assert.ok(!service.snapshot().state.views.some(v=>v.name==='无效范围'));await click(button('取消'));await click(button('清除筛选'));
  });
  await t.test('tag mode can be selected before choosing tags; renaming a saved view preserves unsaved conditions',async()=>{
   await input(label('标签匹配方式'),'any');const chooseTag=name=>[...document.querySelectorAll('.filter-tags .tag-options label')].find(l=>l.textContent===name).querySelector('input');await click(chooseTag('合并目标'));await click(chooseTag('视图草稿'));assert.ok(row('另一事项'));assert.ok(row('周日截止'));
-  await click(button('保存视图'));await input(label('常用视图名称'),'任一标签');await submit(label('常用视图名称').form);const id=service.snapshot().state.views.find(v=>v.name==='任一标签').id;assert.equal(service.snapshot().state.views.find(v=>v.id===id).filter.rules.children.find(r=>r.field==='tags').op,'any');
-  await input(label('筛选截止时间'),'through-week');await click(button('管理当前视图'));await click(button('重命名视图'));await input(label('常用视图名称'),'标签视图');await submit(label('常用视图名称').form);assert.equal(label('筛选截止时间').value,'through-week');assert.ok(button('更新当前视图'));assert.ok(!service.snapshot().state.views.find(v=>v.id===id).filter.rules.children.some(c=>c.field==='dueAt'));
-  await click(button('另存为新视图'));await input(label('常用视图名称'),'标签与日期');await submit(label('常用视图名称').form);assert.ok(service.snapshot().state.views.find(v=>v.name==='标签与日期').filter.rules.children.some(c=>c.field==='dueAt'));
+  await viewAction('保存视图');await input(label('常用视图名称'),'任一标签');await submit(label('常用视图名称').form);const id=service.snapshot().state.views.find(v=>v.name==='任一标签').id;assert.equal(service.snapshot().state.views.find(v=>v.id===id).filter.rules.children.find(r=>r.field==='tags').op,'any');
+  await input(label('筛选截止时间'),'through-week');await viewAction('重命名视图');await input(label('常用视图名称'),'标签视图');await submit(label('常用视图名称').form);assert.equal(label('筛选截止时间').value,'through-week');assert.ok(button('更新当前视图'));assert.ok(!service.snapshot().state.views.find(v=>v.id===id).filter.rules.children.some(c=>c.field==='dueAt'));
+  await viewAction('另存为新视图');await input(label('常用视图名称'),'标签与日期');await submit(label('常用视图名称').form);assert.ok(service.snapshot().state.views.find(v=>v.name==='标签与日期').filter.rules.children.some(c=>c.field==='dueAt'));
  });
  }finally{await action(()=>root.unmount());service.shutdown();dom.window.close();}
 });

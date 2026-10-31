@@ -1,0 +1,13 @@
+.effort-trash-list{max-height:50vh;overflow:auto}
+.effort-trash-list article{display:flex;align-items:center;gap:12px;padding:12px 0;border-top:1px solid var(--line)}
+.effort-trash-list article>div{flex:1;min-width:0;overflow-wrap:anywhere}
+.effort-trash-list article p{margin:5px 0;color:var(--muted);white-space:pre-wrap}
+.effort-trash-list article button{flex-shrink:0}
+.effort-discard>p{line-height:1.7}
+.workbench .danger-action{color:var(--danger,#b54138);border-color:currentColor;background:transparent}
+.workbench .danger-action:hover{background:#fff1ef}
+.assignment-actions{flex-wrap:wrap}
+.assignment-actions .assignment-discard{margin-right:auto;color:var(--muted)}
+.unassigned-record .discard-effort{color:var(--muted)}
+@media(max-width:700px){.unassigned-record{flex-wrap:wrap;padding:8px 0}.unassigned-record>span{flex-basis:55%}}
+.dialog-fields{border:0;margin:0;padding:0;min-width:0}

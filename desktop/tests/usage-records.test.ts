@@ -1,0 +1,20 @@
+import {test} from 'node:test';import assert from 'node:assert/strict';import {mkdtempSync,existsSync,readFileSync,statSync} from 'node:fs';import path from 'node:path';
+import {UsageStore} from '../electron/usage-store';import type {AiUsageRecord} from '../core/usage-types';
+import {aiOperationResult} from '../core/usage-types';
+const record=():AiUsageRecord=>({id:'run-1',at:new Date().toISOString(),scope:{kind:'today'},context:{label:'今日',itemCount:1,recordCount:0,truncated:false,items:[{id:'one',title:'个人事项',path:'项目'}]},prompt:'我的问题',provider:'https://api.example.com',model:'gpt-6-luna',phase:'done',text:'分析结果',error:null,suggestions:[{id:'1',label:'修改名称',target:'个人事项',before:'原名',after:'新名',state:'pending'}],usage:{promptTokens:12,completionTokens:8,totalTokens:20}});
+
+test('AI operation results distinguish generation from application and cancellation',()=>{
+ assert.equal(aiOperationResult('ai.generate',{phase:'done'}),'success');assert.equal(aiOperationResult('ai.generate',{phase:'error'}),'failed');assert.equal(aiOperationResult('ai.generate',{phase:'cancelled'}),'cancelled');assert.equal(aiOperationResult('ai.cancel',{phase:'done'}),'cancelled');
+ assert.equal(aiOperationResult('ai.apply',{phase:'done',suggestions:[{id:'1',state:'pending',error:'stale'}]},'1'),'failed');assert.equal(aiOperationResult('ai.apply',{phase:'done',suggestions:[{id:'1',state:'applied'}]},'1'),'success');assert.equal(aiOperationResult('ai.apply',{phase:'done',suggestions:[]},'missing'),'failed');
+});
+test('operations accept only four semantic fields, batch persist, stay bounded and pause without disabling AI history',()=>{
+ const file=path.join(mkdtempSync(path.resolve('qa-data/usage-')),'usage.json'),s=new UsageStore(file,'0.29.0');assert.throws(()=>s.record({operation:'focus.start',entry:'items.row',result:'success',version:'v',pointer:[1,2]} as any));
+ for(let i=0;i<5100;i++)s.record({operation:'focus.start',entry:'items.row',result:'success',version:'spoof'});assert.equal(s.snapshot().operations.length,5000);assert.equal(existsSync(file),false);s.flush();assert.equal(s.snapshot().operations[0].version,'0.29.0');
+ s.configure(false);s.record({operation:'focus.stop',entry:'today',result:'success',version:'v'});assert.equal(s.snapshot().operations.length,5000);s.saveAi(record());s.dispose();const restored=new UsageStore(file,'0.29.0');assert.equal(restored.snapshot().enabled,false);assert.equal(restored.snapshot().ai.length,1);assert.equal(restored.snapshot().operations.length,5000);restored.dispose();
+});
+test('AI records whitelist fields, update application results without duplicates, clear sensitive text and do not rewrite AI file for ordinary operations',()=>{
+ const file=path.join(mkdtempSync(path.resolve('qa-data/usage-ai-')),'usage.json'),s=new UsageStore(file,'0.29.0');s.saveAi({...record(),apiKey:'fake-secret-never-store',headers:{Authorization:'fake-secret-never-store'}} as any);s.flush();assert.equal(readFileSync(file+'.ai.json','utf8').includes('fake-secret'),false);
+ s.updateSuggestions('run-1',[{...record().suggestions[0],state:'applied'}]);s.feedback('run-1','helpful','有帮助');s.flush();assert.equal(s.snapshot().ai.length,1);assert.equal(s.snapshot().ai[0].suggestions[0].state,'applied');const aiTime=statSync(file+'.ai.json').mtimeMs;
+ s.record({operation:'focus.start',entry:'today',result:'success',version:'v'});s.flush();assert.equal(statSync(file+'.ai.json').mtimeMs,aiTime);
+ s.clear('ai-text');s.flush();assert.equal(s.snapshot().ai[0].prompt,'');assert.equal(s.snapshot().ai[0].context.items.length,0);assert.equal(s.snapshot().ai[0].suggestions[0].state,'applied');assert.equal(s.snapshot().ai[0].suggestions[0].target,'已清理');s.updateSuggestions('run-1',[{...record().suggestions[0],state:'applied'}]);assert.equal(s.snapshot().ai[0].suggestions[0].before,'');s.saveAi(record());assert.equal(s.snapshot().ai[0].prompt,'');assert.equal(s.snapshot().ai[0].suggestions[0].after,'');assert.equal(s.snapshot().operations.length,1);s.dispose();
+});

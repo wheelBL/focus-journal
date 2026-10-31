@@ -4,7 +4,7 @@ import {emptyState,type JournalState} from './types';
 import type {SyncSummary} from './sync-types';
 
 export const MAX_SYNC_BYTES=24*1024*1024;
-const keys=['projects','tasks','tags','views','sessions','deletedSessions','notes','estimates','reviews','audit','moves','itemReviews'] as const;
+const keys=['projects','tasks','tags','views','sessions','deletedSessions','notes','estimates','reviews','audit','moves','itemReviews','activities'] as const;
 // Only journal content is portable. Device preferences and live timer/reminder state are local.
 export function portableState(source:JournalState):JournalState {
  const state=structuredClone(source);
@@ -31,5 +31,5 @@ export function parseSyncDocument(content:string):{state:JournalState;updatedAt:
  const state=parseJournalBackup(JSON.stringify({format:'focus-journal',version:data.state.schemaVersion,state:data.state}));
  return {state:portableState(state),updatedAt:new Date(data.updatedAt).toISOString()};
 }
-export function isEmptyJournal(s:JournalState):boolean {const defaults=emptyState();return keys.every(k=>k==='projects'||k==='tasks'?JSON.stringify(s[k])===JSON.stringify(defaults[k]):s[k].length===0);}
+export function isEmptyJournal(s:JournalState):boolean {const defaults=emptyState();return keys.every(k=>k==='projects'||k==='tasks'?JSON.stringify(s[k])===JSON.stringify(defaults[k]):(s[k]??[]).length===0);}
 export function summarizeSync(s:JournalState):SyncSummary {return {items:s.tasks.length,projects:s.tasks.filter(t=>t.isProject).length,sessions:s.sessions.length,notes:s.notes.length,minutes:Math.round(s.sessions.reduce((n,r)=>n+r.durationMs,0)/60000)};}

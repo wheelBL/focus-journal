@@ -4,18 +4,18 @@ import {deadlineTime} from './deadlines';
 import {localDate,shiftDate,type DatePoint,type FilterCondition,type FilterField,type FilterGroup,type FilterOperator,type FilterRule,type ItemFilter,type JournalState,type Task} from './types';
 import {outlinePath,branchIds,type OutlineIndex} from './outline';
 
-export const fieldLabels:Record<FilterField,string>={focusDate:'重点日期',itemType:'条目类型',status:'结束状态',availability:'可执行情况',plannedDate:'计划开始',dueAt:'截止时间',completedAt:'实际完成',tags:'标签',title:'名称',description:'说明',isProject:'项目标记',estimateMinutes:'原始估计（分钟）',actualMinutes:'实际投入（本项分钟）',scope:'所属范围（含后代）',actionable:'可执行'};
+export const fieldLabels:Record<FilterField,string>={responsibility:'责任安排',assignee:'接手人',completionBy:'完成归属',handedOffAt:'交接日期',focusDate:'重点日期',itemType:'条目类型',status:'结束状态',availability:'可执行情况',plannedDate:'计划开始',dueAt:'截止时间',completedAt:'实际完成',tags:'标签',title:'名称',description:'说明',isProject:'项目标记',estimateMinutes:'原始估计（分钟）',actualMinutes:'实际投入（本项分钟）',scope:'所属范围（含后代）',actionable:'可执行'};
 export const operatorLabels:Record<FilterOperator,string>={is:'是','is-not':'不是',before:'早于',after:'晚于',period:'处于',between:'介于',set:'已设置',unset:'未设置',all:'包含全部',any:'包含任一',none:'不包含',contains:'包含','not-contains':'不包含',greater:'大于',less:'小于'};
 export const anchorLabels={now:'此刻',today:'今天零点',tomorrow:'明天零点','week-start':'本周一零点','next-week':'下周一零点','month-start':'本月一日零点','next-month':'下月一日零点'};
 export const periodLabels={today:'今天','this-week':'本周','next-7-days':'未来 7 天（含今天）','this-month':'本月'};
 export const condition=(field:FilterField,op:FilterOperator,value?:FilterCondition['value'],end?:FilterCondition['end']):FilterCondition=>({kind:'condition',field,op,...value===undefined?{}:{value},...end===undefined?{}:{end}});
 export const group=(children:FilterRule[]=[],mode:'all'|'any'='all'):FilterGroup=>({kind:'group',mode,children});
 export const relative=(anchor:keyof typeof anchorLabels,days=0):DatePoint=>({kind:'relative',anchor,...days?{days}:{}});
-export const isDateField=(field:FilterField)=>['plannedDate','dueAt','completedAt','focusDate'].includes(field);
+export const isDateField=(field:FilterField)=>['plannedDate','dueAt','completedAt','focusDate','handedOffAt'].includes(field);
 export function operators(field:FilterField):FilterOperator[]{
  if(isDateField(field))return ['period','before','after','between','set','unset'];
  if(field==='tags')return ['all','any','none','set','unset'];
- if(field==='title'||field==='description')return ['contains','not-contains','set','unset'];
+ if(field==='title'||field==='description'||field==='assignee')return ['contains','not-contains','set','unset'];
  if(field==='estimateMinutes'||field==='actualMinutes')return ['greater','less','between','set','unset'];
  return ['is','is-not'];
 }
@@ -24,7 +24,7 @@ export function defaultCondition(field:FilterField,op=operators(field)[0]):Filte
  if(isDateField(field))return op==='period'?condition(field,op,'today'):condition(field,op,relative('today'),op==='between'?relative('tomorrow'):undefined);
  if(field==='tags')return condition(field,op,[]);
  if(field==='estimateMinutes'||field==='actualMinutes')return condition(field,op,0,op==='between'?60:undefined);
- return condition(field,op,field==='itemType'?'task':field==='status'?'open':field==='availability'?'active':['isProject','actionable'].includes(field)?true:'');
+ return condition(field,op,field==='responsibility'?'self':field==='completionBy'?'self':field==='itemType'?'task':field==='status'?'open':field==='availability'?'active':['isProject','actionable'].includes(field)?true:'');
 }
 
 export function datePointTime(point:DatePoint,now:string):number{
@@ -51,8 +51,18 @@ export function datePointLabel(p:DatePoint,now?:string){
  if(!now)return label;const d=new Date(datePointTime(p,now));return `${label}（${localDate(d)} ${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')}）`;
 }
 
+/** Earlier saved views expressed the Unfinished preset as these two exclusions.
+ * Extend only that preset; explicit or nested status selections keep their meaning.
+ * Return the original rule when unchanged, and never mutate persisted filters. */
+function currentUnfinishedRules(rules:FilterGroup):FilterGroup{
+ let children=rules.children.map(c=>c.kind==='group'?currentUnfinishedRules(c):c);
+ const statuses=children.filter(c=>c.kind==='condition'&&c.field==='status');
+ const legacy=rules.mode==='all'&&statuses.length===2&&statuses.every(c=>c.kind==='condition'&&c.op==='is-not')&&statuses.some(c=>c.kind==='condition'&&c.value==='done')&&statuses.some(c=>c.kind==='condition'&&c.value==='cancelled')&&!children.some(c=>c.kind==='group'&&hasRuleField(c,'status'));
+ if(legacy)children=[...children,condition('status','is-not','handed-off')];
+ return legacy||children.some((c,i)=>c!==rules.children[i])?{...rules,children}:rules;
+}
 export function rulesFor(f:ItemFilter):FilterGroup{
- if(f.rules)return f.rules;
+ if(f.rules)return currentUnfinishedRules(f.rules);
  const c:FilterRule[]=[];
  if(f.view==='done')c.push(condition('status','is','done'));
  else if(f.view!=='all'&&f.completed==='any')c.push(condition('status','is','open'));
@@ -70,6 +80,7 @@ export function rulesFor(f:ItemFilter):FilterGroup{
  return group(c.filter((v,i,all)=>all.findIndex(a=>JSON.stringify(a)===JSON.stringify(v))===i));
 }
 export function withRules(f:ItemFilter,rules:FilterGroup):ItemFilter{
+ rules=currentUnfinishedRules(rules);
  const direct=rules.mode==='all'?rules.children.filter((r):r is FilterCondition=>r.kind==='condition'):[];
  const status=direct.find(r=>r.field==='status'&&r.op==='is')?.value;
  const view=direct.some(r=>r.field==='actionable'&&r.value===true)?'actions':status==='done'?'done':status==='open'&&direct.some(r=>r.field==='plannedDate'&&r.op==='unset')?'unplanned':'all';
@@ -88,10 +99,10 @@ export function simpleStatusValue(rules:FilterCondition[]):string{
  const status=rules.filter(c=>c.field==='status');
  if(!status.length)return 'any';
  if(status.length===1&&status[0].op==='is')return String(status[0].value);
- if(status.length===2&&status.every(c=>c.op==='is-not')&&status.some(c=>c.value==='done')&&status.some(c=>c.value==='cancelled'))return 'unfinished';
+ if(status.length===3&&status.every(c=>c.op==='is-not'&&['done','cancelled','handed-off'].includes(String(c.value)))&&status.some(c=>c.value==='done')&&status.some(c=>c.value==='cancelled'))return 'unfinished';
  return 'custom';
 }
-export const unfinishedRules=()=>[condition('status','is-not','done'),condition('status','is-not','cancelled')];
+export const unfinishedRules=()=>[condition('status','is-not','done'),condition('status','is-not','cancelled'),condition('status','is-not','handed-off')];
 /** A simple toggle must not rewrite nested AND/OR status logic. */
 export function canToggleCompleted(f:ItemFilter):boolean{
  const r=rulesFor(f);if(!hasRuleField(r,'status'))return true;
@@ -129,7 +140,9 @@ export function validateRules(value:unknown,state:JournalState):FilterGroup{
   if(isDateField(r.field))valid=r.op==='period'?typeof r.value==='string'&&Object.hasOwn(periodLabels,r.value):point(r.value)&&(r.op!=='between'||point(r.end));
   else if(r.field==='tags')valid=Array.isArray(r.value)&&r.value.length<=100&&r.value.every(id=>typeof id==='string'&&state.tags.some(t=>t.id===id));
   else if(r.field==='itemType')valid=['task','note','event'].includes(r.value as string);
-  else if(r.field==='status')valid=['open','done','cancelled'].includes(r.value as string);
+  else if(r.field==='status')valid=['open','done','cancelled','handed-off'].includes(r.value as string);
+  else if(r.field==='responsibility')valid=['self','handed-off','following'].includes(r.value as string);
+  else if(r.field==='completionBy')valid=['self','other','shared','unknown'].includes(r.value as string);
   else if(r.field==='availability')valid=['active','paused'].includes(r.value as string);
   else if(r.field==='isProject'||r.field==='actionable')valid=typeof r.value==='boolean';
   else if(r.field==='scope')valid=state.tasks.some(t=>t.id===r.value)||state.schemaVersion<13&&r.value==='inbox';
@@ -148,7 +161,7 @@ export function matchesRules(r:FilterRule,t:Task,index:OutlineIndex,now:string):
  if(isInformation(t)&&field==='status')return r.op==='is-not';
  if(isInformation(t)&&['plannedDate','dueAt','completedAt','focusDate','status','availability','estimateMinutes','actualMinutes'].includes(field))return false;
  if(isDateField(field)){
-  const value=t[field as 'plannedDate'|'dueAt'|'completedAt'|'focusDate'];if(r.op==='set')return !!value;if(r.op==='unset')return !value;if(!value)return false;
+  const value=field==='handedOffAt'?t.ownership?.at:t[field as 'plannedDate'|'dueAt'|'completedAt'|'focusDate'];if(r.op==='set')return !!value;if(r.op==='unset')return !value;if(!value)return false;
   const time=field==='dueAt'?deadlineTime(value):Date.parse(value.length===10?`${value}T00:00:00`:value);
   if(r.op==='period'){const [a,b]=periodBounds(String(r.value),now);return time>=a&&time<b;}
   const a=datePointTime(r.value as DatePoint,now);if(r.op==='before')return time<a;if(r.op==='after')return time>a;
@@ -162,12 +175,13 @@ export function matchesRules(r:FilterRule,t:Task,index:OutlineIndex,now:string):
   if(r.op==='set')return n!==null;if(r.op==='unset')return n===null;if(n===null)return false;
   return r.op==='greater'?n>Number(r.value):r.op==='less'?n<Number(r.value):n>=Number(r.value)&&n<=Number(r.end);
  }
- if(field==='title'||field==='description'){
-  const value=(t[field]??'').toLocaleLowerCase(),text=String(r.value??'').trim().toLocaleLowerCase();
+ if(field==='title'||field==='description'||field==='assignee'){
+  const value=(field==='assignee'?t.ownership?.assignee??'':t[field]??'').toLocaleLowerCase(),text=String(r.value??'').trim().toLocaleLowerCase();
   if(r.op==='set')return !!value.trim();if(r.op==='unset')return !value.trim();if(!text)return false;
   return r.op==='contains'?value.includes(text):!value.includes(text);
  }
- const actual=field==='itemType'?(t.itemType??'task'):field==='status'?t.status:field==='availability'?(outlinePath(index,t.id).some(n=>(n.record as Task).availability==='paused')?'paused':'active'):field==='isProject'?!!t.isProject:field==='scope'?branchIds(index,String(r.value)).has(t.id):!blockedReason(index,t.id);
+ if(field==='completionBy'&&t.status!=='done')return false;
+ const actual=field==='responsibility'?(t.ownership?t.ownership.followUp?'following':'handed-off':'self'):field==='completionBy'?(t.completionBy??'unknown'):field==='itemType'?(t.itemType??'task'):field==='status'?t.status:field==='availability'?(outlinePath(index,t.id).some(n=>(n.record as Task).availability==='paused')?'paused':'active'):field==='isProject'?!!t.isProject:field==='scope'?branchIds(index,String(r.value)).has(t.id):!t.ownership&&!blockedReason(index,t.id);
  const expected=field==='scope'?true:r.value;return r.op==='is'?actual===expected:actual!==expected;
 }
 
@@ -177,8 +191,10 @@ export function describeRule(r:FilterRule,state:JournalState,now?:string):string
   if(isDateField(r.field))value=r.op==='period'?periodLabels[r.value as keyof typeof periodLabels]:datePointLabel(r.value as DatePoint,now)+(r.op==='between'?` 至 ${datePointLabel(r.end as DatePoint,now)}`:'');
   else if(r.field==='tags')value=(r.value as string[]).map(id=>state.tags.find(t=>t.id===id)?.name??'已移除标签').join('、')||'尚未选择标签';
   else if(r.field==='itemType')value=r.value==='note'?'笔记／信息':r.value==='event'?'事件':'事项';
+  else if(r.field==='responsibility')value=({self:'本人负责','handed-off':'已交接',following:'待他人跟进'})[r.value as 'self'|'handed-off'|'following'];
+  else if(r.field==='completionBy')value=({self:'本人完成',other:'他人完成',shared:'共同完成',unknown:'未注明'})[r.value as 'self'|'other'|'shared'|'unknown'];
   else if(r.field==='availability')value=r.value==='paused'?'已暂停（含父级影响）':'可做安排';
-  else if(r.field==='status')value=({open:'未完成',done:'已完成',cancelled:'已取消'})[r.value as Task['status']];
+  else if(r.field==='status')value=({open:'未完成',done:'已完成',cancelled:'已取消','handed-off':'已交接（关闭）'})[r.value as Task['status']];
   else if(r.field==='scope')value=state.tasks.find(t=>t.id===r.value)?.title??'收件箱';
   else value=typeof r.value==='boolean'?(r.value?'是':'否'):String(r.value??'')+(r.op==='between'?` 至 ${r.end}`:'');
  }

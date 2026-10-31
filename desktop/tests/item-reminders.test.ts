@@ -4,7 +4,9 @@ import {mkdtempSync,readdirSync} from 'node:fs';
 import path from 'node:path';
 import {JournalService} from '../core/service';
 import {SqliteJournalStore} from '../core/store';
-import {emptyState,type JournalState} from '../core/types';
+import {emptyState,type JournalState,type Task} from '../core/types';
+import {scheduledItems,reminderEligible,reminderEligibility} from '../core/item-reminders';
+import {outlineIndex,outlinePath} from '../core/outline';
 import {pendingReminders} from '../core/reminders';
 import {calendarEntries,calendarReminderInput} from '../src/calendar-layout';
 class Store{path='scheduled reminder tests';state=emptyState();fail=false;load(){return structuredClone(this.state);}save(s:JournalState){if(this.fail)throw new Error('disk full');this.state=structuredClone(s);}close(){}}
@@ -49,5 +51,29 @@ test('calendar slots respect scrolled coordinates and reminder lanes never becom
 test('schema nine upgrades keep records and create a pre-migration backup',()=>{
  const {service:s}=setup();add(s,'保留已有任务');const legacy=s.snapshot().state;legacy.schemaVersion=9;for(const t of legacy.tasks)delete t.reminder;
  const dir=mkdtempSync(path.resolve('qa-evidence/reminder-migration-')),file=path.join(dir,'journal.sqlite');const disk=new SqliteJournalStore(file);disk.save(legacy);disk.close();
- const current=new JournalService(new SqliteJournalStore(file));assert.equal(current.snapshot().state.schemaVersion,16);assert.equal(current.snapshot().state.tasks.filter((t:{id:string})=>t.id!=='inbox')[0].id,legacy.tasks.filter((t:{id:string})=>t.id!=='inbox')[0].id);assert.equal(current.snapshot().state.tasks.filter((t:{id:string})=>t.id!=='inbox')[0].reminder,null);current.shutdown();assert.ok(readdirSync(path.join(dir,'backups')).some(f=>f.startsWith('before-schema-9-to-16-')));
+ const current=new JournalService(new SqliteJournalStore(file));assert.equal(current.snapshot().state.schemaVersion,19);assert.equal(current.snapshot().state.tasks.filter((t:{id:string})=>t.id!=='inbox')[0].id,legacy.tasks.filter((t:{id:string})=>t.id!=='inbox')[0].id);assert.equal(current.snapshot().state.tasks.filter((t:{id:string})=>t.id!=='inbox')[0].reminder,null);current.shutdown();assert.ok(readdirSync(path.join(dir,'backups')).some(f=>f.startsWith('before-schema-9-to-19-')));
+});
+
+function oldScheduled(state:JournalState){const index=outlineIndex(state);return state.tasks.filter(task=>task.reminder&&task.reminder.state!=='dismissed'&&task.status==='open'&&!outlinePath(index,task.id).some(n=>{const item=n.record as Task;return item.archived||item.deletedAt||item.status&&item.status!=='open';}));}
+const dueReminder=()=>({at:'2026-10-22T01:00:00.000Z',state:'scheduled' as const,snoozedUntil:null});
+
+test('topology-only reminders match full outline eligibility for lifecycle, paused branches and in-place changes',()=>{
+ const state=emptyState(),base=state.tasks[0];state.tasks=Array.from({length:300},(_,i)=>({...base,id:`t${i}`,title:`T${i}`,parentId:i?`t${Math.floor((i-1)/3)}`:null,isProject:i%4===0,order:300-i,reminder:i%5===0?null:dueReminder()}));
+ state.tasks[1].availability='paused';state.tasks[4].status='done';state.tasks[7].status='cancelled';state.tasks[12].deletedAt='2026-10-21T01:00:00.000Z';state.tasks[20].archived=true;state.tasks[25].reminder={...dueReminder(),state:'dismissed'};state.tasks[26].reminder={...dueReminder(),state:'pending'};state.tasks[27].reminder={...dueReminder(),state:'snoozed',snoozedUntil:'2026-10-23T01:00:00.000Z'};
+ const before=JSON.stringify(state);assert.deepEqual(scheduledItems(state).map(t=>t.id),oldScheduled(state).map(t=>t.id));assert.equal(JSON.stringify(state),before);
+ const index=outlineIndex(state),eligible=reminderEligibility(state,index);for(const task of state.tasks)assert.equal(eligible(task),reminderEligible(state,task,index));
+ for(let i=1;i<40;i++){const task=state.tasks[i];task.status=i%2?'open':'done';task.archived=i%7===0;task.deletedAt=i%11===0?'2026-10-21T01:00:00.000Z':null;task.parentId=i%3===0?'t0':task.parentId;assert.deepEqual(scheduledItems(state).map(t=>t.id),oldScheduled(state).map(t=>t.id));}
+ state.tasks=[{...base,id:'parent',parentId:null,availability:'paused',reminder:null},{...base,id:'child',parentId:'parent',reminder:dueReminder()}];assert.equal(scheduledItems(state)[0],state.tasks[1],'ordinary pause does not suppress reminders');state.tasks[0].status='done';assert.deepEqual(scheduledItems(state),[]);state.tasks[0].status='open';assert.equal(scheduledItems(state)[0],state.tasks[1]);
+});
+
+test('reminder topology preserves legacy projects, ordinary Inbox, missing parents and cycle-safe paths',()=>{
+ const state=emptyState(),base=state.tasks[0];state.schemaVersion=3;state.projects=[{id:'legacy',name:'Legacy',createdAt:'2026-10-20T00:00:00.000Z',archived:true}];state.tasks=[{...base,id:'task',projectId:'legacy',parentId:undefined,reminder:dueReminder()}];assert.deepEqual(scheduledItems(state),oldScheduled(state));assert.equal(scheduledItems(state).length,0);state.projects[0].archived=false;assert.equal(scheduledItems(state).length,1);
+ state.schemaVersion=12;state.projects=[{id:'inbox',name:'旧收件箱',createdAt:'2026-10-20T00:00:00.000Z',archived:true}];state.tasks=[{...base,id:'task',parentId:'inbox',reminder:dueReminder()}];assert.deepEqual(scheduledItems(state),oldScheduled(state));assert.equal(scheduledItems(state).length,0);
+ state.schemaVersion=17;state.tasks=[{...base,id:'a',parentId:'b',reminder:dueReminder()},{...base,id:'b',parentId:'a',reminder:dueReminder()},{...base,id:'orphan',parentId:'missing',reminder:dueReminder()}];assert.deepEqual(scheduledItems(state),oldScheduled(state));state.tasks[1].archived=true;assert.deepEqual(scheduledItems(state),oldScheduled(state));assert.deepEqual(scheduledItems(state).map(t=>t.id),['orphan']);
+});
+
+test('deep reminder eligibility is iterative and never reads historical effort',()=>{
+ const state=emptyState(),base=state.tasks[0];state.tasks=Array.from({length:6000},(_,i)=>({...base,id:`deep${i}`,parentId:i?`deep${i-1}`:null,reminder:dueReminder()})).reverse();
+ Object.defineProperty(state,'sessions',{get(){throw new Error('reminder eligibility must not inspect effort history');}});
+ assert.equal(scheduledItems(state).length,6000);assert.equal(reminderEligible(state,state.tasks[0]),true);state.tasks.at(-1)!.archived=true;assert.equal(scheduledItems(state).length,0);
 });

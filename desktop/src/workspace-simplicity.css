@@ -1,0 +1,12 @@
+/* One settings category at a time; visited forms stay mounted with their drafts. */
+.journal-style .workbench .settings-page{display:block;max-width:none;padding-bottom:100px}
+.journal-style .settings-category[hidden]{display:none!important}
+.journal-style .settings-category>.settings-section{height:auto;max-width:920px;padding-top:0;margin-bottom:0;border-bottom:0}
+.journal-style .settings-page>.page-header{margin-bottom:24px}
+.settings-compact-navigation{display:none}
+.journal-style .review-module-tabs{display:none}
+@media(max-width:740px){
+ .settings-compact-navigation{display:flex;align-items:center;gap:12px;margin-bottom:22px;color:var(--muted);font-size:13px}
+ .settings-compact-navigation select{min-width:180px;max-width:100%}
+ .journal-style .review-module-tabs{display:flex}
+}

@@ -57,10 +57,10 @@ test('batch tag/date/move validation is atomic and organizing undo preserves liv
  s.execute({type:'items.batch',payload:{ids:[a.id,child.id],action:'move',value:b.id,confirm:true}});assert.equal(s.snapshot().state.tasks.find(t=>t.id===child.id)?.parentId,a.id);
  clock.mono+=5000;clock.time+=5000;s.execute({type:'organize.undo'});assert.equal(s.snapshot().state.tasks.find(t=>t.id===a.id)?.parentId,null);assert.equal(s.snapshot().timers[0].durationMs,5000);s.shutdown();
 });
-test('today focus is independent from dates and clock ticks do not change data revision until durable checkpoint',()=>{
+test('today focus is independent from dates and clock-only checkpoints keep the content revision stable',()=>{
  const {s,clock}=setup(),t=create(s,'开始工作 明天开始 周五截止');s.execute({type:'item.focus',payload:{id:t.id,date:'2026-10-20'}});const task=s.snapshot().state.tasks.filter((t:{id:string})=>t.id!=='inbox')[0];assert.equal(task.plannedDate,'2026-10-21');assert.equal(task.dueAt,'2026-10-23');
  s.execute({type:'focus.start',payload:{taskId:t.id}});const before=s.snapshot();clock.mono+=4000;clock.time+=4000;const tick=s.clockSnapshot();assert.equal(tick.revision,before.revision);assert.equal(tick.sessions.length,1);assert.equal(tick.timers[0].durationMs,4000);assert.equal(before.timers[0].durationMs,0);
- clock.mono+=7000;clock.time+=7000;s.tick();assert.ok(s.clockSnapshot().revision>tick.revision);s.shutdown();
+ clock.mono+=7000;clock.time+=7000;s.tick();assert.equal(s.clockSnapshot().revision,tick.revision);assert.equal(s.clockSnapshot().timers[0].durationMs,11000);s.shutdown();
 });
 test('sort explanations identify urgent descendants and project review separates outcomes from unknown progress',()=>{
  const {s}=setup(),p=create(s,'项目',null),child=create(s,'子项 今天截止',p.id);s.execute({type:'outline.patch',payload:{id:p.id,field:'isProject',value:true}});

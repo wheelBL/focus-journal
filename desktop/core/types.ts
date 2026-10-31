@@ -1,15 +1,17 @@
 export type Id = string;
+export const JOURNAL_SCHEMA_VERSION=19;
 export interface Project { id: Id; name: string; description: string; archived: boolean; createdAt: string; parentId?: Id | null; order?: number }
 export interface Task {
+  ownership?:import('./activity').Ownership|null;completionBy?:import('./activity').CompletionBy;
   id: Id; projectId: Id|null; title: string; itemType?:'task'|'note'|'event'; eventAt?:string|null; eventEnd?:string|null; focusDate?:string|null; updatedAt?:string; isProject?: boolean; description?: string; archived?: boolean; availability?:'active'|'paused'; deletedAt?:string|null; reviewSchedule?:ReviewSchedule|null; reminder?:ItemReminder|null; tagIds?: Id[]; outcome: string; nextAction: string; parentId?: Id | null; order?: number;
   recurrence?:Recurrence|null; recurrenceNextId?:Id|null; recurrencePreviousId?:Id|null;
-  estimateMinutes: number | null; plannedDate: string | null; /** YYYY-MM-DD means before local midnight; ISO means an exact time. */ dueAt?: string | null; status: 'open' | 'done' | 'cancelled';
+  estimateMinutes: number | null; plannedDate: string | null; /** YYYY-MM-DD means before local midnight; ISO means an exact time. */ dueAt?: string | null; status: 'open' | 'done' | 'cancelled' | 'handed-off';
   createdAt: string; startedAt: string | null; completedAt: string | null;
 }
 export interface Segment { start: string; end: string; durationMs: number }
 export interface Session {
   id: Id; taskId: Id | null; date: string; start: string | null; end: string | null;
-  status: 'running' | 'paused' | 'ended'; targetMinutes: number;
+  status: 'running' | 'paused' | 'ended'; targetMinutes: number; /** Active effort already counted when the current reminder target began. */ targetOffsetMs?:number;
   segments: Segment[]; durationMs: number; manual: boolean; summary: string;
   reminder?: {state:'pending'|'snoozed'|'dismissed';snoozedUntil:string|null};
   reminded: boolean; recovered: boolean; updatedAt: string;
@@ -25,14 +27,14 @@ export interface Recurrence {mode:'calendar'|'completion';unit:'day'|'week'|'mon
 export interface Audit { id: Id; entityId: Id; before: string; reason: string; createdAt: string }
 export interface ItemReminder {at:string;state:'scheduled'|'pending'|'snoozed'|'dismissed';snoozedUntil:string|null}
 export interface ReminderSettings {sound:boolean;volume:number;repeatSeconds:number}
-export interface ReminderView {kind?:'task'|'break';breakMinutes?:number;canRest?:boolean;continuationTitle?:string;remindAt?:string;sessionId:Id;taskId:Id|null;title:string;durationMs:number;targetMinutes:number}
+export interface ReminderView {kind?:'task'|'break';breakMinutes?:number;canRest?:boolean;continuationTitle?:string;remindAt?:string;sessionId:Id;taskId:Id|null;title:string;durationMs:number;targetMinutes:number;targetOffsetMs?:number}
 export interface ReminderWindowState {alerts:ReminderView[];settings:ReminderSettings;preview:boolean;cue:{id:number;volume:number}|null}
 export type ReminderAction='stop-rest'|'continue'|'restart-break'|'choose'|'stop'|'snooze'|'dismiss'|'open'|'close-preview';
 export interface ReminderApi {snapshot():Promise<ReminderWindowState>;action(action:ReminderAction,sessionId?:string):Promise<void>;onChanged(callback:(state:ReminderWindowState)=>void):()=>void;audioResult(id:number,error?:string):void}
 export interface RestCycle {id:string;phase:'offered'|'running'|'ready';sessionId:Id|null;minutes:number;notify:boolean}
 export interface Settings { rest?:RestCycle|null; reminders?:ReminderSettings; targetMinutes: number; breakMinutes: number; selectedTaskId: Id | null; breakUntil: string | null }
 export interface Tag { id: Id; name: string }
-export type FilterField = 'focusDate'|'itemType'|'status'|'availability'|'plannedDate'|'dueAt'|'completedAt'|'tags'|'title'|'description'|'isProject'|'estimateMinutes'|'actualMinutes'|'scope'|'actionable';
+export type FilterField = 'responsibility'|'assignee'|'completionBy'|'handedOffAt'|'focusDate'|'itemType'|'status'|'availability'|'plannedDate'|'dueAt'|'completedAt'|'tags'|'title'|'description'|'isProject'|'estimateMinutes'|'actualMinutes'|'scope'|'actionable';
 export type FilterOperator = 'is'|'is-not'|'before'|'after'|'period'|'between'|'set'|'unset'|'all'|'any'|'none'|'contains'|'not-contains'|'greater'|'less';
 export type DateAnchor = 'now'|'today'|'tomorrow'|'week-start'|'next-week'|'month-start'|'next-month';
 export type DatePoint = {kind:'relative';anchor:DateAnchor;days?:number}|{kind:'fixed';date:string};
@@ -44,17 +46,22 @@ export type FilterRule = FilterCondition|FilterGroup;
 export interface ItemFilter { trash?:boolean; view: 'all'|'actions'|'unplanned'|'done'; query: string; showDone: boolean; scopeId: Id|null; tagIds: Id[]; tagMode: 'all'|'any'; planned: 'any'|'today'|'through-today'|'unplanned'; completed: 'any'|'today'|'this-week'; due: 'any'|'today'|'this-week'|'overdue'; projectsOnly: boolean; rules?:FilterGroup; sort?:'smart'|'manual'|'due'|'planned'|'title'|'created' }
 export interface SavedView { id: Id; name: string; filter: ItemFilter }
 export interface JournalState {
-  schemaVersion: 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10 | 11 | 12 | 13 | 14 | 15 | 16; itemReviews:ItemReviewLog[]; moves:MoveRecord[]; tags: Tag[]; views: SavedView[]; projects: Project[]; tasks: Task[]; sessions: Session[]; deletedSessions:DeletedSession[]; notes: Note[];
+  schemaVersion: 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10 | 11 | 12 | 13 | 14 | 15 | 16 | 17 | 18 | 19; activities?:import('./activity').BusinessActivity[];itemReviews:ItemReviewLog[]; moves:MoveRecord[]; tags: Tag[]; views: SavedView[]; projects: Project[]; tasks: Task[]; sessions: Session[]; deletedSessions:DeletedSession[]; notes: Note[];
   estimates: Estimate[]; reviews: Review[]; audit: Audit[]; settings: Settings;
 }
-export interface TimerView { sessionId: Id; taskId: Id | null; durationMs: number; targetMinutes: number; paused: boolean; recovered: boolean }
+export interface TimerView { sessionId: Id; taskId: Id | null; durationMs: number; targetMinutes: number; targetOffsetMs?:number; paused: boolean; recovered: boolean }
 export interface Snapshot { revision?:number; stateUndoLabel?:string|null; undoLabel?: string|null; state: JournalState; timers: TimerView[]; focusReminder?: string;itemNotice?:string; /** Legacy single-session projection. Commands must identify a session when several exist. */ timer: TimerView | null; now: string; dataPath: string; demo: boolean }
 export interface ClockSnapshot {revision:number;now:string;timers:TimerView[];sessions:Session[]}
 export interface CapturePreferences {shortcut:string;registered:boolean;error?:string}
 export interface WorkClock { now(): number; monotonic(): number }
-export interface JournalStore { load(): JournalState; save(state: JournalState): void; close(): void; path: string }
-export interface Command { type: string; payload?: Record<string, unknown> }
+export interface JournalStore {
+  load(): JournalState; save(state: JournalState): void; close(): void; path: string;
+  /** Atomically persist elapsed time for existing sessions; no domain or schema changes. */
+  saveSessionCheckpoint?(sessions:readonly Session[]):void;
+}
+export interface Command { type: string; payload?: Record<string, unknown>;meta?:{source?:'user'|'ai'|'api'|'sync'|'system';entry?:string;version?:string;aiRunId?:string} }
 export interface JournalApi {
+  usage?:import('./usage-types').UsageBridge;
   localApi?:import('./local-api-types').LocalApiBridge;
   sync?:import('./sync-types').SyncApi;
   previewReminder?(settings:ReminderSettings,mode:'sound'|'card'):Promise<void>;
@@ -71,7 +78,7 @@ export interface JournalApi {
 export function emptyState(): JournalState {
   const createdAt='1970-01-01T00:00:00.000Z';
   const inbox:Task={id:'inbox',title:'收件箱',description:'还没有归属项目的事项',isProject:true,projectId:'inbox',parentId:null,order:0,createdAt,updatedAt:createdAt,archived:false,availability:'active',deletedAt:null,itemType:'task',tagIds:[],outcome:'',nextAction:'',estimateMinutes:null,plannedDate:null,dueAt:null,status:'open',startedAt:null,completedAt:null,reviewSchedule:null,reminder:null,eventAt:null,eventEnd:null,focusDate:null};
-  return { schemaVersion: 16, itemReviews: [], moves: [], tags: [], views: [], projects: [{ id: inbox.id, name: inbox.title, description: inbox.description!, archived: false, createdAt, parentId:null, order:0 }], tasks: [inbox], sessions: [], deletedSessions:[], notes: [], estimates: [], reviews: [], audit: [], settings: { targetMinutes: 25, breakMinutes: 5, selectedTaskId: null, breakUntil: null, rest:null } };
+  return { schemaVersion: JOURNAL_SCHEMA_VERSION,activities:[],  itemReviews: [], moves: [], tags: [], views: [], projects: [{ id: inbox.id, name: inbox.title, description: inbox.description!, archived: false, createdAt, parentId:null, order:0 }], tasks: [inbox], sessions: [], deletedSessions:[], notes: [], estimates: [], reviews: [], audit: [], settings: { targetMinutes: 25, breakMinutes: 5, selectedTaskId: null, breakUntil: null, rest:null } };
 }
 export function localDate(value: Date | string | number = new Date()): string {
   const d = new Date(value); return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;

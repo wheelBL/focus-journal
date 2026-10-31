@@ -1,0 +1,10 @@
+import type {Command,JournalState,Task} from './types';
+export type CompletionBy='self'|'other'|'shared'|'unknown';
+export interface Ownership {assignee:string;followUp:boolean;at:string;note:string;reminder:import('./types').ItemReminder|null}
+export interface BusinessActivity {id:string;at:string;operation:string;source:'user'|'ai'|'api'|'sync'|'system';entry:string;version:string;aiRunId?:string;changes:{entityId:string;title:string;field:string;before:unknown;after:unknown}[];truncated?:boolean}
+export const completionLabels:Record<CompletionBy,string>={self:'本人完成',other:'他人完成',shared:'共同完成',unknown:'完成归属未注明'};
+export function ownershipLabel(t:Task){return t.ownership?`${t.ownership.followUp?'待他人':'已交接'} · ${t.ownership.assignee}`:'本人负责';}
+export function isPersonalTask(t:Task){return !t.ownership;}
+export const activityLabels:Record<string,string>={'item.handoff':'交接事项','item.reclaim':'重新接手','item.completion':'调整完成归属','task.status':'调整结束状态','item.change':'调整事项状态','outline.create':'新增事项','capture.create':'快速记录','task.save':'保存事项','project.save':'保存项目','outline.patch':'编辑事项','outline.move':'移动事项','item.focus':'调整今日重点','task.plan':'调整计划','focus.start':'开始计时','focus.start-unassigned':'先计时','focus.switch':'切换计时','focus.pause':'暂停计时','focus.resume':'恢复计时','focus.stop':'结束计时','focus.set-start':'调整开始时间','session.manual':'补记或校正投入','session.summary':'记录进展','session.assign':'关联投入','session.delete':'删除投入','session.restore':'恢复投入','estimate.add':'调整剩余估计','review.save':'记录复盘','item.undo':'撤销事项状态','organize.undo':'撤销整理','items.batch':'批量整理','calendar.save':'日历安排','view.save':'保存视图','view.delete':'删除视图'};
+export function validateOwnership(task:Task){const o=task.ownership;if(task.status==='handed-off'&&!o)throw Error('已交接事项缺少责任记录。');if(o!=null){if(typeof o.assignee!=='string'||!o.assignee.trim()||o.assignee.length>120||typeof o.followUp!=='boolean'||typeof o.note!=='string'||o.note.length>2000||!Number.isFinite(Date.parse(o.at))||!o.followUp&&o.reminder)throw Error('交接记录无效。');}
+ if(task.completionBy!==undefined&&!Object.hasOwn(completionLabels,task.completionBy))throw Error('完成归属无效。');}

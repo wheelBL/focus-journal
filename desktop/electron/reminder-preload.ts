@@ -6,3 +6,5 @@ contextBridge.exposeInMainWorld('reminder',{
  onChanged:(callback:(value:unknown)=>void)=>{const listener=(_event:unknown,value:unknown)=>callback(value);ipcRenderer.on('reminder:changed',listener);return()=>ipcRenderer.removeListener('reminder:changed',listener);},
  audioResult:(id:unknown,error:unknown)=>ipcRenderer.send('reminder:audio-result',id,error)
 });
+import {exposeAppearance} from './appearance-preload';
+exposeAppearance();

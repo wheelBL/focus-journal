@@ -37,7 +37,7 @@ const click=e=>action(()=>e.click());
 test('reminder settings audition unsaved options without writing settings or effort',async()=>{
  const root=createRoot(query('#root'));await action(()=>root.render(React.createElement(App)));
  try{
-  await click(query('[aria-label="设置"]'));const before=service.snapshot().state;
+  await click(query('[aria-label="设置"]'));await click(button('到时提醒',query('[aria-label="设置分区"]')));const before=service.snapshot().state;
   const select=query('[aria-label="重复提醒间隔"]');await action(()=>{select.value='60';select.dispatchEvent(new Event('change',{bubbles:true}));});
   await click(button('试听声音'));await click(button('预览提醒'));
   assert.deepEqual(previews.map(p=>p.mode),['sound','card']);assert.equal(previews[0].settings.repeatSeconds,60);assert.deepEqual(service.snapshot().state,before);

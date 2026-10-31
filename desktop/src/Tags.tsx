@@ -5,11 +5,12 @@ import {EditValue} from './InlineEdit';
 import {tagKey} from '../core/filters';
 import {ruleTagIds,rulesFor} from '../core/filter-rules';
 import type {Task} from '../core/types';
+import {useDialogAction} from './useDialogAction';
 
 export function TagEditor({task,onEdit}:{task:Task;onEdit?:()=>void}){
- const {data,run,busy}=useJournal(),[name,setName]=useState(''),[error,setError]=useState('');
- const add=async(e:React.FormEvent)=>{e.preventDefault();if(!name.trim()||busy)return;onEdit?.();try{await run({type:'tag.attach',payload:{id:task.id,name}});setName('');setError('');}catch(e){setError(String((e as Error).message));}};
- return <section className="tag-editor"><label htmlFor={`tag-${task.id}`}><Tag20Regular/>标签</label><div className="tag-chips">{task.tagIds?.map(id=>{const tag=data.state.tags.find(t=>t.id===id);return tag&&<span className="tag-chip" key={id}>{tag.name}<button type="button" aria-label={`从此事项移除标签 ${tag.name}`} disabled={busy} onClick={()=>{onEdit?.();void run({type:'tag.detach',payload:{id:task.id,tagId:id}}).catch(()=>{});}}>×</button></span>;})}</div><form onSubmit={e=>void add(e)}><input id={`tag-${task.id}`} aria-label="自定义标签" value={name} maxLength={40} autoComplete="off" placeholder="输入标签，Enter 添加" onChange={e=>setName(e.target.value)} onKeyDown={e=>{e.stopPropagation();if(e.nativeEvent.isComposing&&e.key==='Enter')e.preventDefault();}}/><Button type="submit" disabled={!name.trim()||busy}>添加</Button></form>{error&&<small role="alert" className="form-error">{error}</small>}</section>;
+ const {data,run,busy}=useJournal(),[name,setName]=useState(''),action=useDialogAction();
+ const add=async(e:React.FormEvent)=>{e.preventDefault();if(!name.trim()||busy)return;const submitted=name;onEdit?.();if(await action.perform(()=>run({type:'tag.attach',payload:{id:task.id,name:submitted}})))setName(current=>current===submitted?'':current);};
+ return <section className="tag-editor"><label htmlFor={`tag-${task.id}`}><Tag20Regular/>标签</label><div className="tag-chips">{task.tagIds?.map(id=>{const tag=data.state.tags.find(t=>t.id===id);return tag&&<span className="tag-chip" key={id}>{tag.name}<button type="button" aria-label={`从此事项移除标签 ${tag.name}`} disabled={busy} onClick={()=>{onEdit?.();void run({type:'tag.detach',payload:{id:task.id,tagId:id}}).catch(()=>{});}}>×</button></span>;})}</div><form aria-busy={action.saving} onSubmit={e=>void add(e)}><input id={`tag-${task.id}`} aria-label="自定义标签" value={name} readOnly={action.saving} maxLength={40} autoComplete="off" placeholder="输入标签，Enter 添加" onChange={e=>{if(!action.saving)setName(e.target.value);}} onKeyDown={e=>{e.stopPropagation();if(e.nativeEvent.isComposing&&e.key==='Enter')e.preventDefault();}}/><Button type="submit" disabled={!name.trim()||busy||action.saving}>{action.saving?'添加中…':'添加'}</Button></form>{action.error&&<small role="alert" className="form-error">{action.error}</small>}</section>;
 }
 export function TagManager({onClose,onChange}:{onClose:()=>void;onChange:(oldId:string,newId:string|null)=>void}){
  const {data,run,busy}=useJournal(),[deleting,setDeleting]=useState<string|null>(null);

@@ -1,0 +1,24 @@
+.action-popover{position:relative;flex:none}
+.action-popover>button{display:flex;align-items:center;gap:5px;white-space:nowrap}
+.disclosure-chevron::after{content:'⌄'}
+.action-popover-panel{position:absolute;z-index:35;right:0;top:calc(100% + 4px);display:flex;flex-direction:column;align-items:stretch;gap:3px;min-width:170px;max-width:min(280px,80vw);padding:8px;background:var(--surface);color:var(--ink);border:1px solid var(--line-strong);border-radius:8px;box-shadow:0 6px 24px var(--shadow)}
+.action-popover-panel[hidden]{display:none}
+.journal-style .action-popover-panel :is(button,label){text-align:left;justify-content:flex-start;white-space:normal;padding:6px 8px;min-height:30px;color:var(--ink);font-size:12px}
+.journal-style .action-popover-panel button{display:flex;align-items:center;gap:6px;width:100%;border:0;border-radius:5px;background:transparent;cursor:pointer}
+.journal-style .action-popover-panel button:hover{background:var(--surface-hover)}
+.action-popover-panel label{display:flex;align-items:center;gap:7px}
+.action-popover-panel hr{border:0;border-top:1px solid var(--line);width:100%;margin:3px 0}
+.action-group-label{font-size:10px;color:var(--muted);padding:3px 8px;overflow-wrap:anywhere}
+.journal-style .application.workbench .tree-page-header{min-height:74px;padding-block:15px}
+.journal-style .application .filter-controls{flex-wrap:wrap;padding-bottom:8px;gap:5px}
+.journal-style .application .filter-controls .sort-control{margin-left:auto}
+.journal-style .application .filter-controls .saved-view-select{display:none}
+.journal-style .application .filter-controls .outline-toolbar{display:flex;padding:0;min-height:0;border:0;margin:0}
+.journal-style .outline-scope-row{padding:0 24px 8px;font-size:11px}
+.journal-style .outline-scope-row .outline-scope{gap:4px}
+.journal-style .application.workbench .outline-footer{min-height:26px;padding-block:4px}
+/* The selected single timer is already pinned in the inspector. Other pages,
+   other selected items, closed details and concurrent timers keep the dock. */
+.journal-style .main:has(> .tree-page .task-inspector .compact-timer)>.timer-dock:not(.multiple-timers){display:none}
+.journal-style .calendar-toolbar>.segmented{display:none}
+@media(max-width:740px){.journal-style .application .filter-controls .saved-view-select{display:inline-block;max-width:120px}.journal-style .calendar-toolbar>.segmented{display:flex}}

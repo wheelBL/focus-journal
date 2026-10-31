@@ -35,6 +35,10 @@ desktop/.runtime-compat/
 **/local-api.json
 **/capture-settings.json
 **/floating-timer-position.json
+**/ai-config.json
+**/appearance.json
+**/usage-records.json*
+**/local-api.audit.jsonl
 **/journal.json
 **/focus-journal.json
 **/*备份*.json
@@ -55,6 +59,11 @@ desktop/.runtime-compat/
 /desktop/AGENTS.md
 /desktop/design-audits/
 /desktop/design-explorations/
+# Native QA imports this synthetic seed; local prototype screenshots/configs stay local.
+/desktop/design-prototypes/*
+!/desktop/design-prototypes/things-3/
+/desktop/design-prototypes/things-3/*
+!/desktop/design-prototypes/things-3/seed.ts
 /desktop/design-qa*.md
 /desktop/src/App.jsx
 /desktop/src/main.jsx

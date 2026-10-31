@@ -1,0 +1,8 @@
+/* Secondary actions share one entry; date, status and timing remain direct. */
+.journal-style .node-meta .inspector-more-actions{margin-left:auto;font-size:11px}
+.journal-style .inspector-more-actions>button{min-height:28px;padding:3px 6px;font-size:11px}
+.journal-style .inspector-more-actions .action-popover-panel{min-width:150px;right:0;left:auto}
+.journal-style .inspector-more-arrangements{margin:8px 0 10px}
+.journal-style .inspector-more-arrangements>summary{color:var(--muted);font-size:11px;cursor:pointer;padding:6px 0}
+.journal-style .inspector-more-arrangements>div{padding:10px 0 0}
+.journal-style .inspector-more-arrangements>summary:focus-visible{outline:2px solid var(--focus-ring);outline-offset:2px;border-radius:4px}

@@ -1,4 +1,5 @@
 import {sessionTitle} from '../core/session-label';
+import {SessionStartControl} from './SessionStart';
 import React from 'react';
 import {Timer24Filled,Pause20Filled,Play20Filled,Stop20Filled,ChevronUp20Regular} from '@fluentui/react-icons';
 import {Button,timerText} from './ui';
@@ -16,6 +17,7 @@ export function TimerDock({data,busy,run,onOpen,onSummary}:{data:Snapshot;busy:b
   return <div className="dock-timer-row" key={timer.sessionId} aria-label={`${title}的计时器`}>
    <button className="dock-task" title={title} onClick={()=>onOpen(timer.taskId)}>{title}<small>{timer.paused?'已暂停':'计时中'}</small></button>
    <strong>{timerText(timer.durationMs)}</strong>
+   <SessionStartControl sessionId={timer.sessionId} compact/>
    <Button disabled={busy} aria-label={`${timer.paused?'恢复':'暂停'}${title}计时`} onClick={()=>void run({type:timer.paused?'focus.resume':'focus.pause',payload:{sessionId:timer.sessionId}}).catch(()=>{})}>{timer.paused?<Play20Filled/>:<Pause20Filled/>}{timer.paused?'恢复':'暂停'}</Button>
    <Button primary disabled={busy} aria-label={`结束${title}计时`} onClick={()=>void stop(timer).catch(()=>{})}><Stop20Filled/>结束本次</Button>
   </div>;

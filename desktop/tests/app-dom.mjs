@@ -8,7 +8,7 @@ import {JSDOM} from 'jsdom';
 import {JournalService} from '../core/service.ts';
 import {emptyState} from '../core/types.ts';
 
-export async function appDom(){
+export async function appDom(options={}){
  const dom=new JSDOM('<!doctype html><div id="root"></div>',{url:'http://localhost',pretendToBeVisual:true});
  for(const key of ['window','document','HTMLElement','HTMLInputElement','HTMLSelectElement','HTMLTextAreaElement','Event','MouseEvent','KeyboardEvent','CustomEvent'])globalThis[key]=dom.window[key];
  globalThis.IS_REACT_ACT_ENVIRONMENT=true;globalThis.requestAnimationFrame=cb=>setTimeout(cb,0);globalThis.cancelAnimationFrame=clearTimeout;
@@ -19,6 +19,8 @@ export async function appDom(){
  const clock={time:Date.parse('2026-10-19T14:00:00'),mono:0,now(){return this.time;},monotonic(){return this.mono;},advance(ms){this.time+=ms;this.mono+=ms;}};
  const service=new JournalService(new Store(),clock);let onChanged=()=>{};
  window.journal={snapshot:async()=>service.snapshot(),command:async c=>service.execute(c),onChanged:cb=>{onChanged=cb;return()=>{onChanged=()=>{};};},exportData:async()=>null,importData:async()=>null,openDataFolder:async()=>{},windowAction:async()=>{}};
+ if(options.usage)window.journal.usage=options.usage;
+ if(options.freeze)Object.freeze(window.journal);
  const {default:React,act}=await import('react'),{createRoot}=await import('react-dom/client');
  const folder=path.resolve(`qa-evidence/release-${JSON.parse(readFileSync('package.json','utf8')).version}/dom`);mkdirSync(folder,{recursive:true});const output=path.join(folder,`app-${process.pid}-${randomUUID()}.mjs`);
  await build({entryPoints:['src/App.tsx'],outfile:output,bundle:true,platform:'node',format:'esm',packages:'external',jsx:'automatic',loader:{'.css':'empty'},logLevel:'silent'});

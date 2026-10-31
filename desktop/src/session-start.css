@@ -1,0 +1,8 @@
+.session-start-control{display:flex;align-items:center;gap:6px;flex-wrap:wrap;margin-top:7px;font-size:12px;color:var(--muted)}
+.session-start-control button{font-size:12px;padding:3px 6px}
+.session-start-control.compact{margin:0;flex-shrink:0}
+.session-start-presets{display:flex;flex-wrap:wrap;gap:6px;margin:-4px 0 16px}
+.session-start-presets button{font-size:12px;padding:5px 9px}
+.session-start-preview{display:flex;flex-wrap:wrap;gap:12px 28px;background:var(--accent-soft);border-radius:6px;padding:12px 14px;color:var(--accent)}
+.session-start-preview p{margin:0}
+.session-start-reminder{line-height:1.7}

@@ -12,3 +12,11 @@
 .assignment-rest-choice{margin-top:14px;font-size:12px}
 .reminder-rest-hint{font-size:12px;color:var(--muted);margin:8px 0 0}
 @media(max-width:760px){.break-bar{flex-wrap:wrap;padding:8px 12px;gap:7px}.break-message{flex-basis:calc(100% - 40px)}.break-actions{margin-left:30px;flex-wrap:wrap;flex-shrink:1}.break-actions button{min-height:28px;padding:4px 8px}}
+
+.journal-style .application.workbench:has(.break-bar){grid-template-rows:44px auto minmax(0,1fr)}
+.journal-style .application.workbench{--rest-nav-width:220px}
+.journal-style #rest-workspace{background:var(--shell)}
+.journal-style #rest-workspace .break-bar{margin-left:var(--rest-nav-width)}
+@media(max-width:1150px){.journal-style .application.workbench{--rest-nav-width:190px}}
+@media(max-width:900px){.journal-style .application.workbench{--rest-nav-width:160px}}
+@media(max-width:740px){.journal-style .application.workbench{--rest-nav-width:0px}}

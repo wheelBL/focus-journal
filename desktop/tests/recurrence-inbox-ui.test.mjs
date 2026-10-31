@@ -15,7 +15,7 @@ test('Inbox exposes ordinary project toggle, edit, timing and lifecycle; details
 });
 test('repeat controls save weekly selected days, create one successor, stop and retain this occurrence',async()=>{
  const h=await appDom();try{
-  const id=h.add('清理邮件','inbox',{plannedDate:'2026-10-19'});await h.mount();await h.click(h.label('事项'));await h.click(h.query(`[data-outline-id="${id}"]`));await h.click(h.button('不重复'));
+  const id=h.add('清理邮件','inbox',{plannedDate:'2026-10-19'});await h.mount();await h.click(h.label('事项'));await h.click(h.query(`[data-outline-id="${id}"]`));await h.click(h.query('.inspector-more-arrangements > summary'));await h.click(h.button('不重复'));
   await h.input(h.label('重复周期'),'week');await h.click(h.label('每周二'));await h.click(h.button('保存重复'));assert.deepEqual(h.get(id).recurrence.weekdays,[1,2]);
   await h.click(h.label('完成清理邮件'));const next=h.get(id).recurrenceNextId;assert.ok(next);assert.equal(h.get(next).plannedDate,'2026-10-20');assert.equal(h.get(id).status,'done');
   await h.click(h.query(`[data-outline-id="${next}"]`));await h.click(h.query('.recurrence-heading button'));await h.input(h.label('重复方式'),'completion');await h.input(h.label('重复间隔'),'2');await h.click(h.button('保存重复'));assert.equal(h.get(next).recurrence.mode,'completion');

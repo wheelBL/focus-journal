@@ -11,6 +11,7 @@ import {calendarEntries} from '../src/calendar-layout';
 import {dayProgress,todayCandidates} from '../core/today';
 import {outlineIndex} from '../core/outline';
 import {emptyFilter,filterOutline} from '../core/filters';
+import {parseCapture} from '../core/capture';
 
 class Store {path='calendar execution tests';state=emptyState();load(){return structuredClone(this.state);}save(s:JournalState){this.state=structuredClone(s);}close(){}}
 function setup(store=new Store()){
@@ -19,6 +20,17 @@ function setup(store=new Store()){
  const manual=(taskId:string,start='20:30',end='20:31')=>service.execute({type:'session.manual',payload:{taskId,date:'2026-10-19',minutes:1,start:`2026-10-19T${start}`,end:`2026-10-19T${end}`,summary:'记录进展'}}).state.sessions.at(-1)!;
  return {service,clock,add,manual,store};
 }
+
+test('calendar semantic creation preserves parent, tags, plan and estimate in the same transaction as effort',()=>{
+ const h=setup(),parent=h.add('工作项目'),now=h.service.snapshot().now;
+ const draft=parseCapture('整理资料 #工作项目 %资料 明天开始 周五截止 估计50分钟',now).draft;
+ const payload={mode:'effort',draft,parentId:null,start:'2026-10-20T09:00:00+08:00',end:'2026-10-20T10:00:00+08:00',summary:'完成整理'};
+ const before=h.service.exportJson();assert.throws(()=>h.service.execute({type:'calendar.save',payload:{...payload,start:'2026-10-23T09:00:00+08:00',end:'2026-10-23T10:00:00+08:00'}}),/未来/);assert.equal(h.service.exportJson(),before);
+ const state=h.service.execute({type:'calendar.save',payload}).state,item=state.tasks.at(-1)!;
+ assert.equal(item.parentId,parent);assert.equal(item.title,'整理资料');assert.equal(item.plannedDate,'2026-10-22');assert.equal(item.dueAt,'2026-10-23');assert.equal(item.estimateMinutes,50);assert.equal(state.tags.find(tag=>item.tagIds!.includes(tag.id))!.name,'资料');assert.equal(state.sessions[0].taskId,item.id);assert.equal(state.sessions[0].durationMs,3600000);
+ const rootDraft=parseCapture('最外层记录',now).draft;const root=h.service.execute({type:'calendar.save',payload:{...payload,mode:'reminder',draft:rootDraft,parentId:null}}).state.tasks.at(-1)!;assert.equal(root.parentId,null,'an explicit root is distinct from the default capture parent');
+ const saved=h.service.exportJson();assert.throws(()=>h.service.execute({type:'calendar.save',payload:{...payload,draft:parseCapture('- 笔记',now).draft}}),/类型/);assert.equal(h.service.exportJson(),saved);
+});
 
 test('nonoverlapping 20:30–20:31 and 20:40–21:17 keep one lane, true duration and original data',()=>{
  const h=setup(),a=h.add('同一事项');h.manual(a);h.manual(a,'20:40','21:17');const state=h.service.snapshot().state,before=JSON.stringify(state);
@@ -57,7 +69,7 @@ test('archive validation rejects duplicate IDs, invalid owners and active archiv
 test('schema 15 gets a pre-migration SQLite backup and deleted evidence survives reopen',()=>{
  const folder=mkdtempSync(join(tmpdir(),'focus-schema16-')),file=join(folder,'journal.sqlite');try{
   let store=new SqliteJournalStore(file);const legacy=emptyState();legacy.schemaVersion=15;store.save(legacy);store.close();
-  store=new SqliteJournalStore(file);let s=new JournalService(store);assert.equal(s.snapshot().state.schemaVersion,16);assert.ok(readdirSync(join(folder,'backups')).some(n=>n.startsWith('before-schema-15-to-16-')));
+  store=new SqliteJournalStore(file);let s=new JournalService(store);assert.equal(s.snapshot().state.schemaVersion,19);assert.ok(readdirSync(join(folder,'backups')).some(n=>n.startsWith('before-schema-15-to-19-')));
   const id=s.execute({type:'task.save',payload:{title:'持久记录',parentId:null}}).state.tasks.at(-1)!.id,record=s.execute({type:'session.manual',payload:{taskId:id,date:'2026-10-19',minutes:12}}).state.sessions[0];s.execute({type:'session.delete',payload:{id:record.id}});s.shutdown();
   s=new JournalService(new SqliteJournalStore(file));assert.equal(s.snapshot().state.deletedSessions[0].id,record.id);assert.equal(s.execute({type:'session.restore',payload:{id:record.id}}).state.sessions[0].durationMs,720000);s.shutdown();
  }finally{rmSync(folder,{recursive:true,force:true});}

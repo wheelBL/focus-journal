@@ -1,5 +1,10 @@
+import {effectiveItemReminder} from '../core/item-reminders';
+import {OwnershipControl} from './Ownership';
+import {ItemActivity} from './ItemActivity';
 import {itemPresentations} from '../core/item-presentation';
+import {useEnterMotion} from './motion';
 import {ItemStatus} from './ItemStatus';
+import {SessionStartControl} from './SessionStart';
 import {RecurrenceControl} from './RecurrenceControl';
 import {FocusToggle} from './FocusToggle';
 import {EventContent} from './EventContent';
@@ -19,6 +24,7 @@ import {ReviewScheduleEditor} from './ReviewSchedule';
 import {LifecycleActions,EstimateFacts} from './ItemActions';
 import {NoteContent} from './NoteContent';
 import {reviewChanges} from '../core/item-reviews';
+import {ActionPopover} from './ActionPopover';
 
 export type InspectorTab='details'|'records'|'review';
 const quiet=(p:Promise<unknown>)=>{void p.catch(()=>{});};
@@ -27,21 +33,29 @@ type Props={reviewing?:boolean;scopeRoot?:string;node:OutlineNode;index:OutlineI
 
 /** Persistent identity/timer header; each tab owns one distinct reading or editing job. */
 export function ItemInspector({reviewing=false,scopeRoot,node,index,tab,setTab,onClose,onSelect,onFocus,onStart,onStop,onPatch,onEdit}:Props){
- const {data}=useJournal(),task=node.record as Task,note=isInformation(task),path=outlinePath(index,node.id),timer=data.timers.find(t=>t.taskId===node.id);
+ const {data}=useJournal(),task=node.record as Task,note=isInformation(task),parents=outlinePath(index,node.id).slice(0,-1);
  const workspace=useWorkspaceJournal(),presentation=useMemo(()=>itemPresentations(index,workspace.data.timers,workspace.data.now).get(node.id)!,[index,workspace.data.timers,workspace.data.now,node.id]);
  const recordCount=data.state.sessions.filter(s=>s.taskId===node.id).length;
- return <aside className="task-inspector" aria-label="所选事项详情">
+ const detailRef=React.useRef<HTMLElement>(null),contentRef=React.useRef<HTMLDivElement>(null);
+ const tabId=React.useId(),tabs=[['details','内容'],['records',`投入 ${recordCount}`],['review','复盘']] as const;
+ const tabKey=(event:React.KeyboardEvent<HTMLElement>)=>{
+  if(event.nativeEvent.isComposing||event.altKey||event.ctrlKey||event.metaKey||!(event.target instanceof HTMLElement)||event.target.getAttribute('role')!=='tab')return;
+  const at=tabs.findIndex(([id])=>id===tab),next=event.key==='ArrowRight'?(at+1)%tabs.length:event.key==='ArrowLeft'?(at+tabs.length-1)%tabs.length:event.key==='Home'?0:event.key==='End'?tabs.length-1:null;
+  if(next===null)return;event.preventDefault();event.stopPropagation();setTab(tabs[next][0]);event.currentTarget.querySelector<HTMLElement>(`[data-inspector-tab="${tabs[next][0]}"]`)?.focus();
+ };
+ useEnterMotion(detailRef,node.id);useEnterMotion(contentRef,tab);
+ return <aside ref={detailRef} className="task-inspector" aria-label="所选事项详情">
   <div className="inspector-fixed"><div className="inspector-top"><span>{note?isEvent(task)?'事件详情':'笔记详情':'事项详情'}</span><Button subtle aria-label="收起详情" onClick={onClose}><Dismiss20Regular/></Button></div>
-   <nav className="node-breadcrumb" aria-label="任务所在路径">{path.map((n,i)=><React.Fragment key={n.id}>{i>0&&<ChevronRight20Regular/>}<button title={n.title} disabled={!!scopeRoot&&!branchIds(index,scopeRoot).has(n.id)} onClick={()=>onSelect(n.id)}>{n.title}</button></React.Fragment>)}</nav>
+    {parents.length>0&&<nav className="node-breadcrumb" aria-label="任务所在路径">{parents.map((n,i)=><React.Fragment key={n.id}>{i>0&&<ChevronRight20Regular/>}<button title={n.title} disabled={!!scopeRoot&&!branchIds(index,scopeRoot).has(n.id)} onClick={()=>onSelect(n.id)}>{n.title}</button></React.Fragment>)}</nav>}
    <div className="inspector-title"><EditValue label="详情名称" value={node.title} onSave={value=>onPatch('title',value)}/></div>
-   <div className="node-meta"><ItemStatus value={presentation}/>{task?.isProject&&<span>项目标记</span>}{task&&!note&&task.status==='open'&&!task.deletedAt&&<FocusToggle task={task}/>}{!reviewing&&<button onClick={()=>onFocus(node.id)}><Target20Regular/>聚焦此分支</button>}</div>
+    <div className="node-meta"><ItemStatus value={presentation}/>{task?.isProject&&<span>项目标记</span>}{task&&!note&&task.status==='open'&&!task.deletedAt&&<FocusToggle task={task}/>}<ActionPopover label="更多操作" className="inspector-more-actions"><button title="参考此事项及子项，先预览 AI 建议" onClick={()=>workspace.dialog({type:'ai',id:node.id})}>AI 帮我梳理</button>{!reviewing&&<button onClick={()=>onFocus(node.id)}><Target20Regular/>聚焦此分支</button>}</ActionPopover></div>
    {task&&!note&&<ItemTimerControls task={task} index={index} onStart={onStart} onStop={onStop}/>}
-   {!note&&<div className="inspector-tabs" role="tablist" aria-label="详情内容">{([['details','内容'],['records',`投入 ${recordCount}`],['review','复盘']] as const).map(([id,label])=><button role="tab" aria-selected={tab===id} className={tab===id?'active':''} key={id} onClick={()=>setTab(id)}>{label}</button>)}</div>}
+   {!note&&<div className="inspector-tabs" role="tablist" aria-label="详情内容" onKeyDown={tabKey}>{tabs.map(([id,label])=><button id={`${tabId}-${id}`} role="tab" aria-selected={tab===id} aria-controls={`${tabId}-panel`} tabIndex={tab===id?0:-1} data-inspector-tab={id} className={tab===id?'active':''} key={id} onClick={()=>setTab(id)}>{label}</button>)}</div>}
   </div>
-  <div className="inspector-scroll">
+  <div ref={contentRef} className="inspector-scroll" role={note?undefined:'tabpanel'} id={note?undefined:`${tabId}-panel`} aria-labelledby={note?undefined:`${tabId}-${tab}`}>
    {note&&task?<>{isEvent(task)?<EventContent task={task} onEdit={onEdit}/>:<NoteContent task={task} onEdit={onEdit}/>}<BranchControls node={node} index={index} onSelect={onSelect}/></>:tab==='details'?<>
-    {task?<><section className="inspector-field inspector-description"><EditValue label="事项说明" value={task.description??''} multiline empty="添加说明…" onSave={value=>onPatch('description',value)}/></section><div className="inspector-properties"><section className="inspector-field"><label><Calendar20Regular/>计划开始</label><EditValue label="详情计划开始" value={task.plannedDate??''} type="date" empty="未设置" onSave={value=>onPatch('plannedDate',value||null)}/></section><section className="inspector-field"><label><Flag20Regular/>截止时间</label><DeadlineEditor label="详情截止时间" value={task.dueAt} onSave={value=>onPatch('dueAt',value)}/>{task.status==='open'&&isDeadlineOverdue(task.dueAt,data.now)&&<small className="overdue">已超过截止时间</small>}</section><ItemReminderControl task={task}/><RecurrenceControl task={task}/><TagEditor task={task} onEdit={onEdit}/></div>{deadlineConstraint(index,task.id)&&<p className="item-reason">{deadlineConstraint(index,task.id)}</p>}{reviewing&&<ReviewChangeSummary id={task.id}/>}<ReviewScheduleEditor id={task.id}/><details className="inspector-history"><summary>实际时间与历史</summary><div className="date-facts"><span>实际开始 <strong>{dateTime(task.startedAt)}</strong></span><span>实际完成 <strong>{dateTime(task.completedAt)}</strong></span><small>时间记录在“投入”，估计与调整在“复盘”。</small></div></details></>:<p className="muted">临时记录在这里，想清楚后再拖到合适的位置。</p>}
-    <BranchControls node={node} index={index} onSelect={onSelect}/>{task&&<LifecycleActions task={task}/>}
+     {task?<><section className="inspector-field inspector-description"><EditValue label="事项说明" value={task.description??''} multiline empty="添加说明…" onSave={value=>onPatch('description',value)}/></section><div className="inspector-properties"><section className="inspector-field"><label><Calendar20Regular/>计划开始</label><EditValue label="详情计划开始" value={task.plannedDate??''} type="date" empty="未设置" onSave={value=>onPatch('plannedDate',value||null)}/></section><section className="inspector-field"><label><Flag20Regular/>截止时间</label><DeadlineEditor label="详情截止时间" value={task.dueAt} onSave={value=>onPatch('dueAt',value)}/>{task.status==='open'&&isDeadlineOverdue(task.dueAt,data.now)&&<small className="overdue">已超过截止时间</small>}</section><TagEditor task={task} onEdit={onEdit}/><ItemArrangements task={task}/><OwnershipControl task={task}/></div>{deadlineConstraint(index,task.id)&&<p className="item-reason">{deadlineConstraint(index,task.id)}</p>}{reviewing&&<ReviewChangeSummary id={task.id}/>}<details className="inspector-history"><summary>实际时间与历史</summary><div className="date-facts"><span>实际开始 <strong>{dateTime(task.startedAt)}</strong></span><span>实际完成 <strong>{dateTime(task.completedAt)}</strong></span><small>时间记录在“投入”，估计与调整在“复盘”。</small></div></details></>:<p className="muted">临时记录在这里，想清楚后再拖到合适的位置。</p>}
+    <ItemActivity id={node.id}/><BranchControls node={node} index={index} onSelect={onSelect}/>{task&&<LifecycleActions task={task}/>}
    </>:tab==='records'?<ItemEffort node={node} index={index}/>:task?<ItemRetrospective task={task}/>:<p className="muted">选择一个事项查看它的估计、成果和调整。</p>}
   </div>
  </aside>;
@@ -50,7 +64,7 @@ export function ItemInspector({reviewing=false,scopeRoot,node,index,tab,setTab,o
 function ItemTimerControls({task,index,onStart,onStop}:{task:Task;index:OutlineIndex;onStart:()=>Promise<unknown>;onStop:()=>Promise<unknown>}){
  const {data,run,dialog,busy}=useJournal(),timer=data.timers.find(t=>t.taskId===task.id),reason=blockedReason(index,task.id),estimate=estimateProgress(data.state,task.id);
  if(task.status!=='open')return null;
- return <>{timer?<div className="inspector-focus compact-timer"><div className="inspector-clock"><span>{timer.paused?'计时暂停':'本次投入'}</span><strong>{timerText(timer.durationMs)}</strong></div><div className="actions"><Button disabled={busy||timer.paused&&!!reason} onClick={()=>quiet(run({type:timer.paused?'focus.resume':'focus.pause',payload:{sessionId:timer.sessionId}}))}>{timer.paused?<Play20Filled/>:<Pause20Filled/>}{timer.paused?'恢复':'暂停'}</Button><Button primary disabled={busy} onClick={()=>quiet(onStop())}><Stop20Filled/>结束本次</Button></div></div>:<div className="inspector-focus"><Button primary disabled={busy||!!reason} title={reason??undefined} onClick={()=>quiet(onStart())}><Play20Filled/>开始 {data.state.settings.targetMinutes} 分钟</Button>{data.timers.some(t=>!t.paused&&t.taskId!==task.id)&&<Button subtle disabled={busy||!!reason} onClick={()=>quiet(run({type:'focus.switch',payload:{taskId:task.id,skipEstimate:true}}))}>切换计时到此项</Button>}</div>}{reason&&<p className="item-reason">{reason}</p>}{estimate.exhausted&&<div className="estimate-exhausted"><span>估计已用尽 · 剩余待重估{estimate.overrun>0?` · 超出 ${minuteText(estimate.overrun*60000)}`:''}</span><Button subtle onClick={()=>dialog({type:'estimate',id:task.id})}>重新估计</Button></div>}</>;
+ return <>{timer?<div className="inspector-focus compact-timer"><div className="inspector-clock"><span>{timer.paused?'计时暂停':'本次投入'}</span><strong>{timerText(timer.durationMs)}</strong></div><SessionStartControl sessionId={timer.sessionId}/><div className="actions"><Button disabled={busy||timer.paused&&!!reason} onClick={()=>quiet(run({type:timer.paused?'focus.resume':'focus.pause',payload:{sessionId:timer.sessionId}}))}>{timer.paused?<Play20Filled/>:<Pause20Filled/>}{timer.paused?'恢复':'暂停'}</Button><Button primary disabled={busy} onClick={()=>quiet(onStop())}><Stop20Filled/>结束本次</Button></div></div>:<div className="inspector-focus"><Button primary disabled={busy||!!reason} title={reason??undefined} onClick={()=>quiet(onStart())}><Play20Filled/>开始 {data.state.settings.targetMinutes} 分钟</Button>{data.timers.some(t=>!t.paused&&t.taskId!==task.id)&&<Button subtle disabled={busy||!!reason} onClick={()=>quiet(run({type:'focus.switch',payload:{taskId:task.id,skipEstimate:true}}))}>切换计时到此项</Button>}</div>}{reason&&<p className="item-reason">{reason}</p>}{estimate.exhausted&&<div className="estimate-exhausted"><span>估计已用尽 · 剩余待重估{estimate.overrun>0?` · 超出 ${minuteText(estimate.overrun*60000)}`:''}</span><Button subtle onClick={()=>dialog({type:'estimate',id:task.id})}>重新估计</Button></div>}</>;
 }
 
 function ItemEffort({node,index}:{node:OutlineNode;index:OutlineIndex}){
@@ -69,3 +83,11 @@ function BranchControls({node,index,onSelect}:{node:OutlineNode;index:OutlineInd
  return children.length>0?<details className="inspector-children" onToggle={e=>setOpen(e.currentTarget.open)}><summary>直接子项 · {children.length}</summary>{(open||children.length<400)&&children.map(n=><button key={n.id} onClick={()=>onSelect(n.id)}>{n.kind==='project'?<Folder20Regular/>:<ChevronRight20Regular/>}<span>{n.title}</span></button>)}</details>:null;
 }
 function ReviewChangeSummary({id}:{id:string}){const {data}=useJournal(),changes=reviewChanges(data.state,id);return <p className="review-change-summary">{changes?`自上次审视以来：新增 ${changes.created} 项、完成 ${changes.completed} 项、${changes.records} 条投入记录有变化。`:'尚无上次审视记录。'}<small>没有记录不表示没有推进。</small></p>;}
+
+/** Existing arrangements stay visible; only empty optional controls need disclosure. */
+function ItemArrangements({task}:{task:Task}){
+ const {data}=useWorkspaceJournal(),reminder=effectiveItemReminder(task),review=!!task.reviewSchedule||data.state.itemReviews.some(r=>r.itemId===task.id);
+ return <>{reminder&&<ItemReminderControl task={task}/>}{task.recurrence&&<RecurrenceControl task={task}/>}{review&&<ReviewScheduleEditor id={task.id}/>}
+  {(!reminder||!task.recurrence||!review)&&<details className="inspector-more-arrangements"><summary>更多安排</summary><div>{!reminder&&<ItemReminderControl task={task}/>}{!task.recurrence&&<RecurrenceControl task={task}/>}{!review&&<ReviewScheduleEditor id={task.id}/>}</div></details>}
+ </>;
+}

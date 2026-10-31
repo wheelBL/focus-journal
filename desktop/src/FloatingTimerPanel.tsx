@@ -35,7 +35,7 @@ export default function FloatingTimerPanel(){
   {data.expanded&&<section id="floating-controls" className="floating-controls" aria-label="计时操作">
    <h1>{timer?.title??(rest?.phase==='ready'?'欢迎回来，准备继续了吗？':rest?.phase==='offered'?'这一段投入已保存':'休息中')}</h1>
    {timer?<>
-    <p className="floating-meta">已投入 {floatingTime(timer.durationMs)} · 目标 {timer.targetMinutes} 分钟{timer.paused&&' · 已暂停'}</p>
+    <p className="floating-meta">已投入 {floatingTime(timer.durationMs)} · {timer.targetOffsetMs!==undefined?'后续目标':'目标'} {timer.targetMinutes} 分钟{timer.paused&&' · 已暂停'}</p>
     <div className="floating-actions"><button disabled={busy} onClick={act(timer.paused?'resume':'pause')}>{timer.paused?<Play20Filled/>:<Pause20Filled/>}{timer.paused?'恢复':'暂停'}</button><button disabled={busy} onClick={act('stop')}><Stop20Filled/>结束本次</button></div>
     <button className="floating-rest-action" disabled={busy||otherRunning} onClick={act('stop-rest')}><DrinkCoffee20Regular/>结束并休息 {data.breakMinutes} 分钟</button>
     {otherRunning?<p className="floating-hint">先暂停或结束其他计时器，再休息。</p>:<p className="floating-hint">{view.tone==='overtime'?'已超过目标，投入仍在记录。':'到时提醒，直到你主动结束。'}</p>}

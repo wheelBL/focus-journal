@@ -1,5 +1,6 @@
 import {breakContinuation} from './break-state';
 import {sessionTitle} from './session-label';
+import {timerTargetMs} from './timer-target';
 import type {ClockSnapshot,JournalState,RestCycle,TimerView} from './types';
 
 export interface FloatingTimerEntry extends TimerView {title:string}
@@ -27,8 +28,8 @@ export function selectFloatingTimer(source:FloatingTimerSource,previous:string|n
 }
 export function floatingReadout(state:FloatingTimerState){
  const timer=state.timers.find(t=>t.sessionId===state.selectedId);
- if(timer){const over=timer.durationMs>=timer.targetMinutes*60000;
-  const ms=Math.abs(timer.targetMinutes*60000-timer.durationMs);
+ if(timer){const over=timer.durationMs>=timerTargetMs(timer);
+  const ms=Math.abs(timerTargetMs(timer)-timer.durationMs);
   return {title:timer.title,label:timer.paused?'暂停':over?'超时':'剩余',ms,value:floatingTime(ms,!over),roundUp:!over,tone:timer.paused?'paused':over?'overtime':'running',timer};
  }
  const rest=state.rest;

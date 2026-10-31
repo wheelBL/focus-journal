@@ -11,3 +11,5 @@
 .capture-body-summary{margin:8px 0;padding:8px 10px;border-left:2px solid var(--line-strong);background:var(--surface-alt);font-size:12px}.capture-body-summary small{color:var(--muted)}.capture-body-summary p{white-space:pre-wrap;overflow-wrap:anywhere;margin:4px 0 0;max-height:96px;overflow:auto}.capture-editor textarea{min-height:72px;width:100%;resize:vertical}
 .workbench .outline-row:focus-visible{outline:2px solid var(--focus-ring);outline-offset:-2px}.batch-toolbar{box-shadow:inset 3px 0 0 var(--accent)}
 .capture-body-summary{display:flex;justify-content:space-between;align-items:center;gap:8px;padding:5px 8px}.capture-body-summary .text-button{font-size:11px}
+fieldset.capture-preview{padding:0;border:0;min-inline-size:0}
+.capture-panel>header button:disabled{opacity:.5;cursor:wait}

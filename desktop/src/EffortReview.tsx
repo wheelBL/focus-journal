@@ -1,0 +1,38 @@
+import {completionLabels} from '../core/activity';
+import React,{useContext,useEffect,useMemo,useState} from 'react';
+import {UnassignedQueue} from './SessionAssignment';
+import {ProjectReview} from './ProjectReview';
+import {isInformation} from '../core/item-kind';
+import {effortReviewIndex,overlayEffortReview} from '../core/effort-review';
+import {periodEffortIndex,mergeEffortPeriods,weekRange} from '../core/review';
+import {useWorkspaceJournal,Button,Empty,minuteText} from './ui';
+import {branchIds} from '../core/outline';
+import {ClockContext} from './JournalClock';
+import {localDate,shiftDate,type Task} from '../core/types';
+
+export function EffortReview(){
+ const {data,dialog}=useWorkspaceJournal(),clock=useContext(ClockContext),week=weekRange(localDate(clock?.now??data.now));
+ const [page,setPage]=useState({key:'',limit:60});
+ const [start,setStart]=useState(week.start),[end,setEnd]=useState(week.end),[filter,setFilter]=useState('all'),[project,setProject]=useState('all'),[tag,setTag]=useState('all'),[query,setQuery]=useState('');
+ const history=useMemo(()=>effortReviewIndex(data.state,start,end,true),[data.state,start,end]);
+ const activeFallback=useMemo(()=>data.state.sessions.filter(s=>s.status!=='ended'),[data.state.sessions]),active=clock?.sessions??activeFallback;
+ const model=useMemo(()=>overlayEffortReview(history,active,start,end),[history,active,start,end]);
+ const valid=!!start&&!!end&&start<=end,tree=model.tree;
+ const scope=useMemo(()=>project==='all'?null:branchIds(tree,project),[tree,project]);
+ const base=useMemo(()=>data.state.tasks.filter(t=>!isInformation(t)&&(!scope||scope.has(t.id))&&(tag==='all'||t.tagIds?.includes(tag))&&t.title.toLocaleLowerCase().includes(query.toLocaleLowerCase())),[data.state.tasks,scope,tag,query]);
+ const ids=useMemo(()=>new Set(base.map(t=>t.id)),[base]),includeUnassigned=project==='all'&&tag==='all'&&!query;
+ const historicalPeriod=useMemo(()=>periodEffortIndex(data.state.sessions.filter(s=>s.status==='ended'&&(s.taskId===null?includeUnassigned:ids.has(s.taskId))),start,end),[data.state.sessions,includeUnassigned,ids,start,end]);
+ const stats=useMemo(()=>mergeEffortPeriods([historicalPeriod,periodEffortIndex(active.filter(s=>s.taskId===null?includeUnassigned:ids.has(s.taskId)),start,end)]),[historicalPeriod,active,includeUnassigned,ids,start,end]);
+ const spent=(id:string)=>model.spent.get(id)??0;
+ const completed=(t:Task)=>t.status==='done'&&!!t.completedAt&&localDate(t.completedAt)>=start&&localDate(t.completedAt)<=end;
+ const tasks=base.filter(t=>valid&&(filter==='unrecorded'?spent(t.id)===0:spent(t.id)>0||completed(t))).filter(t=>filter==='all'||filter==='unrecorded'||(filter==='done'?completed(t):filter==='cancelled'?t.status==='cancelled':filter==='handed-off'?t.status==='handed-off':t.status==='open'));
+ const pageKey=JSON.stringify([start,end,filter,project,tag,query]),limit=page.key===pageKey?page.limit:60;
+ useEffect(()=>setPage({key:pageKey,limit:60}),[pageKey]);
+ const scopeOptions=useMemo(()=>tree.ordered.map(n=><option key={n.id} value={n.id}>{history.fullPaths.get(n.id)}</option>),[tree,history.fullPaths]);
+ return <section className="page review-page"><header className="page-header"><div><p className="eyebrow">估计 → 实践 → 复盘 → 调整</p><h1>这段时间，推进了什么</h1></div></header>
+ <div className="range-toolbar"><label>从 <input aria-label="回顾开始日期" type="date" value={start} onChange={e=>setStart(e.target.value)}/></label><label>到 <input aria-label="回顾结束日期" type="date" value={end} onChange={e=>setEnd(e.target.value)}/></label><Button subtle onClick={()=>{setStart(localDate(data.now));setEnd(localDate(data.now));}}>今天</Button><Button subtle onClick={()=>{setStart(week.start);setEnd(week.end);}}>本周</Button><Button subtle onClick={()=>{setStart(shiftDate(week.start,-7));setEnd(shiftDate(week.end,-7));}}>上周</Button><Button subtle onClick={()=>{setStart(shiftDate(localDate(data.now),-29));setEnd(localDate(data.now));}}>近 30 天</Button></div>
+ <div className="review-filters"><label>项目或事项范围<select aria-label="回顾范围" value={project} onChange={e=>setProject(e.target.value)}><option value="all">全部事项</option>{scopeOptions}</select></label><label>标签<select aria-label="回顾标签" value={tag} onChange={e=>setTag(e.target.value)}><option value="all">全部标签</option>{data.state.tags.map(t=><option key={t.id} value={t.id}>{t.name}</option>)}</select></label><label>事项名称<input aria-label="回顾事项名称" value={query} onChange={e=>setQuery(e.target.value)} placeholder="按名称缩小范围"/></label></div>
+ {!valid?<p role="alert">请选择有效的开始和结束日期。</p>:<><div className="review-summary"><span><strong>{minuteText(stats.cumulativeMs)}</strong> 累计记录时长</span><span><strong>{minuteText(stats.coveredMs)}</strong> 去重时间覆盖</span><span><strong>{base.filter(completed).length}</strong> 件事期间完成</span><span><strong>{base.filter(t=>t.status==='open'&&spent(t.id)>0).length}</strong> 件未完成事项有投入</span></div><p className="muted completion-breakdown" aria-label="期间完成归属">{Object.entries(completionLabels).map(([key,label])=><span key={key}>{label} {base.filter(t=>completed(t)&&(t.completionBy??'unknown')===key).length} 件　</span>)}</p><p className="muted">累计分别计入并行事项；去重覆盖合并重叠区间。{stats.unplacedMs>0?`${minuteText(stats.unplacedMs)} 补记未指定时间，不计入去重覆盖。`:''}没有记录不表示没有推进。</p>
+ {project==='all'&&tag==='all'&&!query&&<UnassignedQueue start={start} end={end}/>}<ProjectReview start={start} end={end} ids={ids} model={model}/><div className="section-toolbar"><div className="segmented">{[['all','全部推进'],['done','期间完成'],['open','有投入未完成'],['handed-off','已交接（关闭）'],['cancelled','已取消'],['unrecorded','未记录投入']].map(([v,label])=><button key={v} className={filter===v?'active':''} onClick={()=>setFilter(v)}>{label}</button>)}</div></div>
+ <p className="muted review-result-count" role="status">{tasks.length>limit?`已显示 ${limit} / ${tasks.length} 件；统计包含全部结果。`:`共 ${tasks.length} 件`}</p><div className="review-results">{tasks.length?tasks.slice(0,limit).map(t=>{const review=model.reviews.get(t.id),progress=model.progress.get(t.id)!;return <article className="review-row" key={t.id}><div className="review-title"><div><span className="project-crumb">{model.paths.get(t.id)}</span><button className="task-link" onClick={()=>dialog({type:'detail',id:t.id})}>{t.title}</button></div><span>{t.deletedAt?'回收站 · ':''}{t.status==='done'?completionLabels[t.completionBy??'unknown']:t.status==='handed-off'?'已交接（关闭）':t.status==='cancelled'?'已取消':t.availability==='paused'?'事项暂停':'未完成'}</span></div><div className="review-numbers"><span>本期投入 <strong>{minuteText(spent(t.id))}</strong></span><span>初始估计 {progress.initial===null?'未记录':`${progress.initial} 分钟`} · 已投入 {minuteText(progress.spent*60000)}</span><span>剩余 {progress.exhausted?'待重估':progress.remaining===null?'未估计':minuteText(progress.remaining*60000)} · 当前预计总投入 {progress.total===null?'待估计':minuteText(progress.total*60000)}</span></div><p>{review?.outcome||model.summaries.get(t.id)||(spent(t.id)>0?'尚未填写推进内容，可稍后补充。':'本期未记录投入。')}</p><div className="actions"><Button subtle onClick={()=>dialog({type:'review',id:t.id})}>复盘与调整</Button>{!t.deletedAt&&<><Button subtle onClick={()=>dialog({type:'plan',id:t.id})}>修改计划</Button><Button subtle onClick={()=>dialog({type:'estimate',id:t.id})}>调整剩余</Button>{t.status==='open'&&<><Button subtle onClick={()=>dialog({type:'task',parentId:t.id})}>拆分事项</Button><Button subtle onClick={()=>dialog({type:'state',id:t.id,action:t.availability==='paused'?'resume':'pause'})}>{t.availability==='paused'?'恢复事项':'暂停事项'}</Button></>}</>}</div></article>;}):<Empty title={filter==='unrecorded'?'此范围的事项都有投入记录':'这段时间没有符合条件的记录'} text="可以调整日期、范围和标签；没有记录不表示没有推进。"/>}</div>{tasks.length>limit&&<Button onClick={()=>setPage({key:pageKey,limit:limit+60})}>显示更多（还有 {tasks.length-limit} 件）</Button>}</>}</section>;
+}

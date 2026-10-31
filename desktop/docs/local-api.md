@@ -10,7 +10,7 @@
 
 读取响应为 `{ "revision": "...", "now": "...", "data": ... }`。`revision` 是不透明字符串，响应的 ETag 也包含该值。每次写入必须携带：
 
-- `If-Match: <此前读取的 revision>`：若期间有界面操作、计时检查点或其他写入，返回 `412 revision_conflict`，不执行操作。重新读取并核对，不要盲目覆盖。
+- `If-Match: <此前读取的 revision>`：若期间有事项、计时状态、提醒或其他业务内容变更，返回 `412 revision_conflict`，不执行操作。重新读取并核对，不要盲目覆盖。仅时间增长和每 10 秒的计时进度保存不改变此修订号；查询仍返回当前投入时长。
 - `Idempotency-Key: <8–120 位唯一键>`：一次逻辑操作一个键，建议 UUID。相同请求重发会返回原结果，不重复创建事项或投入；同键不同内容返回 `409 idempotency_conflict`。
 
 重放缓存保留本次接口运行中最近 1000 个成功操作，不跨接口重启。重启会生成新的修订前缀，旧请求的 `If-Match` 因此失效。网络结果不明时保留原请求键和修订号重试；若返回修订冲突，先查询确认原操作是否已生效。
@@ -21,7 +21,7 @@
 | --- | --- |
 | `GET /status` | 当前时间、本地日期、时区、版本、权限和支持的命令说明 |
 | `GET /items` | 事项列表，默认未完成；只返回实际匹配项，父级路径不会冒充结果 |
-| `GET /items?status=all&query=周报` | 搜索所有状态及笔记、事件；status 可选 open/done/cancelled/all |
+| `GET /items?status=all&query=周报` | 搜索所有状态及笔记、事件；status 可选 open/done/cancelled/handed-off/all |
 | `GET /items?focus=today` | 今日重点；重点日期与计划开始、截止时间独立 |
 | `GET /items?scopeId=<id>` | 指定事项及其后代范围 |
 | `GET /items?viewId=<id>` | 使用保存视图的完整条件，包括动态日期 |
@@ -53,6 +53,7 @@
 | `event.save` | `{"id":"事件ID","at":"2026-10-22T10:00:00+08:00","end":"2026-10-22T11:00:00+08:00"}` |
 | `focus.start` | `{"taskId":"事项ID","targetMinutes":25}` |
 | `focus.start-unassigned` | `{}` |
+| `focus.set-start` | `{"sessionId":"计时记录ID","startedAt":"2026-10-22T13:20:00+08:00","expectedStart":"此前读取的start"}` |
 | `focus.pause` / `focus.resume` | `{"sessionId":"计时记录ID"}` |
 | `focus.stop` | `{"sessionId":"计时记录ID","rest":true}`；complete:true 显式完成事项 |
 | `session.assign` | `{"id":"已结束的未关联记录ID","taskId":"事项ID"}`，或省略 taskId、传 title 新建 |
@@ -70,7 +71,24 @@
 
 投入可传 start/end 精确区间；日期与 minutes 仍需提供，实际时长按区间计算。校正已有记录需传 id，保留原记录审计；同事项重叠或未来投入会被拒绝。计时到达目标只提醒，不自动停止；并行计时返回专注提示，不偷偷结束其他事项。
 
+忘记开始计时时，`focus.start` 和 `focus.start-unassigned` 可直接传 `startedAt`；已启动或暂停的计时使用 `focus.set-start` 调整。过去的时间补入同一条记录，保留后续暂停片段，并同步更新事项、父级汇总、今日和日历。单次调整最多 24 小时，拒绝未来时间、越过第一次暂停或与同事项已有投入重叠。`expectedStart` 可选，用于发现编辑期间的开始时间变更。已结束的记录仍使用 `session.manual` 校正。
+
+只修改已结束投入的归属或进展时，使用 `session.manual`，传入 `id`、`taskId`、`preserveTiming:true`、`reason` 和可选 `summary`，不要同时传入 `date`、`minutes`、`start` 或 `end`。这会保留原始时段、暂停片段和精确时长；更换归属仍检查同事项时段重叠。`preserveTiming` 不用于新建或仍在计时的记录。明确修改时间时沿用 `date`/`minutes` 和可选 `start`/`end` 的原有用法，校正前的记录仍进入历史。
+
+提醒从保存调整后重新计算：已做 40 分钟并设置 25 分钟目标，先计入 40 分钟，再累计 25 分钟实际专注后提醒，总投入为 65 分钟；暂停不消耗目标。暂停中的记录不会自动恢复。`/timers` 和投入记录中的 `targetOffsetMs` 是这次目标开始时已经累计的投入，提醒阈值为 `targetOffsetMs + targetMinutes * 60000`，旧记录缺省为 0。不要把它从累计投入里扣除。结束、恢复、导出及同步均保留原记录身份。
+
 写入结果 `data` 包含 createdItemIds、changedItemIds、createdSessionIds、changedSessionIds 和 notices；可据此读取详情。成功的 API 操作在数据目录的 `local-api.audit.jsonl` 记录时间、请求键、命令名和变更 ID，不记录请求正文或密钥。
+
+## 交接、完成归属与业务活动
+
+通过 `POST /commands` 复用领域命令，并携带修订号和幂等键：
+
+- `item.handoff`：`id`、`assignee` 必填；可传 `ids`（本项和明确选择的后代）、`note`、`at`、`followUp`、`followUpAt`。所选事项存在计时时须 `confirmTimers:true`，将结束并保存这些投入。交接将本人的责任关闭为 handed-off，不计入完成或取消；跟进提醒独立有效。
+- `item.reclaim`：`id`，可选 `ids`，重新接手明确选中的事项，恢复 open，不启动计时。
+- `task.status`：完成时可显式传 `completionBy:self|other|shared|unknown`；默认交接事项为 other，其余新完成事项为 self。
+- `item.completion`：对已完成事项传 `id`、`by` 和可选实际完成时间 `at`，校正归属而不改动投入。
+
+事项数据包含可选 `ownership` 与 `completionBy`；完整日志快照包含 `activities`，每个成功业务修改与活动记录一起保存。API 操作标注来源 api，本机 AI 建议经本人确认后标注 ai。来源不表示完成者。操作摘要和 AI 详细使用记录是设备本地数据，不通过日志同步接口导出。
 
 ## 同步数据
 
@@ -132,3 +150,5 @@ request.json 是 UTF-8 文件，例如 `{"title":"整理周报"}`。工具不会
 
 
 0.20.0 新增投入回收站：`session.delete {id}` 删除已结束的投入，`session.restore {id}` 恢复。仍需写权限、If-Match 和 Idempotency-Key。删除返回 `removedSessionIds`，并更新事项累计投入；`GET /v1/sessions?deleted=true` 分页查询可恢复记录。恢复同一事项的重叠区间会拒绝，运行中的记录不能删除。备份与同步包含回收站，CSV 只导出有效投入。
+
+0.21.1：`session.delete {id, summary?}` 可在放弃投入时原子保留最后填写的进展。`session.summary {id, summary, remainingMinutes?, rest:true}` 可原子保存小结并开始休息；如其他计时仍在运行或保存失败，小结、剩余估计与休息状态均不改变。补记新投入不能选择已删除、归档的事项或其后代；校正原有历史投入可保留原归属。

@@ -14,7 +14,7 @@ export class CaptureWindow {
   try{this.shortcuts.configure(shortcut,false);}catch{this.shortcuts.configure('',false);}
   const trusted=(event:Electron.IpcMainInvokeEvent)=>{if(!this.win||event.sender!==this.win.webContents||event.senderFrame!==this.win.webContents.mainFrame)throw new Error('无效的快速记录请求。');};
   ipcMain.handle('capture:snapshot',event=>{trusted(event);return this.service.snapshot();});
-  ipcMain.handle('capture:save',(event,command:Command)=>{trusted(event);if(command?.type!=='capture.create'||command.payload?.start)throw new Error('快速窗口只保存记录。');const result=this.service.execute(command);this.changed();return result;});
+  ipcMain.handle('capture:save',(event,command:Command)=>{trusted(event);if(command?.type!=='capture.create'||command.payload?.start)throw new Error('快速窗口只保存记录。');const result=this.service.execute({...command,meta:{source:'user',entry:'capture.window'}});this.changed();return result;});
   ipcMain.handle('capture:close',event=>{trusted(event);this.win?.hide();});
  }
  preferences(){return this.shortcuts.preferences();}

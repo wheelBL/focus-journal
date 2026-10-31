@@ -1,5 +1,6 @@
 import {randomUUID} from 'node:crypto';
 import type {JournalState} from './types';
+import {text} from './validation';
 
 function refreshStartedAt(state:JournalState,taskId:string|null,now:string){
  const task=state.tasks.find(t=>t.id===taskId);if(!task)return;
@@ -8,11 +9,12 @@ function refreshStartedAt(state:JournalState,taskId:string|null,now:string){
 }
 
 /** Keep deleted effort outside live projections, with its original identity and evidence. */
-export function deleteSession(state:JournalState,id:unknown,now:string){
+export function deleteSession(state:JournalState,id:unknown,now:string,summary?:unknown){
  const record=state.sessions.find(s=>s.id===id);if(!record)throw new Error('投入记录不存在。');
  if(record.status!=='ended')throw new Error('请先结束这次计时，再删除投入记录。');
+ const savedSummary=summary===undefined?record.summary:text(summary);
  state.audit.push({id:randomUUID(),entityId:record.id,before:JSON.stringify(record),reason:'删除投入记录',createdAt:now});
- state.deletedSessions.push({...record,deletedAt:now});
+ state.deletedSessions.push({...record,summary:savedSummary,updatedAt:now,deletedAt:now});
  state.sessions=state.sessions.filter(s=>s.id!==id);
  if(state.settings.rest&&state.settings.rest.sessionId===id)state.settings.rest.sessionId=null;
  refreshStartedAt(state,record.taskId,now);

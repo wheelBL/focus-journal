@@ -39,9 +39,9 @@ test('schema 12 Inbox is migrated once with exact backup and stable children/his
  try{const {s}=setup(),child=create(s,'已有任务','inbox');s.execute({type:'session.manual',payload:{taskId:child,date:'2026-01-30',minutes:12}});
   const legacy=s.snapshot().state;legacy.schemaVersion=12;legacy.tasks=legacy.tasks.filter((t:{id:string})=>t.id!=='inbox');
   const file=path.join(folder,'journal.sqlite'),old=new SqliteJournalStore(file);old.save(legacy);old.close();
-  service=new JournalService(new SqliteJournalStore(file));assert.equal(service.snapshot().state.schemaVersion,16);assert.equal(get(service,child).parentId,'inbox');assert.deepEqual(service.snapshot().state.sessions,legacy.sessions);
+  service=new JournalService(new SqliteJournalStore(file));assert.equal(service.snapshot().state.schemaVersion,19);assert.equal(get(service,child).parentId,'inbox');assert.deepEqual(service.snapshot().state.sessions,legacy.sessions);
   patch(service,'inbox','isProject',false);service.shutdown();service=new JournalService(new SqliteJournalStore(file));assert.equal(get(service,'inbox').isProject,false);assert.equal(service.snapshot().state.tasks.filter(t=>t.id==='inbox').length,1);
-  const backup=path.join(folder,'backups',readdirSync(path.join(folder,'backups')).find(f=>f.startsWith('before-schema-12-to-16-'))!);
+  const backup=path.join(folder,'backups',readdirSync(path.join(folder,'backups')).find(f=>f.startsWith('before-schema-12-to-19-'))!);
   const db=new DatabaseSync(backup,{readOnly:true});try{assert.equal((db.prepare('PRAGMA user_version').get() as any).user_version,12);assert.equal(db.prepare("SELECT id FROM records WHERE kind='tasks' AND id='inbox'").get(),undefined);}finally{db.close();}
  }finally{service?.shutdown();rmSync(folder,{recursive:true,force:true});}
 });

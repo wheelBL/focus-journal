@@ -1,5 +1,6 @@
 import {isInformation} from './item-kind';
-import type {JournalState,Project,Task} from './types';
+import type {JournalState,Project,Task,FilterRule} from './types';
+import {JOURNAL_SCHEMA_VERSION} from './types';
 
 export type OutlineNode={id:string;kind:'project'|'task';title:string;parentId:string|null;order:number;record:Project|Task};
 export type OutlineStats={tasks:number;done:number;ownMs:number;totalMs:number;childEstimate:number;ownEstimate:number|null};
@@ -48,13 +49,25 @@ export function syncProjectOwnership(state:JournalState){
 }
 // Tasks are canonical items. Projects remains a compatibility projection for old views/exports.
 export function ensureOutlineFields(state:JournalState){
-  state.tags??=[];state.views??=[];state.moves??=[];state.itemReviews??=[];state.deletedSessions??=[];
+  state.activities??=[];state.tags??=[];state.views??=[];state.moves??=[];state.itemReviews??=[];state.deletedSessions??=[];
   const known=new Set(state.tasks.map(t=>t.id));
   state.projects.forEach((p,i)=>{p.parentId??=null;p.order??=i;if(!known.has(p.id))state.tasks.push({id:p.id,projectId:p.id,title:p.name,description:p.description,isProject:true,archived:p.archived,tagIds:[],parentId:p.parentId,order:p.order,outcome:'',nextAction:'',estimateMinutes:null,plannedDate:null,dueAt:null,status:'open',createdAt:p.createdAt,startedAt:null,completedAt:null});});
   state.tasks.forEach((t,i)=>{if(t.parentId===undefined)t.parentId=t.projectId;if(t.order===undefined)t.order=i;t.dueAt??=null;t.isProject??=false;t.description??='';t.archived??=false;t.tagIds??=[];t.availability??='active';t.deletedAt??=null;t.reviewSchedule??=null;t.reminder??=null;t.itemType??='task';t.eventAt??=null;t.eventEnd??=null;t.focusDate??=null;t.updatedAt??=t.createdAt;});
   state.projects=state.tasks.filter(t=>t.isProject).map(t=>({id:t.id,name:t.title,description:t.description!,archived:t.archived!,createdAt:t.createdAt,parentId:t.parentId,order:t.order}));
   if(state.settings.rest===undefined||state.schemaVersion<15&&state.settings.rest===null&&state.settings.breakUntil)state.settings.rest=state.settings.breakUntil?{id:`legacy-break-${state.settings.breakUntil}`,phase:'running',sessionId:null,minutes:state.settings.breakMinutes,notify:false}:null;
-  state.schemaVersion=16;
+  if(state.schemaVersion<19){
+    const closed=new Set<string>();
+    for(const task of state.tasks)if(task.status==='open'&&task.ownership){task.status='handed-off';task.completedAt=null;task.focusDate=null;delete task.completionBy;if(task.reviewSchedule?.enabled){task.reviewSchedule.enabled=false;task.reviewSchedule.nextDate=null;}closed.add(task.id);}
+    // Close at the last durable instant; a stopped host is not evidence of offline work.
+    for(const session of state.sessions)if(session.taskId&&closed.has(session.taskId)&&session.status!=='ended'){session.status='ended';session.end=session.updatedAt;}
+    const migrateView=(rule:FilterRule):FilterRule=>{
+      if(rule.kind!=='group')return rule;
+      const delegated=rule.mode==='all'&&rule.children.some(c=>c.kind==='condition'&&c.field==='responsibility'&&c.op==='is'&&['handed-off','following'].includes(String(c.value)));
+      return {...rule,children:rule.children.map(c=>delegated&&c.kind==='condition'&&c.field==='status'&&c.op==='is'&&c.value==='open'?{...c,value:'handed-off'}:migrateView(c))};
+    };
+    for(const view of state.views)if(view.filter.rules)view.filter.rules=migrateView(view.filter.rules) as import('./types').FilterGroup;
+  }
+  state.schemaVersion=JOURNAL_SCHEMA_VERSION;
 }
 export function migrateOutline(state:JournalState):JournalState{
   const next=structuredClone(state);ensureOutlineFields(next);assertOutline(next);syncProjectOwnership(next);return next;
@@ -78,7 +91,7 @@ export function assertParentAvailable(state:JournalState,parentId:string|null){
   for(const n of outlinePath(index,parentId)){
     if((n.record as Task).deletedAt)throw new Error('请先从回收站恢复父事项。');
     if((n.record as Project).archived)throw new Error('请先恢复已归档的父项目。');
-    if('status' in n.record&&(n.record as Task).status!=='open')throw new Error('请先重新打开父任务，再放入子项。');
+    if('status' in n.record&&(n.record as Task).status!=='open'&&(n.record as Task).status!=='handed-off')throw new Error('请先重新打开父任务，再放入子项。');
   }
 }
 export function currentPosition(state:JournalState,id:string):OutlinePosition{

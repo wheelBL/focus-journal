@@ -1,7 +1,13 @@
+import {appendActivity,validateActivityState} from './activity-log';
+import {validateOwnership,completionLabels} from './activity';
+import {changeOwnership,setCompletion} from './ownership';
 import {breakContinuation} from './break-state';
 import {floatingTimerSource} from './floating-timer';
 import {clearBreak,offerBreak,startBreak,finishBreak} from './break-cycle';
 import {assignSession} from './session-assignment';
+import {setSessionStart} from './session-start';
+import {timerTargetMs} from './timer-target';
+import {JOURNAL_SCHEMA_VERSION} from './types';
 import {sessionTitle} from './session-label';
 import {deleteSession,restoreSession} from './session-trash';
 import {saveManualSession} from './manual-session';
@@ -12,7 +18,7 @@ import {applyBatch,isBatchLifecycle,batchImpact} from './batch';
 import {text,required,number,day,deadline,instant,validateSchedule} from './validation';
 import {createCapture,validateInformation} from './capture-command';
 import {captureItem,isNote,isEvent,isTask,requireAction} from './item-kind';
-import {scheduledItems,reminderTime,setItemReminder,validateItemReminder} from './item-reminders';
+import {effectiveItemReminder,scheduledItems,reminderTime,setItemReminder,validateItemReminder} from './item-reminders';
 import {isDateDeadline,deadlineTime} from './deadlines';
 import {blockedReason} from './item-state';
 import {nextReviewDate,validateReviewSchedule} from './item-reviews';
@@ -33,7 +39,7 @@ export class JournalService {
   private lastMove:OutlinePosition|null=null;
   private stateHistory:{label:string;apply:(s:JournalState)=>void}[]=[];
   private history:{label:string;apply:(s:JournalState)=>void}[]=[];
-  constructor(private store: JournalStore,private clock: WorkClock=realClock,public demo=false) {
+  constructor(private store: JournalStore,private clock: WorkClock=realClock,public demo=false,private appVersion='development') {
     const loaded=store.load();this.state=migrateOutline(loaded);
     if(JSON.stringify(loaded)!==JSON.stringify(this.state))store.save(this.state);
     this.anchor=clock.monotonic(); this.checkpointAt=clock.monotonic();
@@ -52,73 +58,96 @@ export class JournalService {
     return sessions[0];
   }
   private task(state:JournalState,id:unknown) { const task=state.tasks.find(t=>t.id===id); if(!task) throw new Error('找不到这个任务。'); return task; }
-  private live(): JournalState {
-    const s=structuredClone(this.state),delta=Math.max(0,this.clock.monotonic()-this.anchor),now=this.iso();
+  private live(at=this.clock.monotonic(),now=this.iso()): JournalState {
+    const s=structuredClone(this.state),delta=Math.max(0,at-this.anchor);
     for(const active of this.active(s))if(active.status==='running') {
       const segment=active.segments.at(-1)!;
       segment.durationMs+=delta;segment.end=now;active.durationMs+=delta;active.updatedAt=now;
     }
     return s;
   }
-  private commit(change:(state:JournalState)=>void) {
-    const draft=this.live();change(draft);generateTaskSuccessors(this.state,draft,this.iso());ensureOutlineFields(draft);assertOutline(draft);syncProjectOwnership(draft);
-    for(const task of draft.tasks)if((task.status!=='open'||task.deletedAt||task.archived)&&task.reminder){task.reminder.state='dismissed';task.reminder.snoozedUntil=null;}
+  private commit(change:(state:JournalState,now:string)=>void,command?:Command) {
+    const at=this.clock.monotonic(),now=this.iso();
+    const draft=this.live(at,now);change(draft,now);generateTaskSuccessors(this.state,draft,now);ensureOutlineFields(draft);assertOutline(draft);syncProjectOwnership(draft);
+    for(const task of draft.tasks)if((task.status!=='open'&&task.status!=='handed-off'||task.deletedAt||task.archived)&&task.reminder){task.reminder.state='dismissed';task.reminder.snoozedUntil=null;}
     for(const task of draft.tasks)if(task.status!=='open'&&task.reviewSchedule?.enabled){task.reviewSchedule.enabled=false;task.reviewSchedule.nextDate=null;}
     const oldTasks=new Map(this.state.tasks.map(t=>[t.id,t]));
-    for(const task of draft.tasks){const old=oldTasks.get(task.id);if(old&&JSON.stringify(old)!==JSON.stringify(task))task.updatedAt=this.iso();if(old&&(old.parentId!==task.parentId||old.order!==task.order))draft.moves.push({id:randomUUID(),itemId:task.id,fromParent:old.parentId??null,toParent:task.parentId??null,fromProject:old.projectId,toProject:task.projectId,fromOrder:old.order??0,toOrder:task.order??0,createdAt:this.iso()});}
+    for(const task of draft.tasks){const old=oldTasks.get(task.id);if(old&&JSON.stringify(old)!==JSON.stringify(task))task.updatedAt=now;if(old&&(old.parentId!==task.parentId||old.order!==task.order))draft.moves.push({id:randomUUID(),itemId:task.id,fromParent:old.parentId??null,toParent:task.parentId??null,fromProject:old.projectId,toProject:task.projectId,fromOrder:old.order??0,toOrder:task.order??0,createdAt:now});}
+    for(const t of draft.tasks){const old=oldTasks.get(t.id);if(t.status==='done'&&old?.status!=='done')t.completionBy=(t.id===command?.payload?.id?command?.payload?.completionBy as import('./activity').CompletionBy:undefined)??(t.ownership?'other':'self');if(t.status!=='done')delete t.completionBy;validateOwnership(t);}
+    if(command)appendActivity(this.state,draft,{...command,meta:{...command.meta,version:this.appVersion}},now);
     validateInformation(draft);
     const active=this.active(draft),owned=active.filter(s=>s.taskId!==null);
     if(new Set(owned.map(s=>s.taskId)).size!==owned.length)throw new Error('同一事项只能保留一个计时器，请先结束或恢复原计时器。');
     const index=outlineIndex(draft);for(const session of active)if(session.status==='running'&&session.taskId!==null){const reason=blockedReason(index,session.taskId);if(reason)throw new Error(`${reason} 请先暂停这件事的计时，再调整。`);}
-    this.store.save(draft);this.state=draft;this.revision++;this.anchor=this.clock.monotonic();this.checkpointAt=this.anchor;
+    this.store.save(draft);this.state=draft;this.revision++;this.anchor=at;this.checkpointAt=this.clock.monotonic();
+  }
+  private checkpoint() {
+    const at=this.clock.monotonic(),now=this.iso(),delta=Math.max(0,at-this.anchor);
+    const running=this.state.sessions.filter(s=>s.status==='running').map(s=>{
+      const next=structuredClone(s),segment=next.segments.at(-1)!;
+      segment.durationMs+=delta;segment.end=now;next.durationMs+=delta;next.updatedAt=now;return next;
+    });
+    if(!running.length)return;
+    const updates=new Map(running.map(s=>[s.id,s]));
+    const next={...this.state,sessions:this.state.sessions.map(s=>updates.get(s.id)??s)};
+    if(this.store.saveSessionCheckpoint)this.store.saveSessionCheckpoint(running);else this.store.save(next);
+    // Only publish after durability succeeds. Clock consumers overlay these records;
+    // elapsed time alone does not invalidate the workspace's content revision.
+    this.state=next;this.anchor=at;this.checkpointAt=this.clock.monotonic();
   }
   snapshot(): Snapshot {
-    const state=this.live(),timers=this.active(state).map(active=>({sessionId:active.id,taskId:active.taskId,durationMs:active.durationMs,targetMinutes:active.targetMinutes,paused:active.status==='paused',recovered:active.recovered}));
+    const state=this.live(),timers=this.active(state).map(active=>({sessionId:active.id,taskId:active.taskId,durationMs:active.durationMs,targetMinutes:active.targetMinutes,...active.targetOffsetMs!==undefined?{targetOffsetMs:active.targetOffsetMs}:{},paused:active.status==='paused',recovered:active.recovered}));
     return {revision:this.revision,stateUndoLabel:this.stateHistory.at(-1)?.label??null,undoLabel:this.history.at(-1)?.label??null,state,timers,timer:timers[0]??null,now:this.iso(),dataPath:this.store.path,demo:this.demo};
   }
   clockSnapshot():import('./types').ClockSnapshot {
     const sessions=structuredClone(this.active()),delta=Math.max(0,this.clock.monotonic()-this.anchor),now=this.iso();
     for(const active of sessions)if(active.status==='running'){const segment=active.segments.at(-1)!;segment.durationMs+=delta;segment.end=now;active.durationMs+=delta;active.updatedAt=now;}
-    return {revision:this.revision,now,sessions,timers:sessions.map(a=>({sessionId:a.id,taskId:a.taskId,durationMs:a.durationMs,targetMinutes:a.targetMinutes,paused:a.status==='paused',recovered:a.recovered}))};
+    return {revision:this.revision,now,sessions,timers:sessions.map(a=>({sessionId:a.id,taskId:a.taskId,durationMs:a.durationMs,targetMinutes:a.targetMinutes,...a.targetOffsetMs!==undefined?{targetOffsetMs:a.targetOffsetMs}:{},paused:a.status==='paused',recovered:a.recovered}))};
   }
   reminderSnapshot(){const clock=this.clockSnapshot();return {alerts:pendingReminders(this.state,clock.sessions),settings:reminderSettings(this.state.settings)};}
   floatingTimerSnapshot(){return floatingTimerSource(this.state,this.clockSnapshot());}
   tick(): string[] {
     const s=this.state,running=this.clockSnapshot().sessions.filter(x=>x.status==='running'),reminders:string[]=[];
-    const due=new Set(running.filter(x=>(!x.reminded&&x.durationMs>=x.targetMinutes*60000)||(x.reminder?.state==='snoozed'&&Date.parse(x.reminder.snoozedUntil!)<=this.clock.now())).map(x=>x.id));
-    const itemDue=new Set(scheduledItems(s).filter(t=>['scheduled','snoozed'].includes(t.reminder!.state)&&Date.parse(reminderTime(t)!)<=this.clock.now()).map(t=>t.id));
+    const due=new Set(running.filter(x=>(!x.reminded&&x.durationMs>=timerTargetMs(x))||(x.reminder?.state==='snoozed'&&Date.parse(x.reminder.snoozedUntil!)<=this.clock.now())).map(x=>x.id));
+    const itemDue=new Set(scheduledItems(s).filter(t=>['scheduled','snoozed'].includes(effectiveItemReminder(t)!.state)&&Date.parse(reminderTime(t)!)<=this.clock.now()).map(t=>t.id));
     const restDue=!!s.settings.breakUntil&&Date.parse(s.settings.breakUntil)<=this.clock.now();
-    if(due.size||itemDue.size||restDue||(running.length&&this.clock.monotonic()-this.checkpointAt>=10000))this.commit(draft=>{
+    if(due.size||itemDue.size||restDue)this.commit(draft=>{
       for(const session of this.active(draft))if(due.has(session.id)){
         session.reminded=true;session.reminder={state:'pending',snoozedUntil:null};reminders.push(`「${sessionTitle(draft,session.taskId)}」本次目标时间已到，计时会继续，直到你主动结束。`);
       }
-      for(const task of draft.tasks)if(itemDue.has(task.id)){task.reminder!.state='pending';task.reminder!.snoozedUntil=null;}
+      for(const task of draft.tasks)if(itemDue.has(task.id)){const reminder=effectiveItemReminder(task)!;reminder.state='pending';reminder.snoozedUntil=null;}
       if(restDue){finishBreak(draft,true);reminders.push('休息结束了，欢迎回来。准备好后，再开始下一次专注。');}
     });
+    else if(running.length&&this.clock.monotonic()-this.checkpointAt>=10000)this.checkpoint();
     return reminders;
   }
   suspend() { if(this.active().some(s=>s.status==='running'))this.commit(s=>{for(const a of this.active(s)){a.status='paused';a.recovered=true;}}); }
   shutdown() { if(this.active().length)this.commit(s=>{for(const a of this.active(s)){a.status='paused';a.recovered=true;}});this.store.close(); }
-  execute(command:Command): Snapshot {
+  private operationRecorder:((operation:string,entry:string,result:'success'|'failed')=>void)|null=null;
+  setOperationRecorder(record:(operation:string,entry:string,result:'success'|'failed')=>void){this.operationRecorder=record;}
+  execute(command:Command):Snapshot{try{const result=this.executeCommand(command);if(command.meta?.source!=='ai')try{this.operationRecorder?.(command.type,command.meta?.entry??'system.command','success');}catch{}return result;}catch(error){if(command.meta?.source!=='ai')try{this.operationRecorder?.(command.type,command.meta?.entry??'system.command','failed');}catch{}throw error;}}
+  private executeCommand(command:Command): Snapshot {
     const p=command.payload??{};
     if(command.type==='item-review.mark'&&p.batchId&&this.state.itemReviews.some(r=>r.batchId===p.batchId))return this.snapshot();
     const before=structuredClone(this.state);let moved:OutlinePosition|undefined,undo=false,organizing=false,stateUndone=false;
-    const lifecycle=['item.change','task.status'].includes(command.type)||command.type==='focus.stop'&&p.complete===true||command.type==='items.batch'&&isBatchLifecycle(p.action);
+    const lifecycle=['item.change','task.status','item.handoff','item.reclaim','item.completion'].includes(command.type)||command.type==='focus.stop'&&p.complete===true||command.type==='items.batch'&&isBatchLifecycle(p.action);
     const undoLabel=command.type==='recurrence.set'?'重复安排':lifecycle?'事项状态':command.type==='items.batch'?'批量整理':command.type==='item.focus'?'今日重点':command.type==='event.save'?'事件时间':command.type==='outline.move'?'移动事项':command.type.startsWith('tag.')?'修改标签':command.type==='outline.patch'&&p.field!=='estimateMinutes'?'编辑事项':command.type==='task.plan'?'修改计划':command.type==='task.save'&&p.id?'编辑事项':null;
-    this.commit(s=>{
-      const now=this.iso();
+    this.commit((s,now)=>{
       switch(command.type) {
+        case 'item.handoff': {changeOwnership(s,p,now);break;}
+        case 'item.reclaim': {changeOwnership(s,p,now,true);break;}
+        case 'item.completion': {setCompletion(this.task(s,p.id),p,now);break;}
         case 'items.batch': {applyBatch(s,p,now);break;}
         case 'calendar.save': {saveCalendarSelection(s,p,now);break;}
         case 'capture.create': {const item=createCapture(s,p,now);if(p.start===true){requireAction(item);this.startSession(s,{taskId:item.id,skipEstimate:true,mode:p.mode},now);}break;}
         case 'item.focus': {const task=this.task(s,p.id);requireAction(task);if(task.status!=='open'||task.deletedAt)throw new Error('请选择未完成事项。');task.focusDate=p.date?day(p.date):null;break;}
         case 'recurrence.set': {configureRecurrence(this.task(s,p.id),p.rule,now);break;}
         case 'event.save': {const task=this.task(s,p.id);if(!isEvent(task))throw new Error('请选择事件。');task.eventAt=deadline(p.at);task.eventEnd=p.end?instant(p.end):null;if(task.recurrence){task.recurrence.anchor=localDay(task.eventAt);if(task.recurrence.until&&task.recurrence.until<task.recurrence.anchor)throw new Error('事件日期晚于重复结束日，请先调整重复范围。');if(task.reminder&&task.recurrence.reminderOffsetMs!==undefined)task.reminder={at:new Date(Date.parse(task.eventAt.length===10?`${task.eventAt}T00:00:00`:task.eventAt)+task.recurrence.reminderOffsetMs).toISOString(),state:'scheduled',snoozedUntil:null};}break;}
-        case 'item-reminder.set': {const task=this.task(s,p.id);task.reminder=null;setItemReminder(task,p.at);if(task.recurrence&&isEvent(task)){delete task.recurrence.reminderOffsetMs;if(task.reminder)configureRecurrence(task,task.recurrence,now);}break;}
+        case 'item-reminder.set': {const task=this.task(s,p.id);setItemReminder(task,p.at);if(task.recurrence&&isEvent(task)){delete task.recurrence.reminderOffsetMs;if(task.reminder)configureRecurrence(task,task.recurrence,now);}break;}
         case 'item-reminder.snooze':
         case 'item-reminder.dismiss': {
-          const task=scheduledItems(s).find(t=>t.id===p.id&&t.reminder?.state==='pending');if(!task)throw new Error('这个提醒已经处理。');
-          task.reminder!.state=command.type==='item-reminder.snooze'?'snoozed':'dismissed';task.reminder!.snoozedUntil=command.type==='item-reminder.snooze'?new Date(this.clock.now()+300000).toISOString():null;if(command.type==='item-reminder.dismiss')advanceEventReminder(task,now);break;
+          const task=scheduledItems(s).find(t=>t.id===p.id&&effectiveItemReminder(t)?.state==='pending');if(!task)throw new Error('这个提醒已经处理。');
+          effectiveItemReminder(task)!.state=command.type==='item-reminder.snooze'?'snoozed':'dismissed';effectiveItemReminder(task)!.snoozedUntil=command.type==='item-reminder.snooze'?new Date(this.clock.now()+300000).toISOString():null;if(command.type==='item-reminder.dismiss'&&!task.ownership)advanceEventReminder(task,now);break;
         }
         case 'item-review.configure': {
           const task=this.task(s,p.id),enabled=p.enabled===true;if(enabled&&(task.status!=='open'||task.deletedAt))throw new Error('请先重新打开或恢复事项，再开启审视。');
@@ -227,7 +256,7 @@ export class JournalService {
         }
         case 'task.status': {
           const task=this.task(s,p.id);requireAction(task);if(!['open','done','cancelled'].includes(String(p.status)))throw new Error('状态无效。');
-          if(p.status==='open')assertParentAvailable(s,task.parentId??null);
+          if(p.status==='open'){assertParentAvailable(s,task.parentId??null);task.ownership=null;}
           const children=openDescendants(s,task.id);if(p.status!=='open'&&children.length&&!['done','cancelled'].includes(String(p.children)))throw new Error(`还有 ${children.length} 个未完成子事项，请先处理。`);
           for(const target of [task,...p.status!=='open'&&p.children?children:[]]){const status=target===task?p.status:p.children;const active=this.active(s).find(a=>a.taskId===target.id);if(active&&status!=='open'){active.status='ended';active.end=now;active.updatedAt=now;}target.status=status as typeof target.status;target.completedAt=status==='done'?now:null;}break;
         }
@@ -249,6 +278,7 @@ export class JournalService {
           if(active.status==='paused'){active.status='running';active.recovered=false;active.segments.push({start:now,end:now,durationMs:0});}s.settings.selectedTaskId=active.taskId;clearBreak(s);break;
         }
         case 'focus.start-unassigned': {this.startSession(s,p,now,true);break;}
+        case 'focus.set-start': {setSessionStart(s,p,now);break;}
         case 'session.assign': {assignSession(s,p,now);if(p.rest===true)startBreak(s,now,p.id);break;}
         case 'focus.start': {
           this.startSession(s,p,now);break;
@@ -271,13 +301,13 @@ export class JournalService {
         }
         case 'reminder.snooze-all': {
           if(s.settings.rest?.phase==='ready')s.settings.rest.notify=false;
-          for(const task of scheduledItems(s))if(task.reminder!.state==='pending'){task.reminder!.state='snoozed';task.reminder!.snoozedUntil=new Date(this.clock.now()+300000).toISOString();task.reminder!.at=task.reminder!.snoozedUntil;}
+          for(const task of scheduledItems(s))if(effectiveItemReminder(task)!.state==='pending'){const r=effectiveItemReminder(task)!;r.state='snoozed';r.snoozedUntil=new Date(this.clock.now()+300000).toISOString();r.at=r.snoozedUntil;}
           for(const a of this.active(s))if(a.status==='running'&&a.reminder?.state==='pending'){a.reminder={state:'snoozed',snoozedUntil:new Date(this.clock.now()+5*60000).toISOString()};a.updatedAt=now;}break;
         }
         case 'reminder.settings': {s.settings.reminders=validateReminderSettings(p.settings);break;}
         case 'session.summary': {
           const session=s.sessions.find(x=>x.id===p.id);if(!session)throw new Error('记录不存在。');
-          session.summary=text(p.summary??'');session.updatedAt=now;if(session.taskId===null){if(p.nextAction!==undefined||p.remainingMinutes!=null)throw new Error('请先补充事项，再调整估计。');break;}const task=this.task(s,session.taskId);
+          session.summary=text(p.summary??'');session.updatedAt=now;if(p.rest===true)startBreak(s,now,p.id);if(session.taskId===null){if(p.nextAction!==undefined||p.remainingMinutes!=null)throw new Error('请先补充事项，再调整估计。');break;}const task=this.task(s,session.taskId);
           if(p.nextAction!==undefined)task.nextAction=text(p.nextAction);
           if(p.remainingMinutes!=null)s.estimates.push({id:randomUUID(),taskId:task.id,remainingMinutes:number(p.remainingMinutes,0),spentMinutes:taskMs(s,task.id)/60000,reason:session.summary,createdAt:now});break;
         }
@@ -288,7 +318,7 @@ export class JournalService {
           const kind=p.kind==='event'?'event':'note';const taskId=p.taskId?this.task(s,p.taskId).id:null;
           s.notes.push({id:randomUUID(),kind,text:required(p.text,2000),taskId,createdAt:now});break;
         }
-        case 'session.delete': {deleteSession(s,p.id,now);break;}
+        case 'session.delete': {deleteSession(s,p.id,now,p.summary);break;}
         case 'session.restore': {restoreSession(s,p.id,now);break;}
         case 'session.manual': {saveManualSession(s,p,now);break;}
         case 'review.save': {
@@ -315,7 +345,7 @@ export class JournalService {
         const previouslyActive=new Set(before.sessions.filter(r=>r.status!=='ended').map(r=>r.id));
         const ended=s.sessions.findLast(r=>r.status==='ended'&&previouslyActive.has(r.id));if(ended)offerBreak(s,ended.id);
       }
-    });
+    },command);
     if(moved)this.lastMove=moved;if(undo)this.lastMove=null;
     if(stateUndone)this.stateHistory.pop();
     if(organizing)this.history.pop();
@@ -324,7 +354,7 @@ export class JournalService {
       const position=moved,restoreFields=organizingUndo(before,this.state),after=structuredClone(this.state.tasks),apply=(s:JournalState)=>{if(position){const index=outlineIndex(s);moveBranch(s,position.id,position.parentId,position.beforeId&&index.nodes.get(position.beforeId)?.parentId===position.parentId?position.beforeId:null);}restoreFields(s);
         for(const {old,expected} of positions)if(JSON.stringify(currentPosition(s,old.id))===JSON.stringify(expected)){const index=outlineIndex(s);moveBranch(s,old.id,old.parentId,old.beforeId&&index.nodes.get(old.beforeId)?.parentId===old.parentId?old.beforeId:null);}
         if(lifecycle)for(const generated of after.filter(t=>t.recurrencePreviousId&&!before.tasks.some(b=>b.id===t.id))){const current=s.tasks.find(t=>t.id===generated.id);if(!current)continue;if(JSON.stringify(current)!==JSON.stringify(generated)||s.sessions.some(r=>r.taskId===generated.id)||s.tasks.some(t=>t.parentId===generated.id))throw new Error('下一次事项已有变化，未撤销；请保留其进展并手动重新打开本次事项。');s.tasks=s.tasks.filter(t=>t.id!==generated.id);s.projects=s.projects.filter(p=>p.id!==generated.id);const source=s.tasks.find(t=>t.id===generated.recurrencePreviousId);if(source)source.recurrenceNextId=null;}
-        if(lifecycle)for(const old of before.tasks){const expected=after.find(t=>t.id===old.id),task=s.tasks.find(t=>t.id===old.id);if(!expected||!task)continue;const fields=['status','completedAt','availability','deletedAt','reviewSchedule'] as const;for(const field of fields)if(JSON.stringify(old[field])!==JSON.stringify(expected[field])&&JSON.stringify(task[field])===JSON.stringify(expected[field]))(task as any)[field]=structuredClone(old[field]);}
+        if(lifecycle)for(const old of before.tasks){const expected=after.find(t=>t.id===old.id),task=s.tasks.find(t=>t.id===old.id);if(!expected||!task)continue;const fields=['status','completedAt','availability','deletedAt','reviewSchedule','ownership','completionBy'] as const;for(const field of fields)if(JSON.stringify(old[field])!==JSON.stringify(expected[field])&&JSON.stringify(task[field])===JSON.stringify(expected[field]))(task as any)[field]=structuredClone(old[field]);}
         for(const task of s.tasks)if(task.status!=='open'&&!task.deletedAt&&openDescendants(s,task.id).length)throw new Error('子项已发生新的变化，请先处理子项再撤销。');};
       const history=lifecycle?this.stateHistory:this.history;history.push({label:undoLabel,apply});if(history.length>50)history.shift();
     }
@@ -341,8 +371,9 @@ export class JournalService {
     if(p.mode==='switch')for(const a of this.active(s))if(a.status==='running'){a.status='ended';a.end=now;a.updatedAt=now;}
     if(task){task.startedAt??=now;s.settings.selectedTaskId=task.id;}clearBreak(s);
     s.sessions.push({id:randomUUID(),taskId:task?.id??null,date:localDate(this.clock.now()),start:now,end:null,status:'running',targetMinutes:target,segments:[{start:now,end:now,durationMs:0}],durationMs:0,manual:false,summary:'',reminded:false,recovered:false,updatedAt:now});
+    if(p.startedAt!==undefined)setSessionStart(s,{sessionId:s.sessions.at(-1)!.id,startedAt:p.startedAt},now);
   }
-  exportJson() { return JSON.stringify({format:'focus-journal',version:16,exportedAt:this.iso(),state:this.live()},null,2); }
+  exportJson() { return JSON.stringify({format:'focus-journal',version:JOURNAL_SCHEMA_VERSION,exportedAt:this.iso(),state:this.live()},null,2); }
   exportCsv() {
     const s=this.live();const cell=(v:unknown)=>{let t=String(v??'');if(/^[=+@\-\t\r]/.test(t))t="'"+t;return '"'+t.replaceAll('"','""')+'"';};
     const rows:unknown[][]=[['日期','项目','任务','开始时间','结束时间','实际分钟','记录方式','进展']];
@@ -355,7 +386,7 @@ export class JournalService {
   }
   importSyncedState(state:JournalState) {
     if(this.active().some(s=>s.status==='running'))throw new Error('请先暂停正在计时的事项，再同步。');
-    const next=parseJournalBackup(JSON.stringify({format:'focus-journal',version:16,state}));
+    const next=parseJournalBackup(JSON.stringify({format:'focus-journal',version:JOURNAL_SCHEMA_VERSION,state}));
     next.settings=structuredClone(this.state.settings);clearBreak(next);
     if(!next.tasks.some(t=>t.id===next.settings.selectedTaskId))next.settings.selectedTaskId=null;
     return this.restoreState(next);
@@ -420,7 +451,7 @@ export class JournalService {
 export function parseJournalBackup(content:string):JournalState {
   let parsed:unknown;try{parsed=JSON.parse(content);}catch{throw new Error('文件不是有效 JSON。');}
   const data=parsed as {format?:string;version?:number;state?:JournalState};
-  if(!data||data.format!=='focus-journal'||![1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16].includes(data.version??0)||!data.state)throw new Error('这不是支持的专注记备份。');
+  if(!data||data.format!=='focus-journal'||![1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19].includes(data.version??0)||!data.state)throw new Error('这不是支持的专注记备份。');
   validateState(data.state);return migrateOutline(data.state);
 }
 function validateState(s:JournalState) {
@@ -428,7 +459,7 @@ function validateState(s:JournalState) {
   const bool=(v:unknown)=>{if(typeof v!=='boolean')invalid();};
   const stamp=(v:unknown)=>{if(instant(v)!==v)invalid();};
   const nullableStamp=(v:unknown)=>{if(v!==null)stamp(v);};
-  if(!s||typeof s!=='object'||![1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16].includes(s.schemaVersion))throw new Error('备份版本不受支持。');
+  if(!s||typeof s!=='object'||![1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19].includes(s.schemaVersion))throw new Error('备份版本不受支持。');
   for(const k of ['projects','tasks','sessions','notes','estimates','reviews','audit'] as const){
     if(!Array.isArray(s[k])||s[k].length>100000)invalid();
     const ids=new Set();
@@ -442,10 +473,11 @@ function validateState(s:JournalState) {
   if(s.schemaVersion<13&&!s.projects.some(p=>p.id==='inbox'&&!p.archived))invalid();
   for(const p of s.projects){required(p.name);text(p.description);bool(p.archived);stamp(p.createdAt);}
   for(const t of s.tasks){
+    if(t.status==='handed-off'&&s.schemaVersion<19)invalid();validateOwnership(t);if(t.ownership)validateItemReminder(t.ownership.reminder);if(s.schemaVersion>=19&&t.status==='open'&&t.ownership)invalid();
     required(t.title);text(t.outcome);text(t.nextAction);
     if(t.itemType!==undefined&&!['task','note','event'].includes(t.itemType))invalid();if(t.updatedAt!==undefined)stamp(t.updatedAt);
 
-    if(!(s.schemaVersion>=13&&t.projectId===null)&&!projectIds.has(t.projectId as string)||!['open','done','cancelled'].includes(t.status))invalid();
+    if(!(s.schemaVersion>=13&&t.projectId===null)&&!projectIds.has(t.projectId as string)||!['open','done','cancelled','handed-off'].includes(t.status))invalid();
     if(t.estimateMinutes!==null)number(t.estimateMinutes);
     if(t.plannedDate!==null)day(t.plannedDate);
     validateItemReminder(t.reminder);
@@ -470,6 +502,7 @@ function validateState(s:JournalState) {
   const checkSession=(r:Session)=>{
     if(!r||!(r.taskId===null&&s.schemaVersion>=14)&&!taskIds.has(r.taskId as string)||!['running','paused','ended'].includes(r.status)||!Array.isArray(r.segments)||r.segments.length>100000)invalid();
     day(r.date);number(r.durationMs,0,365*86400000);number(r.targetMinutes,1,240);text(r.summary);
+    if(r.targetOffsetMs!==undefined){if(s.schemaVersion<17)invalid();number(r.targetOffsetMs,0,365*86400000);}
     if(r.reminder!==undefined){if(!r.reminder||!['pending','snoozed','dismissed'].includes(r.reminder.state)||!r.reminded)invalid();nullableStamp(r.reminder.snoozedUntil);if((r.reminder.state==='snoozed')!==(r.reminder.snoozedUntil!==null))invalid();}
     bool(r.manual);bool(r.reminded);bool(r.recovered);stamp(r.updatedAt);nullableStamp(r.start);nullableStamp(r.end);
     let sum=0;
@@ -489,6 +522,7 @@ function validateState(s:JournalState) {
   const reviewed=new Set();
   for(const r of s.reviews){text(r.outcome);text(r.reason);text(r.adjustment);stamp(r.updatedAt);if(!taskIds.has(r.taskId)||reviewed.has(r.taskId))invalid();reviewed.add(r.taskId);}
   for(const a of s.audit){stamp(a.createdAt);text(a.reason);if(!sessionIds.has(a.entityId)||typeof a.before!=='string')invalid();let before:Session;try{before=JSON.parse(a.before);}catch{invalid();}checkSession(before!);if(before!.id!==a.entityId)invalid();}
+  validateActivityState(s);
   if(!s.settings)invalid();if(s.settings.reminders!==undefined)validateReminderSettings(s.settings.reminders);number(s.settings.targetMinutes,1,240);number(s.settings.breakMinutes,1,60);nullableStamp(s.settings.breakUntil);
   if(s.settings.rest!=null){const rest=s.settings.rest;required(rest.id,100);if(!['offered','running','ready'].includes(rest.phase))invalid();number(rest.minutes,1,60);bool(rest.notify);if(rest.sessionId!==null&&!s.sessions.some(r=>r.id===rest.sessionId&&r.status==='ended'))invalid();if((rest.phase==='running')!==(s.settings.breakUntil!==null)||rest.notify&&rest.phase!=='ready'||s.sessions.some(r=>r.status==='running'))invalid();}
   else if(s.schemaVersion>=15&&s.settings.breakUntil!==null)invalid();

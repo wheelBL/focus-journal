@@ -1,0 +1,25 @@
+/* Production chrome and companion windows: no prototype tools or preview state. */
+.journal-style .quick-timer-start{margin-right:16px}
+.journal-style .workbench .native-titlebar{padding-right:145px}
+.journal-style .titlebar .demo-badge{margin-right:14px;white-space:nowrap;font-size:10px}
+.journal-style .workbench .window-controls{height:44px}
+html[data-theme=dark] .journal-style .application.workbench .sidebar-bottom{border-top-color:var(--line)}
+.appearance-quick{font-size:11px;padding:4px 8px 7px;color:var(--muted)}
+.appearance-quick label{display:flex;align-items:center;gap:6px;min-width:0}
+.appearance-quick svg{width:17px;flex:none}
+.appearance-quick select{flex:1;min-width:0;padding:3px 2px;border:0;background:transparent;font-size:11px;color:var(--muted);cursor:pointer}
+.appearance-quick p{font-size:10px;color:var(--danger);line-height:1.5}
+.appearance-quick option{background:var(--surface);color:var(--ink)}
+.journal-style[data-panel]:not([data-panel=main]){min-width:0}
+html.floating-timer-root,.journal-style.floating-timer-body{background:transparent!important}
+.journal-style .floating-controls :is(.is-primary,.floating-rest-action){background:var(--filled-accent,var(--accent));border-color:var(--filled-accent,var(--accent));color:#fff}
+.journal-style .capture-panel{background:var(--surface)}
+.journal-style .capture-panel>header{background:var(--surface-alt);color:var(--ink);border-bottom:1px solid var(--line)}
+.journal-style .capture-panel>header button{color:var(--muted)}
+.journal-style .capture-panel .semantic-capture{background:var(--surface)}
+.journal-style .reminder-panel{background:var(--surface);color:var(--ink);border-color:var(--line-strong);border-top-color:var(--accent)}
+html[data-theme=dark] .journal-style .capture-panel{background:var(--surface)}
+html[data-theme=dark] .journal-style :is(.project-review-summary,.project-review-row,.calendar-all-day){border-color:var(--line)}
+html[data-theme=dark] .journal-style :is(.project-review-row button,.project-review-items button){color:var(--accent)}
+.journal-style :is(.page,.task-inspector){scrollbar-color:var(--line-strong) transparent}
+@media(max-width:740px){.journal-style .quick-timer-start{margin-right:8px}.journal-style .workbench .native-titlebar{padding-right:138px}}

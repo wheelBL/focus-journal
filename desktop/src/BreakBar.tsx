@@ -21,8 +21,8 @@ export function BreakBar(){
  const choose=async()=>{await run({type:'break.stop'});navigate('projects');};
  return createPortal(<section className={`break-bar ${rest.phase}`} aria-label="休息与下一次专注">
   <DrinkCoffee20Regular/><div className="break-message">
-   <strong>{ready?'欢迎回来，准备继续了吗？':rest.phase==='offered'?'这一段已保存，休息一下再继续':'休息中'}{rest.phase==='running'&&!ready&&<time aria-label="休息剩余时间">{timerText(remaining)}</time>}</strong>
-   <span>{ready?`下一次：${next!.title}`:rest.phase==='offered'?'小结和事项可以稍后补充。':'离开屏幕，活动一下。休息不计入投入。'}</span>
+   <strong>{ready?'欢迎回来，准备继续了吗？':rest.phase==='offered'?rest.sessionId?'这一段已保存，休息一下再继续':'休息一下，再继续':'休息中'}{rest.phase==='running'&&!ready&&<time aria-label="休息剩余时间">{timerText(remaining)}</time>}</strong>
+   <span>{ready?`下一次：${next!.title}`:rest.phase==='offered'&&rest.sessionId?'小结和事项可以稍后补充。':'离开屏幕，活动一下。休息不计入投入。'}</span>
   </div>
   <div className="break-actions">{rest.phase==='offered'?<><Button primary disabled={busy} onClick={()=>perform('break.start')}>休息 {data.state.settings.breakMinutes} 分钟</Button><Button subtle disabled={busy} onClick={()=>perform('break.stop')}>暂不休息</Button></>:ready?<><Button primary disabled={busy||rest.phase!=='ready'} onClick={()=>perform('break.continue')}><Play20Filled/>{next!.sessionId?'恢复上一事项':`开始下一次 ${data.state.settings.targetMinutes} 分钟`}</Button><Button disabled={busy} onClick={()=>void choose().catch(()=>{})}>选择其他事项</Button><Button subtle disabled={busy} onClick={()=>perform('break.stop')}>暂不开始</Button></>:<Button disabled={busy} onClick={()=>perform('break.finish')}>提前结束休息</Button>}</div>
  </section>,target);

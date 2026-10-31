@@ -26,7 +26,7 @@ export class ReminderWindow{
    const alert=this.service.reminderSnapshot().alerts.find(a=>a.sessionId===sessionId);if(!alert)throw new Error('这个提醒已经处理。');
    if(alert.kind==='break'){
     if(!['continue','restart-break','dismiss','choose'].includes(action))throw new Error('休息提醒操作无效。');
-    this.service.execute({type:action==='continue'?'break.continue':action==='restart-break'?'break.start':'break.acknowledge'});this.changed();
+    this.service.execute({meta:{source:'user',entry:'reminder.card'},type:action==='continue'?'break.continue':action==='restart-break'?'break.start':'break.acknowledge'});this.changed();
     if(action!=='dismiss')this.openJournal(action==='choose');return;
    }
    if(alert.kind==='task'){

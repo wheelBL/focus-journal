@@ -1,0 +1,5 @@
+.workspace-screen{display:contents}
+.workspace-screen[hidden],#workspace-sidebar[hidden]{display:none!important}
+.workbench .main.is-searching{overflow:auto!important}
+.application:has(.timer-dock) .main.is-searching{padding-bottom:80px!important}
+.journal-style .main:not(.is-searching):has(> .workspace-screen:not([hidden]) > .tree-page .task-inspector .compact-timer)>.timer-dock:not(.multiple-timers){display:none}

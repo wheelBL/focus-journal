@@ -7,6 +7,7 @@ import {isInformation,isNote,isEvent} from './item-kind';
 import {setItemReminder,reminderEligible} from './item-reminders';
 import {configureRecurrence} from './recurrence';
 import {saveManualSession} from './manual-session';
+import type {CaptureDraft} from './capture';
 
 /** Creation and the associated reminder/effort commit atomically; cancellation writes nothing. */
 export function saveCalendarSelection(s:JournalState,p:Record<string,unknown>,now:string){
@@ -21,7 +22,9 @@ export function saveCalendarSelection(s:JournalState,p:Record<string,unknown>,no
   if(mode==='effort'&&isInformation(task)||mode==='reminder'&&isNote(task))throw new Error('请选择可以记录投入或设置提醒的事项。');
   if(mode==='reminder'&&!reminderEligible(s,task))throw new Error('事项或父项已关闭，请先恢复再设置提醒。');
  }else{
-  task=createCapture(s,{parentId:defaultCaptureParent(s),draft:{title:required(p.title),description:'',itemType:mode==='event'?'event':'task',parentQuery:null,tagNames:[],plannedDate:null,dueAt:null,estimateMinutes:null,remindAt:null,eventAt:mode==='event'?start:null,eventEnd:mode==='event'?end:null}},now);
+  const draft:CaptureDraft=p.draft as CaptureDraft??{title:required(p.title),description:'',itemType:mode==='event'?'event':'task',parentQuery:null,tagNames:[],plannedDate:null,dueAt:null,estimateMinutes:null,remindAt:null,eventAt:mode==='event'?start:null,eventEnd:mode==='event'?end:null};
+  if(mode==='effort'&&isInformation(draft)||mode==='reminder'&&isNote(draft)||mode==='event'&&!isEvent(draft))throw new Error('记录类型与日历操作不符，请选择事项或事件。');
+  task=createCapture(s,{parentId:Object.hasOwn(p,'parentId')?p.parentId:defaultCaptureParent(s),draft:{...draft,...mode==='event'?{eventAt:start,eventEnd:end}:{} }},now);
  }
  if(mode==='effort')saveManualSession(s,{taskId:task.id,date:localDate(start),minutes:1,start,end,summary:text(p.summary??'')},now);
  else if(mode==='reminder'){

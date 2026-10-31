@@ -15,6 +15,23 @@ function setup(){
 }
 const weekly=()=>withRules(emptyFilter(),group([condition('status','is','open'),condition('dueAt','before',relative('next-week'))]));
 
+test('legacy saved unfinished weekly view excludes handed-off items and their context-only ancestors',()=>{
+ const {service,add}=setup(),parent=add('无截止父级'),id=add('本周交接',parent,'2026-10-23');
+ const filter={...emptyFilter(),rules:group([condition('status','is-not','done'),condition('status','is-not','cancelled'),condition('dueAt','before',relative('next-week'))])};
+ assert.equal(filterOutline(service.snapshot().state,filter,service.snapshot().now).matches.has(id),true);
+ service.execute({type:'item.handoff',payload:{id,assignee:'同事'}});const backup=JSON.parse(service.exportJson());backup.state.views.push({id:'legacy-week',name:'本周待完成',filter});service.importJson(JSON.stringify(backup));
+ const s=service.snapshot(),result=filterOutline(s.state,s.state.views.at(-1)!.filter,s.now);assert.equal(result.matches.has(id),false);assert.equal(result.keep.has(parent),false);assert.equal(result.matches.size,0);
+ const updated=rulesFor(filter);assert.equal(simpleStatusValue(updated.children.filter(c=>c.kind==='condition')),'unfinished');assert.equal(allowsStatus(updated,'handed-off'),false);assert.equal(JSON.stringify(filter.rules).includes('handed-off'),false,'reading never mutates the saved original');
+ assert.deepEqual(rulesFor({...filter,rules:updated}),updated);
+});
+
+test('explicit advanced closed-state choices keep their meaning alongside legacy exclusions',()=>{
+ const explicit=group([condition('status','is-not','done'),condition('status','is-not','cancelled'),condition('status','is','handed-off')]);
+ assert.strictEqual(rulesFor({...emptyFilter(),rules:explicit}),explicit);
+ const any=group([condition('status','is-not','done'),condition('status','is-not','cancelled')],'any');assert.strictEqual(rulesFor({...emptyFilter(),rules:any}),any);
+ const mixed=group([condition('status','is-not','done'),condition('status','is-not','cancelled'),group([condition('status','is','handed-off'),condition('title','contains','周报')],'any')]);assert.strictEqual(rulesFor({...emptyFilter(),rules:mixed}),mixed);
+});
+
 test('closed child stops keeping every undated ancestor; independent matching siblings and parent dates survive',()=>{
  const {service,add}=setup(),root=add('父级'),branch=add('分支',root),a=add('本周子项',branch,'2026-10-23'),other=add('另一个待办',null,'2026-10-25');
  let s=service.snapshot(),f=weekly();assert.ok(filterOutline(s.state,f,s.now).keep.has(root));

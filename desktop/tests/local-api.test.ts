@@ -12,6 +12,7 @@ import {emptyFilter} from '../core/filters';
 import {condition,group,withRules} from '../core/filter-rules';
 import {controlOpenApi} from '../core/control-api';
 
+process.env.TZ='Asia/Shanghai';
 class Store{path='API isolated test';state=emptyState();fail=false;load(){return structuredClone(this.state);}save(s:JournalState){if(this.fail)throw Error('SQLITE ENOSPC C:\\private\\journal.sqlite');this.state=structuredClone(s);}close(){}}
 const token='a'.repeat(64);
 async function setup(access:'read'|'write'='write'){
@@ -26,16 +27,66 @@ async function setup(access:'read'|'write'='write'){
 }
 const freePort=async()=>{const s=createServer();await new Promise<void>(r=>s.listen(0,'127.0.0.1',r));const port=(s.address() as {port:number}).port;await new Promise<void>((r,reject)=>s.close(e=>e?reject(e):r()));return port;};
 
+test('API handoff closes personal work, exposes an explicit closed query and reclaim reopens',async()=>{
+ const h=await setup();try{const id=(await h.command('item.create',{title:'通过 API 交接'})).body.data.createdItemIds[0];assert.equal((await h.command('item.handoff',{id,assignee:'同事'})).status,200);
+ assert.equal((await h.get('/items')).body.data.items.some((t:any)=>t.id===id),false);assert.equal((await h.get('/items?status=done')).body.data.items.some((t:any)=>t.id===id),false);
+ const closed=await h.get('/items?status=handed-off');assert.equal(closed.status,200);assert.equal(closed.body.data.items.find((t:any)=>t.id===id).completedAt,null);
+ assert.equal((await h.command('item.reclaim',{id})).status,200);assert.equal((await h.get('/items')).body.data.items.some((t:any)=>t.id===id),true);assert.equal((await h.get('/timers')).body.data.timers?.length??0,0);
+ }finally{h.close();}
+});
+
+test('content revision survives elapsed-only checkpoints while business changes still reject stale writes',async()=>{
+ const h=await setup();try{
+  const id=(await h.command('item.create',{title:'稳定修订'})).body.data.createdItemIds[0];await h.command('focus.start',{taskId:id});const revision=(await h.get('/status')).body.revision;
+  h.clock.time+=10000;h.s.tick();assert.equal((await h.get('/status')).body.revision,revision);assert.equal((await h.get(`/items/${id}`)).body.data.effort.ownMs,10000);
+  assert.equal((await h.command('outline.patch',{id,field:'title',value:'无需因时钟重试'},revision)).status,200);
+  assert.equal((await h.command('outline.patch',{id,field:'title',value:'应拒绝旧修订'},revision)).status,412);
+ }finally{h.close();}
+});
+
+test('AI backdates and adjusts running effort with a fresh reminder, revision checks and idempotent replay',async()=>{
+ const h=await setup();try{
+  const taskId=(await h.command('item.create',{title:'已做40分钟'})).body.data.createdItemIds[0];
+  const started=await h.command('focus.start',{taskId,startedAt:'2026-10-20T13:20:00+08:00'});assert.equal(started.status,200);
+  const sessionId=started.body.data.createdSessionIds[0];let timer=h.s.snapshot().timer!;assert.equal(timer.durationMs,2400000);assert.equal(timer.targetOffsetMs,2400000);assert.equal(h.s.tick().length,0);
+  const revision=(await h.get('/status')).body.revision,key=randomUUID(),payload={sessionId,startedAt:'2026-10-20T13:10:00+08:00',expectedStart:'2026-10-20T05:20:00.000Z'};
+  const changed=await h.command('focus.set-start',payload,revision,key);assert.equal(changed.status,200);const audits=h.s.snapshot().state.audit.length;
+  const replay=await h.command('focus.set-start',payload,revision,key);assert.equal(replay.body.replayed,true);assert.equal(h.s.snapshot().state.audit.length,audits);assert.equal(h.s.snapshot().state.sessions.length,1);
+  timer=h.s.snapshot().timer!;assert.equal(timer.durationMs,3000000);assert.equal(timer.targetOffsetMs,3000000);assert.equal((await h.get(`/items/${taskId}`)).body.data.effort.ownMs,3000000);
+  assert.equal((await h.command('focus.set-start',{sessionId,startedAt:'2026-10-20T13:00:00+08:00'},revision)).status,412);
+  assert.equal((await h.command('focus.set-start',{sessionId,startedAt:'2026-10-20T15:00:00+08:00'})).status,422);
+  assert.equal((await h.command('focus.set-start',{sessionId,startedAt:'2026-10-20T13:00:00+08:00',targetOffsetMs:0})).status,400);
+  h.clock.time+=25*60000;assert.equal(h.s.tick().length,1);assert.equal(h.s.snapshot().timer!.durationMs,75*60000);
+ }finally{h.close();}
+});
+
+test('AI may start unassigned work in the past but invalid start times leave no partial session',async()=>{
+ const h=await setup();try{
+  const before=h.s.exportJson();assert.equal((await h.command('focus.start-unassigned',{startedAt:'2026-10-20T15:00:00+08:00'})).status,422);assert.equal(h.s.exportJson(),before);
+  assert.equal((await h.command('focus.start-unassigned',{startedAt:'2026-10-20T13:20:00+08:00'})).status,200);assert.equal(h.s.snapshot().timer!.taskId,null);assert.equal(h.s.snapshot().timer!.targetOffsetMs,40*60000);
+ }finally{h.close();}
+});
+
+test('AI can preserve timed evidence while correcting metadata, with strict mode validation and idempotent replay',async()=>{
+ const h=await setup();try{
+  const taskId=(await h.command('item.create',{title:'保留精确片段'})).body.data.createdItemIds[0],sessionId=(await h.command('focus.start',{taskId})).body.data.createdSessionIds[0];h.clock.time+=60000;assert.equal((await h.command('focus.pause',{sessionId})).status,200);h.clock.time+=300000;assert.equal((await h.command('focus.resume',{sessionId})).status,200);h.clock.time+=60000;assert.equal((await h.command('focus.stop',{sessionId})).status,200);
+  const original=h.s.snapshot().state.sessions[0],revision=(await h.get('/status')).body.revision,key=randomUUID(),payload={id:original.id,taskId,preserveTiming:true,reason:'补写成果',summary:'已补充'};
+  const saved=await h.command('session.manual',payload,revision,key);assert.equal(saved.status,200);const record=h.s.snapshot().state.sessions[0];assert.deepEqual({...record,summary:original.summary,updatedAt:original.updatedAt},original);
+  const audits=h.s.snapshot().state.audit.length;assert.equal((await h.command('session.manual',payload,revision,key)).body.replayed,true);assert.equal(h.s.snapshot().state.audit.length,audits);
+  const before=h.s.exportJson();for(const invalid of [{...payload,minutes:2},{...payload,date:'2026-10-20'},{...payload,start:null},{...payload,reason:''},{taskId,preserveTiming:true,reason:'不可新建'}]){assert.equal((await h.command('session.manual',invalid)).status,422);assert.equal(h.s.exportJson(),before);}
+ }finally{h.close();}
+});
+
 test('API deletes and restores ended effort with revision safety, read access to trash and updated item totals',async()=>{
  const h=await setup();try{
   const id=(await h.command('item.create',{title:'投入归属'})).body.data.createdItemIds[0];
   const record=(await h.command('session.manual',{taskId:id,date:'2026-10-19',minutes:12,summary:'有进展'})).body.data.createdSessionIds[0];
   const revision=(await h.get('/status')).body.revision,key=randomUUID();
-  const deleted=await h.command('session.delete',{id:record},revision,key);assert.equal(deleted.status,200);assert.deepEqual(deleted.body.data.removedSessionIds,[record]);
-  assert.equal((await h.command('session.delete',{id:record},revision,key)).body.replayed,true);
+  const deleted=await h.command('session.delete',{id:record,summary:'放弃前补充的进展'},revision,key);assert.equal(deleted.status,200);assert.deepEqual(deleted.body.data.removedSessionIds,[record]);
+  assert.equal((await h.command('session.delete',{id:record,summary:'放弃前补充的进展'},revision,key)).body.replayed,true);
   assert.equal((await h.get('/sessions')).body.data.total,0);assert.equal((await h.get('/sessions?deleted=true')).body.data.items[0].id,record);assert.equal((await h.get(`/items/${id}`)).body.data.effort.ownMs,0);assert.equal((await h.get('/sessions?deleted=yes')).status,400);
   assert.equal((await h.command('session.restore',{id:record},revision)).status,412);assert.equal((await h.command('session.restore',{id:record})).status,200);
-  assert.equal((await h.get('/sessions?deleted=true')).body.data.total,0);assert.equal((await h.get('/sessions')).body.data.items[0].summary,'有进展');assert.equal((await h.get(`/items/${id}`)).body.data.effort.ownMs,720000);
+  assert.equal((await h.get('/sessions?deleted=true')).body.data.total,0);assert.equal((await h.get('/sessions')).body.data.items[0].summary,'放弃前补充的进展');assert.equal((await h.get(`/items/${id}`)).body.data.effort.ownMs,720000);
  }finally{h.close();}
 });
 

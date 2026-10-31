@@ -1,3 +1,4 @@
+import {withOperationEntry,elementEntry} from './operation-entry';
 import {AppContext,LiveAppContext} from './journal-context';
 export {AppContext,type AppContextValue,type DialogSpec} from './journal-context';
 import {isDateDeadline} from '../core/deadlines';
@@ -16,11 +17,13 @@ export const deadlineInputValue=(value:string|null|undefined)=>value?(isDateDead
 export const deadlinePayload=(value:string)=>value?(isDateDeadline(value)?value:new Date(value).toISOString()):null;
 export const dateLabel=(date:string)=>new Date(`${date}T12:00:00`).toLocaleDateString('zh-CN',{month:'long',day:'numeric',weekday:'short'});
 export const projectName=(data:Snapshot,task:Task)=>outlinePath(outlineIndex(data.state),task.id).filter(n=>n.kind==='project'&&n.id!==task.id).map(n=>n.title).join(' / ')||'最外层';
-export function Button({children,primary=false,subtle=false,className='',...props}:React.ButtonHTMLAttributes<HTMLButtonElement>&{primary?:boolean;subtle?:boolean}){return <button {...props} className={`${primary?'primary':subtle?'subtle':'secondary'} ${className}`}>{children}</button>;}
+export function Button({children,primary=false,subtle=false,className='',onClick,...props}:React.ButtonHTMLAttributes<HTMLButtonElement>&{primary?:boolean;subtle?:boolean}){return <button {...props} onClick={onClick?event=>withOperationEntry(elementEntry(event.currentTarget),()=>onClick(event)):undefined} className={`${primary?'primary':subtle?'subtle':'secondary'} ${className}`}>{children}</button>;}
 export function Field({label,children,hint}:React.PropsWithChildren<{label:string;hint?:string}>){return <label className="field"><span>{label}</span>{children}{hint&&<small>{hint}</small>}</label>;}
 export function Empty({title,text,children}:React.PropsWithChildren<{title:string;text:string}>){return <div className="empty"><h2>{title}</h2><p>{text}</p>{children}</div>;}
-export function Modal({title,children,onClose,wide=false}:React.PropsWithChildren<{title:string;onClose:()=>void;wide?:boolean}>){
+export function Modal({title,children,onClose,wide=false,busy=false}:React.PropsWithChildren<{title:string;onClose:()=>void;wide?:boolean;busy?:boolean}>){
   const ref=React.useRef<HTMLDialogElement>(null);
-  React.useEffect(()=>{ref.current?.showModal();const el=ref.current;el?.querySelector<HTMLInputElement|HTMLTextAreaElement|HTMLSelectElement>('input:not([type=checkbox]),textarea,select')?.focus();const cancel=(e:Event)=>{e.preventDefault();onClose();};el?.addEventListener('cancel',cancel);return()=>{el?.removeEventListener('cancel',cancel);el?.close();};},[]);
-  return <dialog ref={ref} className={wide?'modal wide':'modal'} aria-label={title} onClick={e=>{if(e.target===e.currentTarget){const r=e.currentTarget.getBoundingClientRect();if(e.clientX<r.left||e.clientX>r.right||e.clientY<r.top||e.clientY>r.bottom)onClose();}}}><header><h2>{title}</h2><Button subtle aria-label="关闭" onClick={onClose}><Dismiss20Regular/></Button></header>{children}</dialog>;
+  const latest=React.useRef({onClose,busy});latest.current={onClose,busy};
+  const close=()=>{if(!latest.current.busy)latest.current.onClose();};
+  React.useEffect(()=>{ref.current?.showModal();const el=ref.current;el?.querySelector<HTMLInputElement|HTMLTextAreaElement|HTMLSelectElement>('input:not([type=checkbox]):not(:disabled),textarea:not(:disabled),select:not(:disabled)')?.focus();const cancel=(e:Event)=>{e.preventDefault();close();};el?.addEventListener('cancel',cancel);return()=>{el?.removeEventListener('cancel',cancel);el?.close();};},[]);
+  return <dialog ref={ref} className={wide?'modal wide':'modal'} aria-label={title} aria-busy={busy} onClick={e=>{if(e.target===e.currentTarget){const r=e.currentTarget.getBoundingClientRect();if(e.clientX<r.left||e.clientX>r.right||e.clientY<r.top||e.clientY>r.bottom)close();}}}><header><h2>{title}</h2><Button subtle type="button" disabled={busy} aria-label="关闭" onClick={close}><Dismiss20Regular/></Button></header>{children}</dialog>;
 }

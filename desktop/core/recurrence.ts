@@ -71,7 +71,7 @@ export function configureRecurrence(task:Task,value:unknown,now:string){
 export function generateTaskSuccessors(before:JournalState,after:JournalState,now:string){
  const previous=new Map(before.tasks.map(t=>[t.id,t]));
  for(const task of [...after.tasks]){
-  if(!task.recurrence||task.itemType==='event'||task.status!=='done'||previous.get(task.id)?.status!=='open'||task.recurrenceNextId||task.deletedAt)continue;
+  if(!task.recurrence||task.itemType==='event'||task.status!=='done'||!['open','handed-off'].includes(previous.get(task.id)?.status??'')||task.recurrenceNextId||task.deletedAt)continue;
   const base=recurrenceBase(task,now),cutoff=task.recurrence.mode==='completion'?localDate(now):[base,localDate(now)].sort().at(-1)!;
   const next=nextOccurrence(task.recurrence,cutoff);if(!next)continue;
   const offset=dateDistance(base,next),id=cryptoId(task.id,next);
@@ -79,7 +79,7 @@ export function generateTaskSuccessors(before:JournalState,after:JournalState,no
   if(after.tasks.some(t=>t.id===id)){task.recurrenceNextId=id;continue;}
   let parent=task.parentId??null;
   while(parent){const p=after.tasks.find(t=>t.id===parent);if(!p||p.status!=='open'||p.deletedAt||p.archived)parent=p?.parentId??null;else break;}
-  const successor:Task={...structuredClone(task),id,parentId:parent,order:task.order??0,status:'open',startedAt:null,completedAt:null,createdAt:now,updatedAt:now,deletedAt:null,focusDate:null,reviewSchedule:null,recurrencePreviousId:task.id,recurrenceNextId:null,plannedDate:shiftOccurrence(task.plannedDate,offset),dueAt:shiftOccurrence(task.dueAt,offset),reminder:task.reminder?{at:shiftOccurrence(task.reminder.at,offset)!,state:'scheduled',snoozedUntil:null}:null};
+  const successor:Task={...structuredClone(task),id,parentId:parent,order:task.order??0,status:'open',ownership:null,completionBy:undefined,startedAt:null,completedAt:null,createdAt:now,updatedAt:now,deletedAt:null,focusDate:null,reviewSchedule:null,recurrencePreviousId:task.id,recurrenceNextId:null,plannedDate:shiftOccurrence(task.plannedDate,offset),dueAt:shiftOccurrence(task.dueAt,offset),reminder:task.reminder?{at:shiftOccurrence(task.reminder.at,offset)!,state:'scheduled',snoozedUntil:null}:null};
   // Fixed monthly/yearly anchors remain the original day (Jan 31 → Feb 28 → Mar 31).
   after.tasks.push(successor);task.recurrenceNextId=id;
  }

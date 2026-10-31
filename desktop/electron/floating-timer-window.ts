@@ -79,7 +79,7 @@ export class FloatingTimerWindow {
   if(['pause','resume','stop','stop-rest'].includes(action)){
    const timer=this.state.timers.find(t=>t.sessionId===id);if(!timer)throw new Error('这个计时已经结束，请查看当前状态。');
    if((action==='pause'&&timer.paused)||(action==='resume'&&!timer.paused))throw new Error('计时状态已变化，请重试。');
-   this.service.execute({type:`focus.${action==='stop-rest'?'stop':action}`,payload:{sessionId:id,rest:action==='stop-rest'}});
+   this.service.execute({meta:{source:'user',entry:'floating.timer'},type:`focus.${action==='stop-rest'?'stop':action}`,payload:{sessionId:id,rest:action==='stop-rest'}});
    this.changed();this.sync();return;
   }
   const rest=this.state.rest;

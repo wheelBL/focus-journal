@@ -4,6 +4,14 @@ import {appDom} from './app-dom.mjs';
 import {emptyFilter} from '../core/filters.ts';
 import {condition,group,relative,withRules} from '../core/filter-rules.ts';
 
+test('existing weekly unfinished view removes a handed-off row and undated ancestors in both layouts',async()=>{
+ const h=await appDom();try{const p=h.add('旧视图父项',null),a=h.add('将要交接',p,{dueAt:'2026-10-23'}),b=h.add('继续完成',null,{dueAt:'2026-10-24'});
+ const filter={...emptyFilter(),rules:group([condition('status','is-not','done'),condition('status','is-not','cancelled'),condition('dueAt','before',relative('next-week'))])},backup=JSON.parse(h.service.exportJson());backup.state.views.push({id:'legacy-week',name:'本周待完成',filter});h.service.importJson(JSON.stringify(backup));
+ await h.mount();await h.click(h.label('事项'));await h.input(h.label('常用视图'),'legacy-week');const row=id=>document.querySelector(`[data-outline-id="${id}"]`);assert.ok(row(a));assert.ok(row(p));
+ await h.command({type:'item.handoff',payload:{id:a,assignee:'同事'}});assert.equal(row(a),null);assert.equal(row(p),null);assert.ok(row(b));assert.equal(document.querySelector('.view-dirty'),null);await h.click(h.button('平铺'));assert.equal(row(a),null);assert.equal(row(p),null);assert.ok(row(b));
+ }finally{await h.close();}
+});
+
 test('date-only view explains finished matches, offers open-only, removes ancestor context and saves the choice',async()=>{
  const h=await appDom();try{
   const parent=h.add('无截止父项',null),closed=h.add('已闭环子项',parent,{dueAt:'2026-10-23'}),other=h.add('本周还有工作',null,{dueAt:'2026-10-24'});

@@ -26,7 +26,7 @@ export function applyBatch(s:JournalState,p:Record<string,unknown>,now:string){
   else if(action==='dueAt'){t.dueAt=p.value?deadline(p.value):null;validateSchedule(t);}
   else if(action==='pause'||action==='resume')t.availability=action==='pause'?'paused':'active';
   else if(action==='delete')t.deletedAt??=now;
-  else{if(action==='open')assertParentAvailable(s,t.parentId??null);t.status=action;t.completedAt=action==='done'?now:null;}
+  else{if(action==='open'){assertParentAvailable(s,t.parentId??null);t.ownership=null;}t.status=action;t.completedAt=action==='done'?now:null;}
  }
  for(const timer of impact.timers){if(action==='pause')timer.status='paused';else{timer.status='ended';timer.end=now;}timer.updatedAt=now;}
  return impact;

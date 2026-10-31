@@ -1,14 +1,21 @@
-import CapturePanel from './CapturePanel';
-import FloatingTimerPanel from './FloatingTimerPanel';
+import './feature-styles';
 import React from 'react';
 import { createRoot } from 'react-dom/client';
-import App from './App.tsx';
+import {deferredModule} from './DeferredModule';
 import './styles.css';
-import ReminderPanel from './ReminderPanel';
 import './responsive.css';
 import './design-tokens.css';
 import './workbench.css';
+import './journal-style.css';
+import './journal-themes.css';
+import './appearance-layout.css';
+import {initializeAppearance} from './appearance';
+initializeAppearance();
+document.body.classList.add('journal-style');
+document.body.dataset.panel=new URLSearchParams(window.location.search).get('panel')??'main';
 const capture=new URLSearchParams(window.location.search).get('panel')==='capture';
 const reminder=new URLSearchParams(window.location.search).get('panel')==='reminder';
 const floating=new URLSearchParams(window.location.search).get('panel')==='floating-timer';
-createRoot(document.getElementById('root')!).render(<React.StrictMode>{floating?<FloatingTimerPanel/>:reminder?<ReminderPanel/>:capture?<CapturePanel/>:<App/>}</React.StrictMode>);
+// Auxiliary windows load their own renderer without parsing the full main workspace.
+const Panel=floating?deferredModule('悬浮计时',()=>import('./FloatingTimerPanel')):reminder?deferredModule('提醒',()=>import('./ReminderPanel')):capture?deferredModule('快速记录',()=>import('./CapturePanel')):deferredModule('工作区',()=>import('./App.tsx'));
+createRoot(document.getElementById('root')!).render(<React.StrictMode><Panel/></React.StrictMode>);

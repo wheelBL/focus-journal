@@ -28,5 +28,3 @@
 .calendar-compact-entry{display:flex;gap:8px;align-items:center;padding:5px 8px;border:1px solid var(--calendar-color);border-left:3px solid var(--calendar-color);border-radius:4px;max-width:100%;min-height:32px}
 .calendar-compact-entry strong{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:240px}.calendar-compact-entry span{font-size:11px;white-space:nowrap}
 .calendar-delete-confirm{padding:12px;border:1px solid #dcbcb7;background:#fff8f6;border-radius:6px}
-.calendar-trash-list{max-height:55vh;overflow:auto}.calendar-trash-list article{display:flex;gap:16px;justify-content:space-between;align-items:center;padding:12px 0;border-bottom:1px solid var(--line)}
-.calendar-trash-list article p{font-size:12px;margin:4px 0}

@@ -1,0 +1,31 @@
+.ai-assistant{display:grid;gap:16px;min-width:0;color:var(--ink)}
+.ai-intro,.ai-settings>p{margin:0;color:var(--muted);line-height:1.6}
+.ai-setup{display:grid;justify-items:start;gap:8px;padding:14px;border:1px solid var(--line);border-radius:10px;background:var(--surface-alt)}
+.ai-setup p{margin:0;color:var(--muted);font-size:13px}
+.ai-unavailable{padding:14px;background:var(--surface-alt);border:1px solid var(--line);border-radius:9px;color:var(--muted)}
+.ai-compose{display:grid;gap:10px}.ai-compose .field,.ai-connection-form .field{margin:0}
+.ai-compose textarea{width:100%;resize:vertical;min-height:82px;line-height:1.6}
+.ai-context{border:1px solid var(--line);border-radius:9px;padding:10px 12px;font-size:12px;background:var(--surface-alt)}
+.ai-context summary{cursor:pointer;font-weight:600;line-height:1.6}.ai-context summary span{margin-left:10px;font-weight:400;color:var(--muted)}
+.ai-context>p{color:var(--muted);line-height:1.6;margin:10px 0 0}
+.ai-context ul{list-style:none;padding:0;margin:10px 0;max-height:190px;overflow:auto;display:grid;gap:7px}
+.ai-context li{display:grid;gap:2px;min-width:0}.ai-context li strong{font-weight:500;overflow-wrap:anywhere}.ai-context li small{color:var(--muted);overflow-wrap:anywhere}
+.ai-context .ai-limit{padding:8px;border-left:2px solid var(--accent);color:var(--ink)}
+.ai-context-loading{font-size:12px;color:var(--muted);margin:0}
+.ai-prompts{display:flex;gap:6px;flex-wrap:wrap}.ai-prompts button{font-size:12px;border:1px solid var(--line);border-radius:16px;padding:4px 10px}
+.ai-compose-actions{display:flex;align-items:center;justify-content:space-between;gap:12px}.ai-compose-actions small{color:var(--muted);font-size:11px}
+.ai-response{border-top:1px solid var(--line);padding-top:15px;min-width:0}.ai-response>header{display:flex;align-items:center;justify-content:space-between;gap:12px}.ai-response h3{font-size:14px;margin:0}.ai-response>header>span{font-size:11px;color:var(--muted)}
+.ai-response-scope{display:block;color:var(--muted);margin-top:5px;font-size:11px}
+.ai-response-text{white-space:pre-wrap;overflow-wrap:anywhere;font-size:13px;line-height:1.75;padding:14px 0;user-select:text}
+.ai-suggestions{display:grid;gap:10px;margin-top:14px}.ai-suggestions>h3{display:flex;gap:7px;align-items:center}.ai-suggestions>h3>span{font-size:11px;font-weight:400;color:var(--muted)}
+.ai-suggestion{border:1px solid var(--line);border-radius:10px;overflow:hidden}.ai-suggestion>header{display:flex;justify-content:space-between;align-items:center;gap:14px;padding:11px 12px;background:var(--surface-alt)}
+.ai-suggestion h4{font-size:13px;margin:0;overflow-wrap:anywhere}.ai-suggestion header p{font-size:11px;color:var(--muted);margin:4px 0 0;overflow-wrap:anywhere}.ai-suggestion header button{flex-shrink:0;font-size:12px}
+.ai-change{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);padding:12px;gap:14px}.ai-change>div>span{font-size:11px;color:var(--muted)}
+.ai-change pre{white-space:pre-wrap;overflow-wrap:anywhere;font-family:inherit;font-size:12px;line-height:1.6;margin:5px 0 0;max-height:220px;overflow:auto}
+.ai-suggestion-reason{margin:0;padding:10px 12px 0;color:var(--muted);font-size:12px;line-height:1.6;white-space:pre-wrap;overflow-wrap:anywhere}
+.ai-applied{color:var(--accent);font-size:12px;white-space:nowrap}.ai-suggestion.is-applied{border-color:color-mix(in srgb,var(--accent) 35%,var(--line))}
+.ai-error{color:var(--danger,#c24444);font-size:12px;line-height:1.6;white-space:pre-wrap;overflow-wrap:anywhere;margin:0}.ai-suggestion>.ai-error{padding:0 12px 12px}
+.ai-success{color:var(--accent);font-size:12px;margin:0}.ai-key-state,.ai-settings-hint{font-size:11px;color:var(--muted);line-height:1.6;margin:0}
+.ai-connection-form{margin-top:14px}.ai-connection-form fieldset{display:grid;gap:12px}.ai-settings{display:grid;gap:12px}.ai-connection-form input{width:100%}.ai-connection-form .actions{display:flex;gap:8px;flex-wrap:wrap}
+@media(max-width:620px){.ai-change{grid-template-columns:minmax(0,1fr)}.ai-suggestion>header{align-items:flex-start}.ai-compose-actions{flex-wrap:wrap}.ai-context summary span{display:block;margin-left:0}}
+@media(prefers-reduced-motion:reduce){.ai-assistant *{scroll-behavior:auto}}

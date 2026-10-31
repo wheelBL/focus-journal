@@ -45,7 +45,7 @@ test('full app concurrent timers keep tree, Today, dock and summaries synchroniz
    assert.equal(service.snapshot().timers.find(t=>t.taskId===b).durationMs,before);assert.equal(service.snapshot().timers.find(t=>t.taskId===a).durationMs,20000);
    await click(label('开始阅读'));assert.match(query('.toast[role=status]').textContent,/每次只做一件事情/);
    clock.advance(5000);await click(button('结束本次',query('.task-inspector')));assert.deepEqual(service.snapshot().timers.map(t=>t.taskId),[a]);
-   assert.equal(button('休息 5 分钟',label('结束本次后')).disabled,true);await click(button('稍后填写'));
+   assert.equal(button('保存并休息 5 分钟',label('结束本次后')).disabled,true);assert.match(label('结束本次后').textContent,/还有 1 个计时器在运行/);await click(button('稍后填写'));
   });
   await t.test('Today preserves the timeline and controls each active card independently',async()=>{
    await click(label('开始阅读'));await click(label('今日'));
@@ -63,7 +63,7 @@ test('full app concurrent timers keep tree, Today, dock and summaries synchroniz
    await click(label('日历'));await click(label('管理所有计时器'));assert.equal(document.querySelectorAll('.dock-timer-row').length,2);
    await click(label('暂停练习计时'));assert.ok(service.snapshot().timers.find(t=>t.taskId===c).paused);assert.ok(!service.snapshot().timers.find(t=>t.taskId===a).paused);
    await click(label('恢复练习计时'));clock.advance(5000);await click(label('结束练习计时'));await click(button('稍后填写'));
-   assert.deepEqual(service.snapshot().timers.map(t=>t.taskId),[a]);assert.ok(query('.calendar-caption').textContent.includes('并行'));
+   assert.deepEqual(service.snapshot().timers.map(t=>t.taskId),[a]);const guide=query('.calendar-guide details');await click(query('summary',guide));assert.equal(guide.open,true);assert.match(guide.textContent,/仅真实重叠的时段并排显示，并行投入分别累计/);
    await click(label('结束写作计时'));await click(button('稍后填写'));assert.equal(service.snapshot().timers.length,0);assert.equal(document.querySelectorAll('.timer-dock').length,0);
   });
   await t.test('recovered sessions are visible individually and preserving records across page switches',async()=>{

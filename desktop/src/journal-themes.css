@@ -1,0 +1,149 @@
+:root[data-theme=dark]{
+  color-scheme:dark;
+  --ink:#e2e6ed;--muted:#abb4c3;--subtle-ink:#929dad;
+  --surface:#26282d;--surface-alt:#2d3037;--surface-hover:#353a44;
+  --line:#3b4049;--line-strong:#515a68;
+  --accent:#83b1ff;--accent-hover:#a3c7ff;--accent-soft:#303f56;--soft:#2c3544;
+  --shell:#212328;--shell-hover:#30343c;--shell-selected:#34455e;
+  --shell-ink:#c5ccd7;--shell-muted:#a2adbd;
+  --success:#8bcbb2;--success-soft:#293f36;
+  --danger:#eea196;--danger-soft:#47332f;
+  --warning:#dfbd7e;--warning-soft:#423b2b;
+  --reminder:#9ac8d9;--reminder-soft:#2c3b42;
+  --focus-ring:#83b1ff;--shadow:#00000050;--overlay:#080b1270;
+  --filled-accent:#356dcc;--filled-accent-hover:#4078d7;
+  background:var(--surface);color:var(--ink);
+}
+
+/* Navigation, toolbars, search and native controls. */
+html[data-theme=dark] .journal-style{background:var(--surface);color:var(--ink);scrollbar-color:#505967 transparent}
+html[data-theme=dark] .journal-style .workbench :is(.titlebar,.main){background:var(--surface)}
+html[data-theme=dark] .journal-style :is(.secondary,input,textarea,select){background:var(--surface-alt);border-color:var(--line-strong);color:var(--ink)}
+html[data-theme=dark] .journal-style .primary{background:var(--filled-accent);border-color:var(--filled-accent);color:#fff;box-shadow:none}
+html[data-theme=dark] .journal-style .primary:hover:not(:disabled){background:var(--filled-accent-hover);border-color:var(--filled-accent-hover)}
+html[data-theme=dark] .journal-style .secondary:hover:not(:disabled){background:var(--surface-hover)}
+html[data-theme=dark] .journal-style :is(input,textarea)::placeholder{color:var(--subtle-ink)}
+html[data-theme=dark] .journal-style .workbench .brand{background:var(--shell);border-color:var(--line)}
+html[data-theme=dark] .journal-style .application.workbench .sidebar{border-color:var(--line)}
+html[data-theme=dark] .journal-style .workbench .top-navigation .nav-item{color:var(--shell-ink)}
+html[data-theme=dark] .journal-style .workbench .top-navigation .nav-item:hover{background:var(--shell-hover)}
+html[data-theme=dark] .journal-style .workbench .top-navigation .nav-item.selected{background:var(--shell-selected);color:#bed5fc}
+html[data-theme=dark] .journal-style .workbench .top-search{background:#2c3037;color:var(--muted)}
+html[data-theme=dark] .journal-style .workbench .top-search:focus-within{background:#303743;border-color:var(--accent)}
+html[data-theme=dark] .journal-style .workbench .top-search input{background:transparent;color:var(--ink)}
+html[data-theme=dark] .journal-style .workbench .top-search input::placeholder{color:var(--subtle-ink)}
+html[data-theme=dark] .journal-style .workbench .context-nav button{color:var(--shell-ink)}
+html[data-theme=dark] .journal-style .workbench .context-nav button.selected{background:var(--shell-selected);color:#bed5fc}
+html[data-theme=dark] .journal-style .context-nav button.selected svg{color:var(--accent)}
+html[data-theme=dark] .journal-style :is(.context-section,.sidebar-bottom){border-color:var(--line)}
+html[data-theme=dark] .journal-style .context-date input{color-scheme:dark;background:var(--surface-alt);border-color:var(--line-strong)}
+html[data-theme=dark] .journal-style .application.workbench .sidebar-bottom .nav-item{color:var(--shell-muted)}
+html[data-theme=dark] .journal-style :is(.context-heading,.context-help,.sync-shortcut small){color:var(--shell-muted)}
+html[data-theme=dark] .journal-style .nav-count{background:var(--shell-hover);color:#b9ccec}
+html[data-theme=dark] .journal-style :is(.sidebar-content,.workbench .outline-scroll){scrollbar-color:#505967 transparent}
+html[data-theme=dark] .journal-style .workbench .quick-timer-start{background:var(--soft);border-color:#3b485e;color:#a6c8ff}
+html[data-theme=dark] .journal-style .workbench .outline-search{background:var(--surface-alt)}
+html[data-theme=dark] .journal-style .sort-control select{background:var(--surface-alt)}
+html[data-theme=dark] .journal-style .layout-switch button[aria-pressed=true]{background:var(--accent-soft);color:#b5d0fc}
+html[data-theme=dark] .journal-style .filter-chip{background:var(--accent-soft);color:#b5cbed}
+
+
+
+
+
+
+/* Dense outline: selected, running, overdue and focused remain distinct. */
+html[data-theme=dark] .journal-style .workbench .tree-columns{border-color:var(--line);color:var(--muted)}
+html[data-theme=dark] .journal-style .workbench .outline-row.root-row .tree-title>.editable-value{color:#d1d9e6}
+html[data-theme=dark] .journal-style .workbench .outline-row:hover{background:#2f333b}
+html[data-theme=dark] .journal-style .workbench .outline-row.selected{background:#34455e}
+html[data-theme=dark] .journal-style .workbench .outline-row.timing:not(.selected){background:#2c3847}
+html[data-theme=dark] .journal-style .workbench .outline-row.daily-focus-row-mark:not(.selected):not(.timing){background:#353128}
+html[data-theme=dark] .journal-style .workbench .outline-row.row-overdue:not(.selected):not(.timing){box-shadow:inset 2px 0 #c08479}
+html[data-theme=dark] .journal-style .tree-guides{opacity:.65;background:repeating-linear-gradient(to right,#627085 0,#627085 1px,transparent 1px,transparent 18px)}
+html[data-theme=dark] .journal-style .tree-name>input{accent-color:var(--filled-accent)}
+html[data-theme=dark] .journal-style .workbench .tree-title>.branch-count{background:#343d4c;color:#b8c6dc}
+html[data-theme=dark] .journal-style .item-status{color:var(--muted)}
+html[data-theme=dark] .journal-style .item-status.status-running{color:var(--success)}
+html[data-theme=dark] .journal-style .item-status.status-progress{color:#a1bde5}
+html[data-theme=dark] .journal-style :is(.item-status.status-blocked,.item-status.status-paused){color:var(--warning)}
+html[data-theme=dark] .journal-style .workbench :is(.tree-estimate,.tree-effort,.tree-date,.tree-deadline){color:var(--muted)}
+html[data-theme=dark] .journal-style :is(.tree-deadline.overdue .editable-value,.overdue-label,.child-overdue){color:var(--danger)}
+html[data-theme=dark] .journal-style .row-tag{background:#343b47;color:#c0ccdf}
+html[data-theme=dark] .journal-style .repeat-badge{color:#aabbd2}
+html[data-theme=dark] .journal-style .workbench .outline-row.item-note :is(.tree-title>.editable-value,.note-marker){color:#b3cfc4}
+html[data-theme=dark] .journal-style .workbench .outline-row.item-event :is(.tree-title>.editable-value,.note-marker){color:#cbb9e7}
+html[data-theme=dark] .journal-style .workbench .outline-row:is(.muted-row,.completed) .tree-title>.editable-value{color:#acb6c5}
+html[data-theme=dark] .journal-style .item-status.status-timer-paused{color:var(--warning)}
+html[data-theme=dark] .journal-style .overdue-label{background:var(--danger-soft)}
+html[data-theme=dark] .journal-style .tree-row-actions .row-start{color:#9dbfe9;opacity:.9}
+html[data-theme=dark] .journal-style .tree-row-actions .row-start.active{color:var(--success)}
+html[data-theme=dark] .journal-style .workbench .outline-row.dragging{background:var(--accent-soft);box-shadow:0 3px 12px #0004}
+html[data-theme=dark] .journal-style .workbench .outline-row.drop-inside{background:#3b5071;box-shadow:inset 0 0 0 2px #8cb8ff}
+html[data-theme=dark] .journal-style .workbench .outline-footer{border-color:var(--line);color:var(--subtle-ink)}
+html[data-theme=dark] .journal-style .inline-creator{background:var(--soft);border-color:#455c7c}
+html[data-theme=dark] .journal-style .inline-creator input{background:var(--surface);border-color:var(--accent)}
+html[data-theme=dark] .journal-style .inline-edit-help{background:var(--surface-alt);box-shadow:0 3px 12px #0006}
+html[data-theme=dark] .journal-style .motion-completed-ghost{background:#34445a}
+html[data-theme=dark] .motion-completed-ghost .tree-title .editable-value{color:#afbed3}
+
+/* Details and floating controls use subtly raised surfaces. */
+html[data-theme=dark] .journal-style .workbench .task-inspector{background:#292c32;border-color:var(--line)}
+html[data-theme=dark] .journal-style :is(.inspector-top,.node-breadcrumb button,.node-meta>button){color:var(--muted)}
+html[data-theme=dark] .journal-style .compact-timer{background:#303e53}
+html[data-theme=dark] .journal-style .compact-timer .inspector-clock strong{color:#abcaff}
+html[data-theme=dark] .journal-style .compact-timer .inspector-clock span{color:#b5c7e3}
+html[data-theme=dark] .journal-style .inspector-description>.editable-value{color:#bdc6d4}
+html[data-theme=dark] .journal-style .inspector-properties :is(.inspector-field>label,.tag-editor>label){color:var(--muted)}
+html[data-theme=dark] .journal-style .inspector-properties .inspector-field>label svg{color:#a3b3c9}
+html[data-theme=dark] .journal-style .tag-chip{background:#354053;color:#c3d4ee}
+html[data-theme=dark] .journal-style .tag-editor input{border-color:var(--line-strong)}
+html[data-theme=dark] .journal-style :is(.inspector-history summary,.inspector-children summary,.review-schedule summary){color:var(--muted)}
+html[data-theme=dark] .journal-style .lifecycle-actions{border-color:var(--line)}
+html[data-theme=dark] .journal-style .workbench .timer-dock{background:#303640;border-color:#4d5a6b;box-shadow:0 5px 28px #0005}
+html[data-theme=dark] .journal-style :is(.timer-dock>strong,.dock-timer-row>strong){color:#abcaff}
+
+/* Today: calm focus area, legible progress and a continuous timeline. */
+html[data-theme=dark] .journal-style .today-now .focus-area{background:#2d384a;border-color:#3d4b61}
+html[data-theme=dark] .journal-style .today-now .big-timer{color:#b3cefa}
+html[data-theme=dark] .journal-style :is(.today-execution-grid h2,.today-progress h2,.today-history h2){color:#bdc9db}
+html[data-theme=dark] .journal-style :is(.focus-status,.field-caption,.today-now .project-crumb,.daily-focus-summary,.today-page .date-nav,.today-progress-row p,.progress-duration,.today-section-heading>span){color:#adbdd2}
+html[data-theme=dark] .journal-style .today-now .task-plan{background:var(--surface-alt);border-color:var(--line)}
+html[data-theme=dark] .journal-style :is(.today-progress,.today-history,.daily-focus-row,.today-progress-row){border-color:var(--line)}
+html[data-theme=dark] .journal-style .today-plan .today-section-heading>.subtle{color:#a6c8fa}
+html[data-theme=dark] .journal-style .today-capture :is(.capture,.semantic-capture){background:var(--surface-alt);border-color:var(--line)}
+html[data-theme=dark] .journal-style .today-capture .semantic-capture>textarea{background:var(--surface);border-color:var(--line-strong)}
+html[data-theme=dark] .journal-style :is(.capture-hint,.today-capture .capture-syntax summary){color:var(--muted)}
+html[data-theme=dark] .journal-style .today-progress-stats strong{color:#b1c9eb}
+html[data-theme=dark] .journal-style .progress-status{background:#344359;color:#c3d6f2}
+html[data-theme=dark] .journal-style .progress-status.done{background:#2e4439;color:#b5d9bf}
+html[data-theme=dark] .journal-style .today-history .time-gutter{color:#b4c1d3;border-color:var(--line)}
+html[data-theme=dark] .journal-style .today-history .session-summary{color:#bec9d8}
+html[data-theme=dark] .journal-style :is(.daily-focus-badge,.focus-pin[aria-pressed=true]){background:#4a402c;color:#f0ce8a}
+html[data-theme=dark] .journal-style :is(.daily-focus-running,.daily-focus-finished){color:var(--success)}
+html[data-theme=dark] .journal-style .capture-chip{background:var(--accent-soft);color:#c2d5f1;border-color:#536780}
+html[data-theme=dark] .journal-style .capture-clean-title{color:var(--muted)}
+html[data-theme=dark] .journal-style .capture-editor{background:var(--surface-alt);border-color:var(--line-strong)}
+html[data-theme=dark] .journal-style .capture-error{color:var(--danger)}
+html[data-theme=dark] .journal-style .literal-tokens button{background:var(--surface-alt);border-color:var(--line-strong)}
+html[data-theme=dark] .journal-style .batch-toolbar{background:var(--accent-soft);border-color:var(--line)}
+html[data-theme=dark] .journal-style .outline-row.batch-selected{background:#34455e!important}
+
+/* Keep each item's established hue across sources; adapt only lightness. */
+html[data-theme=dark] .journal-style .calendar-page .calendar-item-color{
+  background:color-mix(in srgb,var(--calendar-color) 28%,var(--surface))!important;
+  color:color-mix(in srgb,var(--calendar-color) 22%,#fff)!important;
+  border-color:color-mix(in srgb,var(--calendar-color) 65%,#fff)!important;
+}
+html[data-theme=dark] .journal-style .calendar-page .calendar-event.calendar-tiny{background:color-mix(in srgb,var(--calendar-color) 65%,#fff)!important}
+html[data-theme=dark] .journal-style .calendar-page .calendar-event.calendar-reminder.calendar-tiny{background:transparent!important}
+
+/* Dialogs and menus share the same appearance, including previews and errors. */
+html[data-theme=dark] .journal-style :is(.modal,.tree-context-menu,.deadline-popover){background:#2e323a;border-color:#525c6c;box-shadow:0 14px 55px #0007}
+html[data-theme=dark] .journal-style .modal :is(header,.modal-actions){background:#2e323a}
+html[data-theme=dark] .journal-style .modal-actions{box-shadow:0 -8px 10px #2e323a}
+html[data-theme=dark] .journal-style .modal::backdrop{background:var(--overlay)}
+html[data-theme=dark] .journal-style .toast{background:#364252;color:#dce8fa;border-color:#647894;box-shadow:0 6px 25px #0006}
+
+
+@media(max-width:740px){html[data-theme=dark] .journal-style .workbench .brand{background:var(--surface)}}

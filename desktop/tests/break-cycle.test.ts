@@ -74,9 +74,9 @@ test('schema 14 migration backs up the original break deadline and preserves una
  const dir=path.resolve('qa-evidence/release-0.16.0');mkdirSync(dir,{recursive:true});const folder=mkdtempSync(path.join(dir,'migration-')),file=path.join(folder,'journal.sqlite');
  const old=emptyState();old.schemaVersion=14;delete old.settings.rest;old.settings.breakUntil='2026-10-20T02:05:00.000Z';
  const disk=new SqliteJournalStore(file);disk.save(old);disk.close();
- const clock=new Clock(),s=new JournalService(new SqliteJournalStore(file),clock);assert.equal(s.snapshot().state.schemaVersion,16);assert.equal(s.snapshot().state.settings.breakUntil,old.settings.breakUntil);assert.equal(s.snapshot().state.settings.rest!.phase,'running');
+ const clock=new Clock(),s=new JournalService(new SqliteJournalStore(file),clock);assert.equal(s.snapshot().state.schemaVersion,19);assert.equal(s.snapshot().state.settings.breakUntil,old.settings.breakUntil);assert.equal(s.snapshot().state.settings.rest!.phase,'running');
  clock.advance(300000);s.tick();assert.equal(s.reminderSnapshot().alerts[0].kind,'break');s.shutdown();
- const name=readdirSync(path.join(folder,'backups')).find(n=>n.startsWith('before-schema-14-to-16-'))!;assert.ok(name);const backup=new DatabaseSync(path.join(folder,'backups',name),{readOnly:true});
+ const name=readdirSync(path.join(folder,'backups')).find(n=>n.startsWith('before-schema-14-to-19-'))!;assert.ok(name);const backup=new DatabaseSync(path.join(folder,'backups',name),{readOnly:true});
  assert.equal((backup.prepare('PRAGMA user_version').get() as any).user_version,14);assert.deepEqual(JSON.parse((backup.prepare("SELECT data FROM records WHERE kind='settings'").get() as any).data),old.settings);backup.close();
 });
 

@@ -1,0 +1,136 @@
+/* Things-inspired exploration. Dense outline and the production information
+   architecture are intentional adaptations, not a pixel clone of Things. */
+:root{font-family:"Segoe UI Variable Text","Segoe UI","Microsoft YaHei UI",sans-serif;--ink:#292c32;--muted:#737984;--subtle-ink:#9298a1;--surface:#fff;--surface-alt:#f7f8fa;--surface-hover:#eef0f3;--line:#eaecef;--line-strong:#daddE3;--accent:#3478f6;--accent-hover:#2165e4;--accent-soft:#eaf2ff;--soft:#f5f8fe;--shell:#f3f4f6;--shell-hover:#e9ebef;--shell-selected:#e0eafa;--shell-ink:#4c535f;--shell-muted:#858c98;--success:#37846c;--success-soft:#edf8f3;--danger:#c05b50;--danger-soft:#fff2ee;--warning:#987427;--focus-ring:#4385ef;--shadow:#243b5b18;--overlay:#26354b38;--nav-width:220px;--motion-fast:130ms;--motion-layout:210ms;color-scheme:light}
+html,body,#root{height:100%;margin:0}body.journal-style{min-width:650px;background:#fff;font-family:"Segoe UI","Microsoft YaHei UI","Microsoft YaHei",sans-serif}
+.journal-style button,.journal-style input,.journal-style select,.journal-style textarea{font-family:inherit}
+.journal-style button{transition:background-color var(--motion-fast),color var(--motion-fast),box-shadow var(--motion-fast);touch-action:manipulation}
+.journal-style button:active:not(:disabled):not(.editable-value):not(.drag-grip){scale:.98}
+.journal-style .primary{border:1px solid var(--accent);border-radius:7px;box-shadow:0 1px 2px #153b7710;background:var(--accent);font-weight:600}
+.journal-style .secondary,.journal-style .subtle{border-radius:7px;font-size:12px}
+.journal-style .secondary{border-color:#e0e4ea;background:#fff}.journal-style .subtle{color:var(--muted)}
+.journal-style :is(button,input,select,textarea):focus-visible{outline:2px solid #78a6fa;outline-offset:2px}
+.journal-style .application.workbench{grid-template-rows:44px minmax(0,1fr)}
+.journal-style .workbench .titlebar{background:#fff;border:0;color:var(--ink);padding:0;position:relative;z-index:15}
+.journal-style .workbench .brand{width:220px;min-width:220px;background:var(--shell);border-right:1px solid #e9ebef;padding-left:22px;font-size:14px;font-weight:650;gap:9px;letter-spacing:.2px}
+.journal-style .brand svg{color:var(--accent);width:23px;height:23px}
+.journal-style .workbench .top-navigation{position:fixed;left:12px;top:91px;width:196px;display:flex;flex-direction:column;gap:3px;z-index:20;height:auto}
+.journal-style .workbench .top-navigation .nav-item{height:34px;min-height:34px;min-width:0;width:100%;justify-content:flex-start;gap:10px;padding:0 12px;border-radius:7px;color:#4b525e;font-size:14px;font-weight:500;background:none;box-shadow:none}
+.journal-style .workbench .top-navigation .nav-item span{display:inline}.journal-style .workbench .top-navigation .nav-item svg{width:21px;height:21px;color:#8b94a1}
+.journal-style .workbench .top-navigation .nav-item[aria-label=今日] svg{color:#d6a445}.journal-style .workbench .top-navigation .nav-item[aria-label=事项] svg{color:#6593dc}.journal-style .workbench .top-navigation .nav-item[aria-label=日历] svg{color:#d57672}.journal-style .workbench .top-navigation .nav-item[aria-label=回顾] svg{color:#6caa88}
+.journal-style .workbench .top-navigation .nav-item:hover{background:#e9ebef}.journal-style .workbench .top-navigation .nav-item.selected{background:#e0eafa;color:#2860ad;box-shadow:none}
+.journal-style .workbench .top-search{position:fixed;left:16px;top:51px;z-index:20;width:188px;min-width:0;height:28px;margin:0;padding:0 8px;background:#e9ecf0;color:#8a919c;border-radius:6px;border:1px solid transparent}
+.journal-style .workbench .top-search:focus-within{border-color:#98baf8;background:#fff}.journal-style .workbench .top-search input{display:block;color:#414956;font-size:12px;padding:3px 0}.journal-style .workbench .top-search input::placeholder{color:#8c949e}
+
+.journal-style .quick-timer-start{margin-left:auto;margin-right:344px;height:28px;min-height:28px;padding:3px 9px;font-size:12px;border:0;color:var(--accent);background:#f4f7fd}
+.journal-style .application.workbench .shell{--nav-width:220px;grid-template-columns:220px minmax(0,1fr)}
+.journal-style .application.workbench .sidebar{display:flex;align-items:stretch;padding:202px 12px 10px;border-right:1px solid #e9ebef;background:var(--shell);color:var(--shell-ink)}
+.journal-style .sidebar-toggle{display:none}.journal-style .sidebar-content{scrollbar-gutter:stable;scrollbar-color:#d4d9e1 transparent}
+.journal-style .context-heading{font-size:10px;letter-spacing:1px;color:#969da7;font-weight:600;margin:9px 12px 7px}
+.journal-style .workbench .context-nav button{padding:5px 12px;min-height:30px;font-size:12px;border-radius:6px;gap:9px;color:#626a76}
+.journal-style .context-nav svg{width:16px;height:16px;color:#99a1ac}.journal-style .context-nav button.selected{background:#e3eaf5;color:#3366a9}.journal-style .context-nav button.selected svg{color:#5e8aca}
+.journal-style .context-section{border-top:1px solid #e3e6eb;margin-top:14px;padding-top:9px}
+.journal-style .context-date input{color-scheme:light;background:#fff;border-color:#dfe3e9;color:var(--ink)}
+.journal-style .application.workbench .sidebar-bottom{margin-top:8px;padding-top:8px;border-top:1px solid #e3e6eb}
+.journal-style .application.workbench .sidebar-bottom .nav-item{font-size:12px;height:30px;min-height:30px;color:#747d8a}.journal-style .sync-shortcut small{color:#969da7}
+.journal-style .nav-count{background:#dbe4f3;color:#6383b5}.journal-style .context-help{font-size:11px;color:#969da7}
+.journal-style .workbench .main{background:#fff}.journal-style .workbench .with-details .tree-workspace{grid-template-columns:minmax(0,1fr) clamp(310px,28%,380px);gap:0}
+.journal-style .workbench .tree-page-header{min-height:91px;padding:23px 25px 20px;border:0;gap:12px}
+.journal-style .workbench .tree-page-header h1{font-size:25px;font-weight:650;letter-spacing:-.5px;gap:6px}.journal-style .workbench .tree-page-header h1>span{font-size:11px;letter-spacing:0;color:#989fa9;margin-left:5px}
+.journal-style .tree-page-header .actions{gap:7px}.journal-style .workbench .outline-search{width:132px;background:#f7f8fa;height:28px;border-radius:6px}.journal-style .tree-page-header .secondary{font-size:12px;min-height:28px;padding:3px 8px}
+.journal-style .filter-area{border-bottom:0}.journal-style .filter-controls{padding:4px 22px 8px;min-height:36px;gap:4px}
+.journal-style .filter-controls :is(select,.subtle){font-size:11px;min-height:26px;padding:3px 5px;border-radius:5px}
+.journal-style .sort-control{font-size:11px;gap:4px}.journal-style .sort-control select{width:130px;background:#f7f8fa;font-size:11px}
+.journal-style .layout-switch{padding-right:8px;border:0}.journal-style .layout-switch button{font-size:11px;min-height:25px;padding:3px 6px}
+.journal-style .layout-switch button[aria-pressed=true]{border-color:transparent;background:#edf3fd;color:#4d7dbe}
+.journal-style .workbench .outline-toolbar{padding:3px 24px 8px;min-height:28px}.journal-style .outline-tools label{font-size:10px}
+.journal-style .filter-summary{padding-inline:24px}.journal-style .filter-chip{background:#f0f4fb;color:#6a88b1;border-radius:4px}
+.journal-style .workbench .tree-columns,.journal-style .workbench .outline-row{grid-template-columns:minmax(225px,1fr) 78px 67px 58px 68px 88px 103px 30px}
+.journal-style .workbench .tree-columns{height:29px;min-height:29px;padding:0 13px 0 19px;margin:0 12px;border-top:0;border-bottom:1px solid #e6e9ee;font-size:10px;color:#929ba7}
+.journal-style .workbench .outline-scroll{padding:0 12px;scrollbar-width:thin;scrollbar-color:#dce1e8 transparent}
+.journal-style .workbench .outline-row{height:32px;min-height:32px;border:0;border-radius:5px;padding:0 13px 0 19px;margin:0;box-shadow:none;background:transparent;font-size:12px}
+.journal-style .workbench .tree-name{height:32px;min-height:32px;gap:6px}.journal-style .workbench .tree-title>.editable-value{font-size:13px;line-height:1.5;font-weight:400}
+.journal-style .workbench .outline-row.root-row .tree-title>.editable-value{font-weight:650;color:#424a57}.journal-style .workbench .outline-row.branch-row:not(.root-row) .tree-title>.editable-value{font-weight:550}
+.journal-style .workbench .outline-row:hover{background:#f6f8fb}.journal-style .workbench .outline-row.selected{background:#eaf2ff;box-shadow:none}
+.journal-style .workbench .outline-row.timing:not(.selected){background:#f3f8fe;box-shadow:none}.journal-style .workbench .outline-row.row-overdue:not(.selected):not(.timing){box-shadow:inset 2px 0 #d9a299}
+.journal-style .workbench .outline-row.daily-focus-row-mark:not(.selected):not(.timing){background:#fffdf6}
+.journal-style .tree-guides{opacity:.35}.journal-style .tree-chevron{color:#98a2b0}.journal-style .tree-name>input{width:14px;height:14px;accent-color:#4386ef;cursor:pointer}
+.journal-style .drag-grip{opacity:0;color:#9ea9b9}.journal-style .outline-row:is(:hover,:focus-within,.selected) .drag-grip{opacity:.7}.journal-style .drag-grip:focus-visible{opacity:1}
+.journal-style .folder-icon svg{width:16px;height:16px;color:#7b9bc9}.journal-style .branch-icon{color:#9faaba}
+.journal-style .workbench .tree-title>.branch-count{background:#f0f3f8;color:#929fb1;font-size:9px;padding-inline:4px;line-height:15px;margin-left:2px}
+.journal-style .item-status{font-size:10px;color:#9ba3ae;gap:3px}.journal-style .item-status svg{width:13px;height:13px}.journal-style .item-status.status-running{color:#43816e}.journal-style .item-status.status-progress{color:#7d96ba}.journal-style .item-status.status-blocked,.journal-style .item-status.status-paused{color:#aa9567}
+.journal-style .workbench .tree-estimate,.journal-style .workbench .tree-effort,.journal-style .workbench .tree-date,.journal-style .workbench .tree-deadline{font-size:10px;color:#8a95a4}
+.journal-style .workbench .tree-estimate .editable-value,.journal-style .workbench .tree-date .editable-value,.journal-style .workbench .tree-deadline .editable-value{font-size:10px}.journal-style .tree-deadline.overdue .editable-value,.journal-style .overdue-label{color:#bd6b60}
+.journal-style .tree-effort small{display:none}.journal-style .child-overdue{font-size:9px;color:#bd8b80}
+.journal-style .outline-row .empty-value{opacity:0}.journal-style .outline-row:is(:hover,:focus-within,.selected) .empty-value{opacity:.65}.journal-style .outline-row .editable-value:focus-visible{opacity:1}
+.journal-style .row-tag{background:#f2f4f8;color:#8a98ab;border:0;border-radius:4px;font-size:9px;max-width:65px}.journal-style .repeat-badge{color:#9ba9be}
+.journal-style .tree-row-actions .row-start{color:#91b0dc;opacity:.7}.journal-style .outline-row:is(:hover,.selected,:focus-within) .row-start{color:var(--accent);opacity:1}.journal-style .tree-row-actions .row-start.active{color:#43816e}
+.journal-style .workbench .outline-row.dragging{opacity:.4;background:#f0f5ff;box-shadow:0 3px 10px #1c42661c}.journal-style .workbench .outline-row.drop-inside{background:#e4efff;box-shadow:inset 0 0 0 2px #78a5ed}
+.journal-style .outline-row.drop-before:before,.journal-style .outline-row.drop-after:after{height:2px;background:#6c9de9}
+.journal-style .workbench .outline-footer{font-size:10px;color:#a2a9b4;padding:7px 24px;min-height:34px;border-top:1px solid #f0f2f5}.journal-style .outline-footer .shortcut-link{font-size:10px;color:#98a2b0}
+.journal-style .inline-creator{border-radius:7px;background:#f7faff;border-color:#e1ebfc;padding-block:8px}.journal-style .inline-creator input{border-color:#a5c3f4;border-radius:6px}.journal-style .inline-edit-help{border-radius:4px;background:#fff;box-shadow:0 2px 12px #243b5b14}
+.journal-style .workbench .task-inspector{padding:15px 25px 0;margin:0;background:#fcfcfd;border-left:1px solid #edf0f4;overflow:hidden}
+.journal-style .inspector-top{font-size:10px;color:#a2a9b2;padding:0 0 10px}.journal-style .inspector-top .subtle{color:#a3adba}
+.journal-style .node-breadcrumb{font-size:10px;margin:2px 0 16px}.journal-style .node-breadcrumb button{color:#8b98a9;font-size:10px}.journal-style .node-breadcrumb svg{color:#b3bdc9}
+.journal-style .workbench .inspector-fixed .inspector-title{font-size:23px;font-weight:600;line-height:1.5;margin:14px 0 13px;letter-spacing:-.3px}.journal-style .inspector-title .editable-value{line-height:1.45}
+.journal-style .node-meta{margin-bottom:18px;gap:8px;font-size:10px}.journal-style .node-meta>button{color:#8ca1bc;font-size:10px}.journal-style .focus-toggle{font-size:10px}
+.journal-style .inspector-focus>.primary{min-height:35px;border-radius:7px}.journal-style .compact-timer{padding:12px;background:#f0f5fd;border-radius:8px;gap:6px;margin-bottom:15px}
+.journal-style .compact-timer .inspector-clock{width:100%;margin:0}.journal-style .compact-timer .inspector-clock strong{font-size:28px;font-weight:500;color:#397bdc;letter-spacing:-.4px}
+.journal-style .compact-timer .inspector-clock span{font-size:10px;color:#7f98bb}.journal-style .compact-timer .actions{margin-left:auto}.journal-style .compact-timer .actions button{font-size:11px;min-height:28px;flex:0 1 auto}
+.journal-style .workbench .inspector-fixed .inspector-tabs{margin:12px 0 0;gap:22px}.journal-style .inspector-tabs>button{font-size:12px;padding:8px 0 10px;border-bottom-width:2px}.journal-style .inspector-tabs>button.active{font-weight:600}
+.journal-style .workbench .inspector-scroll{padding-top:19px;scrollbar-width:thin}.journal-style .inspector-description>.editable-value{font-size:12px!important;line-height:1.9;color:#6e7785}
+.journal-style .inspector-properties{margin-top:17px}.journal-style .inspector-properties .inspector-field,.journal-style .inspector-properties .tag-editor{grid-template-columns:91px minmax(0,1fr);padding-block:2px;margin-bottom:10px}
+.journal-style .workbench .inspector-properties .inspector-field>label,.journal-style .workbench .inspector-properties .tag-editor>label{font-size:11px;color:#8c97a7}.journal-style .inspector-properties .inspector-field>label svg{color:#a3afbf;width:16px;height:16px}
+.journal-style .inspector-properties .editable-value{font-size:11px}.journal-style .tag-chip{border:0;background:#edf2f9;color:#7e94b3;border-radius:5px;font-size:10px}.journal-style .tag-editor input{font-size:11px;border-color:#e8ecf2}
+.journal-style .inspector-history summary,.journal-style .inspector-children summary,.journal-style .review-schedule summary{font-size:11px;color:#8e99a8}.journal-style .lifecycle-actions{padding-top:12px;border-top:1px solid #eef1f5;margin-top:17px}.journal-style .lifecycle-actions button{font-size:11px}
+.journal-style .workbench .timer-dock{left:calc(50% + 110px);bottom:12px;background:#fff;box-shadow:0 4px 22px #253b611c;border:1px solid #e5eaf1;border-radius:11px;max-width:calc(100% - 250px);padding:9px 13px}
+.journal-style .timer-dock .dock-task{font-size:12px}.journal-style .timer-dock>strong,.journal-style .dock-timer-row>strong{color:#5086ce;font-weight:550}.journal-style .timer-dock :is(.primary,.secondary){font-size:11px;min-height:28px}
+.journal-style .workbench .page{padding:24px 32px 35px}.journal-style .workbench .tree-page{padding:0}
+.journal-style .today-page .page-header{margin:0 0 25px;min-height:64px;align-items:center}.journal-style .today-page .date-nav{font-size:12px;color:#9aa5b3;margin-bottom:9px}.journal-style .today-page h1{font-size:27px;font-weight:650;letter-spacing:-.5px}
+.journal-style .today-page .header-actions .secondary,.journal-style .today-page .header-actions .subtle{font-size:11px;padding-inline:8px;min-height:28px}
+.journal-style .today-execution-grid{grid-template-columns:minmax(0,1.15fr) minmax(290px,.85fr);gap:34px;margin-bottom:28px}
+.journal-style .today-now,.journal-style .today-plan{border:0;border-radius:0;padding:0;background:none}
+.journal-style .today-execution-grid h2,.journal-style .today-progress h2,.journal-style .today-history h2{font-size:14px;font-weight:600;color:#586474;margin-bottom:15px}
+.journal-style .today-now .task-title-row{margin-bottom:14px}.journal-style .today-now .task-title{font-size:16px;font-weight:600}.journal-style .today-now .project-crumb{font-size:10px;color:#9ba8ba}
+.journal-style .today-now .focus-area{border:1px solid #e6eefb;background:#f5f8fe;border-radius:10px;padding:19px 22px;gap:20px}
+.journal-style .today-now .big-timer{font-size:52px;font-weight:400;letter-spacing:-1.5px;color:#3e76bd;font-variant-numeric:tabular-nums;line-height:1.3}.journal-style .focus-status{font-size:11px;color:#93a6be}.journal-style .field-caption{color:#8aa0be;font-size:11px}
+.journal-style .focus-actions .primary,.journal-style .focus-actions .secondary{font-size:12px;min-height:30px;padding:4px 10px}.journal-style .focus-actions .subtle{font-size:10px}
+.journal-style .today-next{padding-top:17px;margin-top:16px}.journal-style .today-now .task-plan{padding:13px 15px;background:#fafbfd;border-radius:8px;border:1px solid #eef1f5}.journal-style .today-now .task-plan dl{font-size:11px;line-height:1.5}.journal-style .today-now .task-plan .primary{font-size:12px}
+.journal-style .daily-focus-row{padding:8px 0;border-bottom:1px solid #f0f2f6}.journal-style .daily-focus-name>button,.journal-style .daily-focus-name .task-link{font-size:13px}.journal-style .daily-focus-summary{font-size:11px;color:#9aa5b3}
+.journal-style .today-plan .today-section-heading>.subtle{font-size:11px;color:#7294c4}.journal-style .today-capture .capture{margin-top:22px;background:#fafbfd;border:1px solid #ebeff5;border-radius:8px;padding:12px}.journal-style .capture textarea{font-size:12px}.journal-style .capture-hint{color:#a6afbb}
+.journal-style .today-progress{padding:18px 0 0;margin:0 0 25px;border:0;border-top:1px solid #e9edf3;border-radius:0}.journal-style .today-progress-stats{gap:22px;font-size:11px;padding:0 0 16px}.journal-style .today-progress-stats strong{font-size:15px;color:#5c7699;font-weight:550;margin-left:4px}
+.journal-style .today-progress-row{padding:10px 0;border-top:1px solid #f0f2f5;grid-template-columns:48px minmax(0,1fr) auto auto;gap:13px}.journal-style .today-progress-row .task-link{font-size:13px}.journal-style .today-progress-row p{font-size:11px;color:#97a1ae}.journal-style .progress-status{font-size:9px;padding:3px 4px;border-radius:5px;background:#edf3fc;color:#809bc0}.journal-style .progress-status.done{background:#edf6f0;color:#7eaa8c}.journal-style .progress-duration{font-size:11px;color:#8697ac}
+.journal-style .today-history{border-top:1px solid #e9edf3;padding-top:19px}.journal-style .today-section-heading>span{font-size:10px;color:#a3adba}.journal-style .today-history .time-gutter{font-size:11px;color:#9aa8b9;border-left-color:#e8edf5}.journal-style .today-history .entry-body{padding-block:10px}.journal-style .today-history .session-row{font-size:12px}.journal-style .today-history .session-summary{font-size:12px;color:#7d8c9e}
+.journal-style .modal{border-radius:12px;border-color:#e4e9f1;box-shadow:0 16px 65px #2c3d5b26}.journal-style .modal::backdrop{background:#30415f24}.journal-style .modal>header{padding-block:19px}.journal-style .modal>header h2{font-size:18px}
+.journal-style .tree-context-menu,.journal-style .deadline-popover{border-radius:9px;border-color:#e6ebf2;box-shadow:0 8px 30px #2b405523}.journal-style .tree-context-menu button{min-height:29px;font-size:12px;border-radius:5px}.journal-style .toast{border-radius:9px;box-shadow:0 6px 25px #243c5b24;background:#fff;color:#526378;border:1px solid #e6edf6}
+
+
+
+
+
+.journal-style .motion-completed-ghost{display:grid;background:#f4f8ff;border-radius:5px;grid-template-columns:minmax(225px,1fr) 78px 67px 58px 68px 88px 103px 30px;overflow:hidden}.motion-completed-ghost .tree-title .editable-value{text-decoration:line-through;color:#8da2bd}
+@keyframes surface-enter{from{opacity:0;transform:translateY(5px) scale(.99)}to{opacity:1;transform:none}}
+.journal-style :is(.modal,.tree-context-menu,.deadline-popover,.toast){animation:surface-enter 150ms cubic-bezier(.2,.75,.25,1)}
+.journal-style :is(.focus-area,.compact-timer,.rest-banner,.break-bar){animation:surface-enter 180ms ease-out}
+@container outline (max-width:990px){.journal-style .workbench .tree-columns,.journal-style .workbench .outline-row{grid-template-columns:minmax(205px,1fr) 74px 62px 65px 100px 30px}.journal-style :is(.tree-estimate,.tree-date,.col-estimate,.col-planned){display:none!important}}
+@container outline (max-width:730px){.journal-style .workbench .tree-columns,.journal-style .workbench .outline-row{grid-template-columns:minmax(180px,1fr) 70px 60px 90px 28px}.journal-style :is(.tree-tags,.col-tags){display:none!important}.journal-style .workbench .tree-title>.editable-value{font-size:12px}.journal-style .workbench .tree-page-header{padding-inline:22px}.journal-style .workbench .outline-search{width:110px}}
+@container outline (max-width:560px){.journal-style .workbench .tree-columns,.journal-style .workbench .outline-row{grid-template-columns:minmax(140px,1fr) 66px 85px 28px}.journal-style :is(.tree-effort,.col-effort){display:none!important}.journal-style .tree-page-header .outline-search{display:none!important}.journal-style .workbench .tree-page-header h1{font-size:22px}.journal-style .filter-controls{padding-inline:12px}.journal-style .workbench .outline-toolbar{padding-inline:18px}.journal-style .workbench .outline-row{padding-left:3px;padding-right:2px}.journal-style .workbench .tree-columns{padding-left:3px;padding-right:2px}}
+@container outline (max-width:410px){.journal-style .workbench .tree-columns,.journal-style .workbench .outline-row{grid-template-columns:minmax(120px,1fr) 82px 28px}.journal-style :is(.tree-status,.col-status){display:none!important}.journal-style .workbench .tree-title>.editable-value{font-size:12px}.journal-style .workbench .tree-name{gap:3px}}
+@media(max-width:1150px){.journal-style .application.workbench .shell{--nav-width:190px;grid-template-columns:190px minmax(0,1fr)}.journal-style .workbench .brand{width:190px;min-width:190px}.journal-style .workbench .top-navigation{width:166px}.journal-style .workbench .top-search{width:158px}.journal-style .workbench .with-details .tree-workspace{grid-template-columns:minmax(0,1fr) 300px}.journal-style .workbench .task-inspector{padding-inline:19px}.journal-style .today-execution-grid{gap:20px;grid-template-columns:minmax(0,1.05fr) minmax(250px,.95fr)}.journal-style .workbench .page{padding-inline:24px}.journal-style .workbench .tree-page{padding:0}.journal-style .workbench .timer-dock{left:calc(50% + 95px);max-width:calc(100% - 215px)}.journal-style .quick-timer-start{margin-right:255px}}
+@media(max-width:900px){.journal-style .application.workbench .shell{--nav-width:160px;grid-template-columns:160px minmax(0,1fr)}.journal-style .application.workbench .sidebar{padding-inline:8px;display:flex}.journal-style .workbench .brand{width:160px;min-width:160px;padding-left:15px}.journal-style .brand span{display:inline}.journal-style .workbench .top-navigation{left:8px;width:144px}.journal-style .workbench .top-search{left:12px;width:136px}.journal-style .workbench .with-details .tree-workspace{grid-template-columns:minmax(0,1fr) 270px}.journal-style .workbench .task-inspector{padding-inline:16px}.journal-style .context-nav button>span{display:inline}.journal-style .today-execution-grid{grid-template-columns:minmax(0,1fr)}.journal-style .today-page .page-header{flex-wrap:wrap;gap:15px}.journal-style .workbench .timer-dock{left:calc(50% + 80px);max-width:calc(100% - 180px)}.journal-style .workbench .inspector-title{font-size:20px}.journal-style .context-help{font-size:10px}.journal-style .tree-page-header h1>span{display:none!important}}
+@media(max-width:740px){.journal-style .application.workbench .shell{grid-template-columns:minmax(0,1fr);--nav-width:0px}.journal-style .application.workbench .sidebar{display:none}.journal-style .workbench .top-navigation{position:static;flex-direction:row;gap:2px;width:auto;height:44px}.journal-style .workbench .top-navigation .nav-item{width:51px;height:44px;padding:0 7px;justify-content:center}.journal-style .workbench .top-navigation .nav-item svg{display:none}.journal-style .workbench .top-search{display:none}.journal-style .workbench .brand{width:99px;min-width:99px;background:#fff;border:0}.journal-style .quick-timer-start{margin-right:145px;white-space:nowrap}.journal-style .workbench .timer-dock{left:50%;max-width:calc(100% - 24px)}.journal-style .workbench .with-details .tree-workspace{grid-template-columns:minmax(0,1fr) 270px}.journal-style .workbench .tree-page-header{padding-top:16px;min-height:72px}}
+html[data-motion=reduce] *,html[data-motion=reduce] *::before,html[data-motion=reduce] *::after{animation:none!important;transition:none!important;scroll-behavior:auto!important}
+@media(prefers-reduced-motion:reduce){html:not([data-motion=full]) *,html:not([data-motion=full]) *::before,html:not([data-motion=full]) *::after{animation:none!important;transition:none!important;scroll-behavior:auto!important}}
+
+/* Keep secondary information readable without restoring a heavy table grid. */
+.journal-style .item-status{font-size:11px;color:#738094}.journal-style .tree-effort,.journal-style .tree-date,.journal-style .tree-deadline{color:#78879a}
+.journal-style .workbench .tree-columns{color:#7e8999;font-size:11px}.journal-style .workbench .tree-title>.editable-value{font-size:13px}.journal-style .workbench .inspector-title{font-size:21px}
+.journal-style .workbench .quick-timer-start{background:#f4f7fd;color:#5f84b8;border:1px solid #e8eef8}
+.journal-style:has(.timer-dock) .toast{bottom:92px;max-width:min(620px,calc(100vw - 230px))}
+.journal-style .tree-effort,.journal-style .tree-date,.journal-style .tree-deadline,.journal-style .row-tag,.journal-style .inspector-properties .inspector-field>label,.journal-style .inspector-properties .tag-editor>label{color:#6e7d90}
+.journal-style .today-capture .semantic-capture{margin-top:14px;padding:11px 13px;border-color:#e9edf4;border-radius:8px;background:#fafbfd}
+.journal-style .today-capture .semantic-capture>textarea{font-size:12px;border-color:#e2e8f1;border-radius:5px}
+.journal-style .today-capture .semantic-capture:not(:focus-within)>textarea:placeholder-shown{height:36px;min-height:36px;resize:none}
+.journal-style .today-capture .semantic-capture:not(:focus-within):has(>textarea:placeholder-shown)>.capture-toolbar{display:none}
+.journal-style .today-capture .capture-syntax summary{font-size:10px;color:#7c8ba1;line-height:1.7}
+.journal-style .today-now .task-card.daily-focus-card{border-top:0}
+.settings-fields{border:0;padding:0;margin:0;min-inline-size:0}

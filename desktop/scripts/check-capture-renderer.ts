@@ -27,7 +27,7 @@ async function main(){try{
  await win.webContents.session.clearStorageData({storages:['localstorage']});
  await win.loadFile(path.join(root,'dist/client/index.html'),{query:{panel:'capture'}});
  await until(`document.activeElement?.getAttribute('aria-label')==='快速添加事项名称'`);
- await win.webContents.insertText('- 保留的草稿 %资料');key('Escape');await until(`localStorage.getItem('journal.capture.draft')==='- 保留的草稿 %资料'`);assert.equal(service.snapshot().state.tasks.length,0);assert.equal(closed,1);
+ await win.webContents.insertText('- 保留的草稿 %资料');key('Escape');await until(`JSON.parse(localStorage.getItem('journal.capture.draft')||'null')?.raw==='- 保留的草稿 %资料'`);assert.equal(service.snapshot().state.tasks.length,0);assert.equal(closed,1);
  await win.webContents.reload();await until(`document.querySelector('textarea')?.value==='- 保留的草稿 %资料'`);key('Enter');await until(`document.querySelector('textarea')?.value===''`);
  assert.equal(service.snapshot().state.tasks[0].itemType,'note');assert.equal(service.snapshot().state.tasks[0].title,'保留的草稿');assert.equal(closed,2);
  await win.webContents.insertText('找不到归属 #不存在');key('Enter');await until(`Array.from(document.querySelectorAll('[role="alert"]')).some(e=>e.textContent.includes('归属'))`);assert.equal(service.snapshot().state.tasks.length,1);assert.equal(await run(`document.querySelector('textarea').value`),'找不到归属 #不存在');

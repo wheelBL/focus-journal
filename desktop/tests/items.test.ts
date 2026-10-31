@@ -32,7 +32,7 @@ test('schema 3 project migration preserves full records, IDs, hierarchy, descrip
   for(const t of legacy.tasks){delete t.isProject;delete t.archived;delete t.description;delete t.tagIds;}
   const file=path.join(dir,'journal.sqlite'),old=new SqliteJournalStore(file);old.save(legacy);old.close();
   current=new JournalService(new SqliteJournalStore(file),clock);const state=current.snapshot().state;
-  assert.equal(state.schemaVersion,16);assert.equal(state.tasks.filter((t:{id:string})=>t.id!=='inbox').length,3);assert.equal(state.tasks.find(t=>t.id===p)!.description,'保留项目说明');
+  assert.equal(state.schemaVersion,19);assert.equal(state.tasks.filter((t:{id:string})=>t.id!=='inbox').length,3);assert.equal(state.tasks.find(t=>t.id===p)!.description,'保留项目说明');
   assert.deepEqual(outlinePath(outlineIndex(state),sub).map(n=>n.id),[p,t,sub]);
   for(const key of ['projects','sessions','notes','estimates','reviews','audit'] as const)assert.deepEqual(state[key],legacy[key]);
   for(const [key,value] of Object.entries(legacy.tasks.filter((t:{id:string})=>t.id!=='inbox')[0]))assert.deepEqual((state.tasks.find(a=>a.id===t) as any)[key],value);

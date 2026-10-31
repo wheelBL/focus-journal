@@ -24,7 +24,7 @@ test('defer, calendar inspection and period review retain unassigned effort; ass
   await h.click(h.label('日历'));const block=h.query('[data-session-id]');assert.match(block.textContent,/未关联事项/);await h.click(block);assert.ok(h.button('补充事项'));await h.click(h.button('补充事项'));
   await h.click(h.button('关联已有事项'));await h.input(h.label('查找已有事项'),'客户反馈');await h.click(h.query('.assignment-candidates button'));
   await h.click(h.button('保存并关联'));assert.equal(h.service.snapshot().state.sessions[0].taskId,taskId);assert.match(h.query('[data-session-id]').textContent,/处理客户反馈/);
-  await h.click(h.label('回顾'));await h.click(h.query('[role=tab]:last-child'));assert.match(h.query('.review-summary').textContent,/10 分钟/);
+  await h.click(h.label('回顾'));await h.click(h.query('[data-review-tab=effort]'));assert.match(h.query('.review-summary').textContent,/10 分钟/);
   await h.click(h.button('先计时'));h.clock.advance(300000);await h.click(h.button('结束并补充事项'));await h.click(h.button('稍后补充'));
   await h.click(h.label('回顾'));assert.match(h.query('.review-summary').textContent,/15 分钟/);assert.match(h.query('.unassigned-queue').textContent,/5 分钟/);
   await h.click(h.label('今日'));await h.input(h.label('查看日期'),'2026-10-18');assert.ok(h.query('.unassigned-queue'));
