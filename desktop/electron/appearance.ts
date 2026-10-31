@@ -28,7 +28,7 @@ export class AppearanceController {
   if(window.isDestroyed())return;
   // Preserve the floating timer's transparent, rounded outer area.
   if(window.getBackgroundColor()!=='#00000000')window.setBackgroundColor(nativeTheme.shouldUseDarkColors?'#26282D':'#FFFFFF');
-  if(window===this.main)window.setTitleBarOverlay({color:nativeTheme.shouldUseDarkColors?'#26282D':'#FFFFFF',symbolColor:nativeTheme.shouldUseDarkColors?'#E2E6ED':'#4C535F',height:44});
+  if(window===this.main&&process.platform!=='darwin')window.setTitleBarOverlay({color:nativeTheme.shouldUseDarkColors?'#26282D':'#FFFFFF',symbolColor:nativeTheme.shouldUseDarkColors?'#E2E6ED':'#4C535F',height:44});
  }
  private created=(_event:Electron.Event,window:BrowserWindow)=>{
   this.style(window);window.webContents.on('did-finish-load',()=>{if(!window.isDestroyed()){this.style(window);window.webContents.send('appearance:changed',this.value);}});

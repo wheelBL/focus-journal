@@ -74,3 +74,6 @@ desktop/.runtime-compat/
 Thumbs.db
 __pycache__/
 *.pyc
+
+# Derived macOS application icon
+/desktop/assets/icon.icns

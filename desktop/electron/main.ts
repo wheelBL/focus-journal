@@ -1,3 +1,4 @@
+import {mainWindowChrome,applicationMenu} from './desktop-platform';
 import {UsageStore} from './usage-store';
 import {AiController} from './ai-controller';
 import {LocalApiController} from './local-api-controller';
@@ -25,7 +26,7 @@ const demo=process.argv.includes('--demo');
 const treePrototype=process.argv.includes('--tree-prototype');
 const explicitData=flag('--data-dir');
 if(explicitData)app.setPath('userData',path.resolve(explicitData));
-app.setName('专注记');app.setAppUserModelId('local.focusjournal.desktop');
+app.setName('专注记');if(process.platform==='win32')app.setAppUserModelId('local.focusjournal.desktop');
 if(!app.requestSingleInstanceLock())app.quit();
 else {
   app.on('second-instance',(_event,argv)=>{if(argv.includes('--quit')){app.quit();return;}win?.show();win?.focus();});
@@ -39,9 +40,9 @@ else {
     const backups=path.join(dataDir,'backups');mkdirSync(backups,{recursive:true});
     const dailyBackup=path.join(backups,`${localDate()}.json`);
     if(!existsSync(dailyBackup))writeFileSync(dailyBackup,service.exportJson(),'utf8');
-    Menu.setApplicationMenu(null);
+    const menu=applicationMenu(process.platform,app.getName());Menu.setApplicationMenu(menu?Menu.buildFromTemplate(menu):null);
     const icon=path.join(__dirname,'../assets/icon.png');
-    win=new BrowserWindow({width:demo&&!treePrototype?1060:1440,height:demo&&!treePrototype?640:920,minWidth:900,minHeight:640,show:false,title:treePrototype?'专注记 · 任务树交互稿':'专注记',icon,backgroundColor:'#FFFFFF',titleBarStyle:'hidden',titleBarOverlay:{color:'#2C323B',symbolColor:'#E4E9F1',height:48},webPreferences:{preload:path.join(__dirname,'preload.cjs'),contextIsolation:true,nodeIntegration:false,sandbox:true}});
+    win=new BrowserWindow({width:demo&&!treePrototype?1060:1440,height:demo&&!treePrototype?640:920,minWidth:900,minHeight:640,show:false,title:treePrototype?'专注记 · 任务树交互稿':'专注记',icon,backgroundColor:'#FFFFFF',...mainWindowChrome(process.platform),webPreferences:{preload:path.join(__dirname,'preload.cjs'),contextIsolation:true,nodeIntegration:false,sandbox:true}});
     appearance.setMain(win);
     win.webContents.setWindowOpenHandler(()=>({action:'deny'}));
     win.webContents.on('render-process-gone',(_event,details)=>log('renderer-exit',details));
@@ -53,8 +54,9 @@ else {
     win.on('close',event=>{if(!quitting){event.preventDefault();if(demo)app.quit();else win?.hide();}});
     win.loadFile(path.join(__dirname,'../dist/client/index.html'),treePrototype?{query:{prototype:'tree'}}:{});
     const show=()=>{if(win?.isMinimized())win.restore();win?.show();win?.focus();};
+    app.on('activate',()=>{if(!quitting&&!closed)show();});
     const openSession=(id:string)=>{show();win?.webContents.send('journal:open-session',id);};
-    tray=new Tray(nativeImage.createFromPath(icon));tray.setToolTip(demo?'专注记 · 测试工作区':'专注记 · 点击打开工作日志');tray.on('click',show);
+    const trayIcon=nativeImage.createFromPath(icon).resize({width:18,height:18});if(process.platform==='darwin')trayIcon.setTemplateImage(true);tray=new Tray(process.platform==='darwin'?trayIcon:nativeImage.createFromPath(icon));tray.setToolTip(demo?'专注记 · 测试工作区':'专注记 · 点击打开工作日志');tray.on('click',show);
     const performTimer=(command:Command)=>{try{
       const result=service.execute({...command,meta:{source:'user',entry:'tray.timer'}});changed();
       if(result.focusReminder&&Notification.isSupported())new Notification({title:'专注提醒',body:result.focusReminder,icon}).show();

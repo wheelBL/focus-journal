@@ -1,6 +1,6 @@
 # 专注记 · Focus Journal
 
-Windows 11 上的本地工作日志，把 **估计 → 实践 → 复盘 → 调整** 串成每天的工作流程。
+Windows 11 与 macOS 上的本地工作日志，把 **估计 → 实践 → 复盘 → 调整** 串成每天的工作流程。
 
 任务树负责理清事情，番茄计时帮助开始，日历记录真实投入，今日与回顾回答“今天推进了什么”。界面为中文，采用 TypeScript + React + Electron + SQLite。
 
@@ -10,11 +10,11 @@ Windows 11 上的本地工作日志，把 **估计 → 实践 → 复盘 → 调
 
 ## 下载与运行
 
-当前 `main` 源码版本为 **0.29.2**。Windows 下载包以 Releases 中实际发布的版本为准；此次源码更新不包含 Windows 包上传。
+当前 `main` 源码版本为 **0.30.0**。Windows 下载包以 Releases 中实际发布的版本为准。macOS 的 Apple Silicon（arm64）和 Intel（x64）ZIP / DMG 由 [macOS 构建工作流](https://github.com/wheelBL/focus-journal/actions/workflows/macos.yml) 生成，验证通过后可下载构建产物。
 
 在 [Releases](https://github.com/wheelBL/focus-journal/releases/latest) 下载对应版本的 **FocusJournal-版本号-Windows-x64.zip**，解压整个文件夹，双击 **专注记.exe**。无需安装 Node.js。
 
-- 系统：Windows 11 x64。
+- 系统：Windows 11 x64；macOS 14 或更新系统，提供 Apple Silicon 与 Intel 两种包。macOS 原生启动测试使用 macOS 15。
 - 更新：先在旧版托盘中选择“退出专注记”，再运行新版。数据保存在用户数据目录中，升级数据结构前自动备份。
 - 关闭主窗口后继续在托盘运行；完全退出请使用托盘菜单或设置中的“保存并退出”。
 - 发布包目前未做 Windows 代码签名。校验值随 Releases 中的 `SHA256SUMS.txt` 提供。
@@ -23,7 +23,7 @@ Windows 11 上的本地工作日志，把 **估计 → 实践 → 复盘 → 调
 ## 主要能力
 
 - **统一事项树**：任意嵌套，项目为可选标记；行内编辑、拖拽调整层级、自动排序、标签、筛选与保存视图。
-- **子弹笔记式快速记录**：普通事项、`- ` 笔记、`o ` 事件；支持日期、标签、估计和已有项目路径的语义识别。全局 `Ctrl+Alt+Space` 随时记录。
+- **子弹笔记式快速记录**：普通事项、`- ` 笔记、`o ` 事件；支持日期、标签、估计和已有项目路径的语义识别。全局快速记录：Windows 为 `Ctrl+Alt+Space`，macOS 为 `⌘⇧Space`；均可在设置修改。
 - **从计时开始**：直接计时，或先开始再补充事项；暂停、恢复、手动补记和校正均保留真实时间。不需要的投入可放弃并从今日或日历恢复，稍后补充也会保存已填写的进展。支持多个事项独立计时。
 - **补入开始时间**：已做一段时间才想起计时，可先开始，再选择“调整开始时间”；支持 40 分钟前等快捷选择或准确日期时间。过去投入计入累计，从现在再专注一个目标时长才提醒，暂停不消耗目标。
 - **完整专注与休息**：默认 25 分钟专注、5 分钟休息；到点发声并显示持续置顶卡片，计时继续，直到主动结束。休息结束后自行确认继续。
@@ -41,6 +41,16 @@ Windows 11 上的本地工作日志，把 **估计 → 实践 → 复盘 → 调
 
 ![展开操作](docs/images/timer-expanded.png)
 
+## macOS
+
+分别下载对应芯片的 ZIP 或 DMG：M 系列使用 arm64，Intel 使用 x64。解压 ZIP 或打开 DMG，将“专注记.app”放入“应用程序”后打开。首次运行使用独立的本机数据目录；可从 Windows 导出 JSON 备份，再在 Mac 恢复，保留事项身份和投入。密钥由各自系统加密，需在 Mac 重新配置。
+
+macOS 使用原生菜单、窗口红黄绿按钮、菜单栏图标和 Dock 恢复窗口。主要快捷键使用 Command：`⌘K` 搜索、`⌘N` 新增、`⌘Enter` 控制计时；树中 `⌘⇧N` 新增同级、`⌘⌥N` 新增子项。完整列表见应用快捷键帮助。
+
+当前包为 ad-hoc 签名，尚未通过 Apple 公证。系统可能要求在“系统设置 → 隐私与安全性”中确认打开；企业策略可能禁止此类应用。未使用 Apple Developer 证书或读取用户签名凭据，不声称已完成公证。
+
+本机构建：在 `desktop` 执行 `npm ci`、`npm run package:mac`。原生包与重启验证通过 `node scripts/package-macos.mjs --qa`、`node scripts/run-macos-smoke.mjs` 和 `node scripts/check-macos-package.mjs` 执行，测试使用隔离数据并自行退出。
+
 ## 第一次使用
 
 1. 在事项页右键创建事项，或直接用快速记录输入名称。估计可以暂时不填。
@@ -53,7 +63,7 @@ Windows 11 上的本地工作日志，把 **估计 → 实践 → 复盘 → 调
 
 ## 本地开发
 
-需要 **Node.js 24.x、npm、Git**。Windows 打包需要 Windows x64。Electron 版本固定在锁文件中，安装依赖时需要网络下载运行时。
+需要 **Node.js 24.x、npm、Git**。Windows 打包需要 Windows x64；macOS 打包需在 Mac 上运行，或使用仓库的 macOS 工作流。Electron 版本固定在锁文件中，安装依赖时需要网络下载运行时。
 
 ```powershell
 cd desktop

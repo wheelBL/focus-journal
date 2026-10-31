@@ -1,0 +1,45 @@
+// Included only in the isolated QA .app; production contains no test entry or data.
+const {app,BrowserWindow,Menu,clipboard}=require('electron');
+const fs=require('node:fs'),path=require('node:path');
+module.exports=({data,evidence,version,arch})=>{
+ const restart=process.argv.includes('--restart-verification'),checks=[],failures=[];let finished=false;
+ const name=restart?'restart':'smoke',wait=ms=>new Promise(r=>setTimeout(r,ms));
+ const check=(ok,label)=>{if(!ok)throw Error(label);checks.push(label);};
+ const js=(w,code)=>w.webContents.executeJavaScript(code);
+ const until=async(fn,label)=>{for(let i=0;i<200;i++){if(await fn())return;await wait(50);}throw Error(label);};
+ const key=async(w,keyCode,modifiers=[])=>{w.webContents.sendInputEvent({type:'keyDown',keyCode,modifiers});w.webContents.sendInputEvent({type:'keyUp',keyCode,modifiers});await wait(100);};
+ fs.mkdirSync(evidence,{recursive:true});
+ const timeout=setTimeout(()=>{failures.push('macOS smoke timed out');app.quit();},45000);
+ app.on('will-quit',()=>{clearTimeout(timeout);const remainingWindows=BrowserWindow.getAllWindows().length;if(!finished)failures.push('Smoke did not finish');if(remainingWindows)failures.push('Windows remain');fs.writeFileSync(path.join(evidence,name+'.json'),JSON.stringify({version:app.getVersion(),arch:process.arch,checks,failures,remainingWindows,packaged:app.isPackaged},null,2));});
+ void app.whenReady().then(async()=>{let main;try{
+  await until(()=>BrowserWindow.getAllWindows().some(w=>!w.webContents.getURL().includes('panel=')),'Main missing');main=BrowserWindow.getAllWindows().find(w=>!w.webContents.getURL().includes('panel='));
+  await until(()=>js(main,`!!window.journal&&!!document.querySelector('.today-page')`),'Main renderer missing');main.show();main.focus();app.focus({steal:true});await wait(150);
+  check(app.isPackaged&&process.platform==='darwin'&&process.arch===arch&&app.getVersion()===version,'Native packaged macOS app and expected architecture/version');
+  const before=await js(main,'window.journal.snapshot()');check(before.demo&&before.dataPath.startsWith(data),'Only isolated journal data');
+  check(await js(main,`window.journalPlatform==='darwin'&&document.documentElement.dataset.platform==='darwin'`),'Native platform reaches all renderers');
+  const menu=Menu.getApplicationMenu(),roles=[];const walk=m=>{for(const item of m.items){if(item.role)roles.push(item.role);if(item.submenu)walk(item.submenu);}};walk(menu);
+  check(['quit','close','copy','paste','undo'].every(r=>roles.includes(r)),'Native application and Edit menus available');
+  if(restart){const saved=JSON.parse(fs.readFileSync(path.join(evidence,'saved.json')));check(JSON.stringify(before.state.tasks)===JSON.stringify(saved.tasks)&&JSON.stringify(before.state.sessions)===JSON.stringify(saved.sessions)&&JSON.stringify(before.state.activities)===JSON.stringify(saved.activities),'Restart retains task identities, handoff status, effort and business records');check((await js(main,'window.journalAppearance.get()')).theme==='dark','Restart retains device appearance');finished=true;return;}
+  for(const timer of before.timers)await js(main,`window.journal.command({type:'focus.stop',payload:{sessionId:${JSON.stringify(timer.sessionId)}}})`);
+  await js(main,`window.journal.command({type:'break.stop'})`);
+  const prefs=await js(main,`window.journal.capture.configure('CommandOrControl+Shift+Space')`);check(prefs.registered,'macOS global capture accelerator registers');await js(main,`window.journal.capture.configure('')`);
+  await key(main,'k',['meta']);await until(()=>js(main,`document.activeElement?.getAttribute('aria-label')==='搜索任务和笔记'`),'Command K missing');check(true,'Command K focuses search');await key(main,'Escape');
+  await js(main,`document.activeElement?.blur()`);await key(main,'n',['meta']);await until(()=>js(main,`!!document.querySelector('dialog[open]')`),'Command N missing');
+  check(true,'Command N creates an editable capture');
+  const priorClipboard=clipboard.readText();try{clipboard.writeText('macOS native paste');await key(main,'v',['meta']);check(await js(main,`document.activeElement?.value==='macOS native paste'`),'Command V preserves native text editing');}finally{clipboard.writeText(priorClipboard);}
+  await key(main,'Escape');await until(()=>js(main,`!document.querySelector('dialog[open]')`),'Capture cancellation missing');
+  const created=await js(main,`window.journal.command({type:'task.save',payload:{title:'macOS 平台验证',parentId:null}})`),id=created.state.tasks.at(-1).id;
+  await js(main,`document.querySelector('.top-navigation [aria-label=事项]').click()`);await until(()=>js(main,`!!document.querySelector('[data-outline-id="${id}"]')`),'Created item missing');
+  await js(main,`window.journal.command({type:'outline.patch',payload:{id:${JSON.stringify(id)},field:'title',value:'macOS undo verification'}})`);await js(main,`document.querySelector('[data-outline-id="${id}"]').focus()`);await key(main,'z',['meta']);
+  await until(()=>js(main,`window.journal.snapshot().then(s=>s.state.tasks.find(t=>t.id===${JSON.stringify(id)}).title==='macOS 平台验证')`),'Command Z did not undo tree edit');check(true,'Command Z undoes organizing while preserving input editing');
+  await js(main,`window.journal.command({type:'focus.start',payload:{taskId:${JSON.stringify(id)}}})`);await wait(1100);let stopped=await js(main,`window.journal.command({type:'focus.stop',payload:{sessionId:(await window.journal.snapshot()).timers.find(t=>t.taskId===${JSON.stringify(id)}).sessionId}})`);
+  check(stopped.state.sessions.some(s=>s.taskId===id&&s.status==='ended'&&s.durationMs>=900),'Real native SQLite timer records and stops actual effort');
+  const handed=await js(main,`window.journal.command({type:'item.handoff',payload:{id:${JSON.stringify(id)},assignee:'协作者',followUp:true}})`);check(handed.state.tasks.find(t=>t.id===id).status==='handed-off'&&!handed.state.tasks.find(t=>t.id===id).completedAt,'Handoff closes responsibility without false completion');
+  await js(main,`window.journal.capture.open()`);await until(()=>BrowserWindow.getAllWindows().some(w=>w.webContents.getURL().includes('panel=capture')),'Quick capture missing');
+  const capture=BrowserWindow.getAllWindows().find(w=>w.webContents.getURL().includes('panel=capture'));await until(()=>js(capture,`window.journalPlatform==='darwin'&&!!document.querySelector('textarea')`),'Capture bridge missing');check(true,'Native global capture companion loads');await js(capture,'window.journal.capture.close()');
+  await js(main,`window.journal.previewReminder({sound:false,volume:0,repeatSeconds:30},'card')`);await until(()=>BrowserWindow.getAllWindows().some(w=>w.webContents.getURL().includes('panel=reminder')),'Reminder card missing');const reminder=BrowserWindow.getAllWindows().find(w=>w.webContents.getURL().includes('panel=reminder'));await until(()=>js(reminder,`!!document.querySelector('.reminder-item')`),'Reminder renderer missing');check(reminder.isAlwaysOnTop(),'Native reminder companion remains on top');await js(reminder,`window.reminder.action('close-preview')`);
+  await js(main,`window.journalAppearance.set({theme:'dark',motion:'reduce'})`);await until(()=>js(main,`document.documentElement.dataset.theme==='dark'`),'Dark theme missing');
+  check(await js(main,`document.documentElement.scrollWidth<=innerWidth`),'macOS main window has no horizontal overflow');fs.writeFileSync(path.join(evidence,'macos-dark.png'),(await main.webContents.capturePage()).toPNG());
+  const saved=await js(main,'window.journal.snapshot()');fs.writeFileSync(path.join(evidence,'saved.json'),JSON.stringify({tasks:saved.state.tasks,sessions:saved.state.sessions,activities:saved.state.activities}));finished=true;
+ }catch(error){failures.push(String(error));if(main&&!main.isDestroyed())fs.writeFileSync(path.join(evidence,'failure.png'),(await main.webContents.capturePage()).toPNG());}finally{clearTimeout(timeout);app.quit();}});
+};

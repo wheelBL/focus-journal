@@ -1,3 +1,5 @@
+import {desktopPlatform} from './platform';
+import './platform.css';
 import './feature-styles';
 import React from 'react';
 import { createRoot } from 'react-dom/client';
@@ -11,6 +13,7 @@ import './journal-themes.css';
 import './appearance-layout.css';
 import {initializeAppearance} from './appearance';
 initializeAppearance();
+document.documentElement.dataset.platform=desktopPlatform();
 document.body.classList.add('journal-style');
 document.body.dataset.panel=new URLSearchParams(window.location.search).get('panel')??'main';
 const capture=new URLSearchParams(window.location.search).get('panel')==='capture';

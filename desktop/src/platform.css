@@ -1,0 +1,5 @@
+html[data-platform=darwin] .journal-style{font-family:-apple-system,BlinkMacSystemFont,"Helvetica Neue","PingFang SC",sans-serif}
+html[data-platform=darwin] .journal-style .workbench .native-titlebar{padding-right:12px}
+html[data-platform=darwin] .journal-style .workbench .brand{padding-left:88px;gap:6px}
+html[data-platform=darwin] .journal-style .workbench .brand svg{width:19px;height:19px}
+html[data-platform=darwin] .journal-style .workbench .window-controls{display:none}

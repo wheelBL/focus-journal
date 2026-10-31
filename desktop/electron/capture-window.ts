@@ -1,3 +1,4 @@
+import {defaultCaptureShortcut} from '../core/desktop-platform';
 import {BrowserWindow,globalShortcut,ipcMain} from 'electron';
 import {existsSync,readFileSync} from 'node:fs';
 import path from 'node:path';
@@ -10,7 +11,7 @@ export class CaptureWindow {
  private shortcuts:CaptureShortcut;
  constructor(private service:JournalService,private changed:()=>void,private icon:string,file:string,demo:boolean){
   this.shortcuts=new CaptureShortcut(globalShortcut,()=>this.open(),key=>atomicWrite(file,JSON.stringify({shortcut:key})));
-  let shortcut=demo?'':'Ctrl+Alt+Space';try{if(existsSync(file))shortcut=JSON.parse(readFileSync(file,'utf8')).shortcut;}catch{}
+  let shortcut=demo?'':defaultCaptureShortcut(process.platform==='darwin'?'darwin':'win32');try{if(existsSync(file))shortcut=JSON.parse(readFileSync(file,'utf8')).shortcut;}catch{}
   try{this.shortcuts.configure(shortcut,false);}catch{this.shortcuts.configure('',false);}
   const trusted=(event:Electron.IpcMainInvokeEvent)=>{if(!this.win||event.sender!==this.win.webContents||event.senderFrame!==this.win.webContents.mainFrame)throw new Error('无效的快速记录请求。');};
   ipcMain.handle('capture:snapshot',event=>{trusted(event);return this.service.snapshot();});

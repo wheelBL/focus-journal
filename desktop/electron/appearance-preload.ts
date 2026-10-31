@@ -1,6 +1,7 @@
 import {contextBridge,ipcRenderer} from 'electron';
 import type {Appearance} from '../core/appearance';
 export function exposeAppearance(){
+ contextBridge.exposeInMainWorld('journalPlatform',process.platform);
  contextBridge.exposeInMainWorld('journalAppearance',{
   get:()=>ipcRenderer.invoke('appearance:get'),
   set:async(value:Appearance)=>{try{return await ipcRenderer.invoke('appearance:set',value);}catch(e){throw new Error((e as Error).message.replace(/^Error invoking remote method '[^']+': (?:Error: )?/,''));}},

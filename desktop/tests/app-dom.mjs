@@ -18,6 +18,7 @@ export async function appDom(options={}){
  class Store{path='full app scenario tests';state=emptyState();load(){return structuredClone(this.state);}save(s){this.state=structuredClone(s);}close(){}}
  const clock={time:Date.parse('2026-10-19T14:00:00'),mono:0,now(){return this.time;},monotonic(){return this.mono;},advance(ms){this.time+=ms;this.mono+=ms;}};
  const service=new JournalService(new Store(),clock);let onChanged=()=>{};
+ if(options.platform)window.journalPlatform=options.platform;
  window.journal={snapshot:async()=>service.snapshot(),command:async c=>service.execute(c),onChanged:cb=>{onChanged=cb;return()=>{onChanged=()=>{};};},exportData:async()=>null,importData:async()=>null,openDataFolder:async()=>{},windowAction:async()=>{}};
  if(options.usage)window.journal.usage=options.usage;
  if(options.freeze)Object.freeze(window.journal);

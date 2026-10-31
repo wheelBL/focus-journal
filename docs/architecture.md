@@ -1,6 +1,6 @@
 # 架构说明
 
-当前本地交付版本：0.29.2；日志数据结构：19。GitHub 公开版本以 Releases 为准。技术栈为 TypeScript、React、Electron 和 SQLite。
+当前本地交付版本：0.30.0；日志数据结构：19。GitHub 公开版本以 Releases 为准。技术栈为 TypeScript、React、Electron 和 SQLite。
 
 ## 责任边界
 
@@ -64,3 +64,9 @@ HTTP API 默认关闭、默认只读，只绑定回环地址。Bearer 密钥、�
 业务规则和真实组件交互优先自动验证；原生行为用隔离 Electron 配置做短烟测。所有测试输出保存在忽略目录，测试必须正常退出，不影响个人实例。
 
 Windows 包从固定 Electron 运行时和应用构建生成，使用 app.asar，不需要用户安装 Node.js。第三方许可证随包提供。生产包不包含测试入口、数据库或设备配置。发布前核对版本、压缩包 SHA-256 和源文件范围。
+
+## 桌面平台
+
+核心业务与 schema 19 继续共用。core/desktop-platform.ts 定义修饰键和全局记录默认值；src/platform.ts 读取受限预加载提供的平台标识，统一转换 Command 操作和提示。electron/desktop-platform.ts 管理原生窗口配置与菜单；macOS 不调用 Windows 标题栏覆盖 API，使用模板菜单栏图标并响应 Dock activate。
+
+macOS 在原生 arm64 / x64 GitHub runner 分别构建和验证，生产与 QA 分开打包。QA 只改测试入口，不改业务代码；生产包不包含 QA 入口或数据库。ZIP / DMG 验证架构、ad-hoc 签名和归档完整性；目前不包含 Developer ID 签名或 Apple 公证。
