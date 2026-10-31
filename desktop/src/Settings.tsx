@@ -1,4 +1,5 @@
 import React,{useLayoutEffect,useState} from 'react';
+import {isMac,shortcutLabel} from './platform';
 import {applySettingsSection,requestSettingsSection,settingsSections,useSettingsSection,type SettingsSection} from './settings-navigation';
 import {AiSettings} from './AiSettings';
 import {AppearanceSettings} from './AppearanceSettings';
@@ -33,7 +34,7 @@ function DataSettings(){
 
 function HabitSettings(){
  const {data,dialog}=useWorkspaceJournal();
- return <section className="settings-section" id="settings-habits"><h2>使用习惯</h2><p>{data.demo?'这是独立测试工作区，关闭窗口会保存并退出，不留托盘图标。':'关闭窗口后保留在系统托盘中，计时继续。选择托盘中的“退出专注记”会保存并暂停全部计时器。'}电脑休眠时自动暂停全部计时器，回来后由你决定何时恢复。</p><p>Ctrl + K 搜索；Ctrl + N 新建事项；事项树中 Insert 新增同级、Ctrl + Insert 新增子项、F2 改名、Ctrl + Z 撤销整理；今日快速添加事项：Enter 保存。</p><Button onClick={()=>dialog({type:'shortcuts'})}>查看事项快捷键</Button><p className="muted">专注记 {appVersion}</p>{isDesktop&&<Button onClick={()=>void api.windowAction('quit')}>保存并退出专注记</Button>}</section>;
+ return <section className="settings-section" id="settings-habits"><h2>使用习惯</h2><p>{data.demo?'这是独立测试工作区，关闭窗口会保存并退出，不留托盘图标。':'关闭窗口后保留在系统托盘中，计时继续。选择托盘中的“退出专注记”会保存并暂停全部计时器。'}电脑休眠时自动暂停全部计时器，回来后由你决定何时恢复。</p><p>{shortcutLabel('Ctrl + K 搜索；Ctrl + N 新建事项；事项树中 ')}{isMac()?'⌘ + ⇧ + N 新增同级、⌘ + ⌥ + N 新增子项、':'Insert 新增同级、Ctrl + Insert 新增子项、'}{shortcutLabel('F2 改名、Ctrl + Z 撤销整理；今日快速添加事项：Enter 保存。')}</p><Button onClick={()=>dialog({type:'shortcuts'})}>查看事项快捷键</Button><p className="muted">专注记 {appVersion}</p>{isDesktop&&<Button onClick={()=>void api.windowAction('quit')}>保存并退出专注记</Button>}</section>;
 }
 
 const contents:Record<SettingsSection,React.ComponentType>={appearance:AppearanceSettings,focus:FocusSettings,reminders:ReminderSettingsSection,capture:CaptureSettings,ai:AiSettings,api:LocalApiSettings,sync:SyncSettingsSection,data:DataSettings,habits:HabitSettings};
