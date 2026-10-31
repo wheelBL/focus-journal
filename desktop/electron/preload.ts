@@ -1,11 +1,12 @@
 import { contextBridge, ipcRenderer } from 'electron';
+import type {DesktopEditAction} from '../core/desktop-platform';
 async function invoke(channel:string,...args:unknown[]){
   try{return await ipcRenderer.invoke(channel,...args);}
   catch(error){const message=error instanceof Error?error.message:String(error);throw new Error(message.replace(/^Error invoking remote method '[^']+': (?:Error: )?/,''));}
 }
 contextBridge.exposeInMainWorld('journal',{
   editText:(action:string)=>invoke('journal:text-edit',action),
-  onEditAction:(callback:(action:'undo'|'redo')=>void)=>{const receive=(_event:unknown,action:string)=>{if(action==='undo'||action==='redo')callback(action);};ipcRenderer.on('journal:edit-action',receive);return()=>ipcRenderer.removeListener('journal:edit-action',receive);},
+  onEditAction:(callback:(action:DesktopEditAction)=>void)=>{const receive=(_event:unknown,action:string)=>{if(action==='undo'||action==='redo'||action==='selectAll')callback(action);};ipcRenderer.on('journal:edit-action',receive);return()=>ipcRenderer.removeListener('journal:edit-action',receive);},
   usage:{record:(value:unknown)=>invoke('usage:record',value),snapshot:()=>invoke('usage:snapshot'),configure:(enabled:boolean)=>invoke('usage:configure',enabled),clear:(kind:string)=>invoke('usage:clear',kind),feedback:(id:string,rating:string,note:string)=>invoke('usage:feedback',id,rating,note),export:()=>invoke('usage:export')},
   localApi:{status:()=>invoke('local-api:status'),configure:(settings:unknown)=>invoke('local-api:configure',settings),token:()=>invoke('local-api:token'),rotateToken:()=>invoke('local-api:rotate-token')},
   capture:{open:()=>invoke('journal:capture-open'),preferences:()=>invoke('journal:capture-preferences'),configure:(value:string)=>invoke('journal:capture-configure',value)},

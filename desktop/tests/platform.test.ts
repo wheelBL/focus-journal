@@ -10,6 +10,8 @@ test('platform conventions retain Windows control and isolate native macOS windo
  assert.equal(mainWindowChrome('darwin').titleBarOverlay,undefined);assert.deepEqual(mainWindowChrome('darwin').trafficLightPosition,{x:14,y:14});assert.ok(mainWindowChrome('win32').titleBarOverlay);
  const spaces:unknown[]=[];const companion={setVisibleOnAllWorkspaces:(...args:unknown[])=>{spaces.push(args);}};configureCompanionWindow(companion,'win32');assert.equal(spaces.length,0);configureCompanionWindow(companion,'darwin');assert.deepEqual(spaces,[[true,{visibleOnFullScreen:true}]]);
  assert.equal(applicationMenu('win32','专注记'),null);assert.ok(applicationMenu('darwin','专注记')!.some(m=>m.label==='编辑'));
+ const edits:string[]=[],editMenu=applicationMenu('darwin','专注记',action=>edits.push(action))!.find(m=>m.label==='编辑')!.submenu as import('electron').MenuItemConstructorOptions[];
+ for(const item of editMenu)if(item.click)(item.click as ()=>void)();assert.deepEqual(edits,['undo','redo','selectAll']);
 });
 test('macOS default capture shortcut registers without breaking existing Windows customizations',()=>{
  const registered=new Set<string>(),s=new CaptureShortcut({register:key=>{registered.add(key);return true;},unregister:key=>{registered.delete(key);},isRegistered:key=>registered.has(key)},()=>{},()=>{});

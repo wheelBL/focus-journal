@@ -1,4 +1,5 @@
 import {mainWindowChrome,applicationMenu} from './desktop-platform';
+import type {DesktopEditAction} from '../core/desktop-platform';
 import {UsageStore} from './usage-store';
 import {AiController} from './ai-controller';
 import {LocalApiController} from './local-api-controller';
@@ -40,12 +41,12 @@ else {
     const backups=path.join(dataDir,'backups');mkdirSync(backups,{recursive:true});
     const dailyBackup=path.join(backups,`${localDate()}.json`);
     if(!existsSync(dailyBackup))writeFileSync(dailyBackup,service.exportJson(),'utf8');
-    const nativeEdit=(action:'undo'|'redo')=>{const focused=BrowserWindow.getFocusedWindow();if(focused&&focused!==win){if(action==='undo')focused.webContents.undo();else focused.webContents.redo();}else win?.webContents.send('journal:edit-action',action);};
+    const nativeEdit=(action:DesktopEditAction)=>{const focused=BrowserWindow.getFocusedWindow();if(focused&&focused!==win)focused.webContents[action]();else win?.webContents.send('journal:edit-action',action);};
     const menu=applicationMenu(process.platform,app.getName(),nativeEdit);Menu.setApplicationMenu(menu?Menu.buildFromTemplate(menu):null);
     const icon=path.join(__dirname,'../assets/icon.png');
     win=new BrowserWindow({width:demo&&!treePrototype?1060:1440,height:demo&&!treePrototype?640:920,minWidth:900,minHeight:640,show:false,title:treePrototype?'专注记 · 任务树交互稿':'专注记',icon,backgroundColor:'#FFFFFF',...mainWindowChrome(process.platform),webPreferences:{preload:path.join(__dirname,'preload.cjs'),contextIsolation:true,nodeIntegration:false,sandbox:true}});
     appearance.setMain(win);
-    if(process.platform==='darwin')win.webContents.on('before-input-event',(event,input)=>{if(input.type==='keyDown'&&input.meta&&!input.alt&&!input.control&&input.key.toLowerCase()==='z'){event.preventDefault();nativeEdit(input.shift?'redo':'undo');}});
+    if(process.platform==='darwin')win.webContents.on('before-input-event',(event,input)=>{if(input.type!=='keyDown'||!input.meta||input.alt||input.control)return;const key=input.key.toLowerCase();if(key==='z'||key==='a'&&!input.shift){event.preventDefault();nativeEdit(key==='a'?'selectAll':input.shift?'redo':'undo');}});
     win.webContents.setWindowOpenHandler(()=>({action:'deny'}));
     win.webContents.on('render-process-gone',(_event,details)=>log('renderer-exit',details));
     win.webContents.on('did-fail-load',(_event,code,description)=>log('load-error',{code,description}));
@@ -100,7 +101,7 @@ else {
     ipcMain.handle('journal:capture-open',event=>{trusted(event);capture.open();});
     ipcMain.handle('journal:capture-preferences',event=>{trusted(event);return capture.preferences();});
     ipcMain.handle('journal:capture-configure',(event,value:unknown)=>{trusted(event);return capture.configure(value);});
-    ipcMain.handle('journal:text-edit',(event,action:string)=>{trusted(event);if(action==='undo')win?.webContents.undo();else if(action==='redo')win?.webContents.redo();else throw Error('无效的编辑请求。');});
+    ipcMain.handle('journal:text-edit',(event,action:string)=>{trusted(event);if(action==='undo'||action==='redo'||action==='selectAll')win?.webContents[action]();else throw Error('无效的编辑请求。');});
     ipcMain.handle('journal:clock',event=>{trusted(event);return service.clockSnapshot();});
     ipcMain.handle('journal:snapshot',event=>{trusted(event);return service.snapshot();});
     ipcMain.handle('journal:reminder-preview',(event,settings:unknown,mode:unknown)=>{trusted(event);return reminders.preview(settings,mode);});
