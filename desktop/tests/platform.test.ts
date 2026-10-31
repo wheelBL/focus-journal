@@ -4,6 +4,9 @@ import {primaryModifier,defaultCaptureShortcut,shortcutLabel} from '../core/desk
 import {mainWindowChrome,applicationMenu,configureCompanionWindow} from '../electron/desktop-platform';
 import {CaptureShortcut} from '../electron/capture-shortcut';
 import {macosConfig} from '../scripts/macos-config.mjs';
+import {readFileSync} from 'node:fs';
+import {Script} from 'node:vm';
+import ts from 'typescript';
 test('platform conventions retain Windows control and isolate native macOS window chrome',()=>{
  assert.equal(primaryModifier({ctrlKey:true,metaKey:false},'win32'),true);assert.equal(primaryModifier({ctrlKey:true,metaKey:false},'darwin'),false);assert.equal(primaryModifier({ctrlKey:false,metaKey:true},'darwin'),true);
  assert.equal(shortcutLabel('Ctrl+Enter','darwin'),'⌘+Enter');assert.equal(shortcutLabel('Ctrl+Enter','win32'),'Ctrl+Enter');
@@ -21,4 +24,15 @@ test('macOS production package has explicit ad-hoc signing and excludes QA entri
  const pkg={build:{appId:'local.focusjournal.desktop',productName:'专注记'},devDependencies:{electron:'44.9.0'},version:'0.30.0'};
  const config=macosConfig(pkg,{root:process.cwd(),stage:'/stage',output:'/output'});assert.equal(config.mac.identity,'-');assert.equal(config.mac.notarize,false);assert.equal(config.asar,true);assert.equal(config.files.some((f:string)=>f.includes('qa-')),false);
  assert.equal(macosConfig(pkg,{root:process.cwd(),stage:'/stage',output:'/output',qa:true}).files.includes('qa-start.cjs'),true);
+});
+
+test('native QA renderer expressions parse before remote packaging',()=>{
+ const source=ts.createSourceFile('qa-macos-smoke.cjs',readFileSync('scripts/qa-macos-smoke.cjs','utf8'),ts.ScriptTarget.Latest,true,ts.ScriptKind.JS);let expressions=0;
+ const visit=(node:ts.Node)=>{if(ts.isCallExpression(node)&&ts.isIdentifier(node.expression)&&node.expression.text==='js'){
+  const arg=node.arguments[1];let code:string;
+  if(ts.isStringLiteralLike(arg))code=arg.text;
+  else if(ts.isTemplateExpression(arg))code=arg.head.text+arg.templateSpans.map(span=>'null'+span.literal.text).join('');
+  else throw Error('QA renderer expressions must be inspectable literals');
+  assert.doesNotThrow(()=>new Script(code),code);expressions++;
+ }ts.forEachChild(node,visit);};visit(source);assert.ok(expressions>=25);
 });
