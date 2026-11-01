@@ -10,11 +10,11 @@ Windows 11 与 macOS 上的本地工作日志，把 **估计 → 实践 → 复�
 
 ## 下载与运行
 
-最近公开发布版本为 **0.30.0**，源码和下载包见 [Releases](https://github.com/wheelBL/focus-journal/releases/tag/v0.30.0)。
+最近公开发布版本为 **0.31.0**，源码和下载包见 [Releases](https://github.com/wheelBL/focus-journal/releases/tag/v0.31.0)。
 
 | 设备 | 下载 |
 | --- | --- |
-| Windows 11 x64 | [ZIP](https://github.com/wheelBL/focus-journal/releases/download/v0.30.0/FocusJournal-0.30.0-Windows-x64.zip) |
+| Windows 11 x64 | [ZIP](https://github.com/wheelBL/focus-journal/releases/download/v0.31.0/FocusJournal-0.31.0-Windows-x64.zip) |
 | Mac，M 系列芯片 | [DMG](https://github.com/wheelBL/focus-journal/releases/download/v0.30.0/FocusJournal-0.30.0-macOS-arm64.dmg) · [ZIP](https://github.com/wheelBL/focus-journal/releases/download/v0.30.0/FocusJournal-0.30.0-macOS-arm64.zip) |
 | Mac，Intel 芯片 | [DMG](https://github.com/wheelBL/focus-journal/releases/download/v0.30.0/FocusJournal-0.30.0-macOS-x64.dmg) · [ZIP](https://github.com/wheelBL/focus-journal/releases/download/v0.30.0/FocusJournal-0.30.0-macOS-x64.zip) |
 
@@ -30,6 +30,7 @@ Windows 解压整个文件夹，双击 **专注记.exe**；Mac 安装说明见�
 ## 主要能力
 
 - **统一事项树**：任意嵌套，项目为可选标记；行内编辑、拖拽调整层级、自动排序、标签、筛选与保存视图。
+- **分组**：分类容器可任意嵌套，没有自身执行状态、完成勾选或计时；汇总下面事项的待办与投入。右键新增分组或将事项转为分组，原身份、子项、历史投入及估计保留。筛选、回顾和 AI/API 使用同一规则，详见[分组说明](desktop/docs/groups.md)。
 - **子弹笔记式快速记录**：普通事项、`- ` 笔记、`o ` 事件；支持日期、标签、估计和已有项目路径的语义识别。全局快速记录：Windows 为 `Ctrl+Alt+Space`，macOS 为 `⌘⇧Space`；均可在设置修改。
 - **从计时开始**：直接计时，或先开始再补充事项；暂停、恢复、手动补记和校正均保留真实时间。不需要的投入可放弃并从今日或日历恢复，稍后补充也会保存已填写的进展。支持多个事项独立计时。
 - **补入开始时间**：已做一段时间才想起计时，可先开始，再选择“调整开始时间”；支持 40 分钟前等快捷选择或准确日期时间。过去投入计入累计，从现在再专注一个目标时长才提醒，暂停不消耗目标。
@@ -124,6 +125,7 @@ node scripts/package-windows.mjs --versioned
 - [快速记录语法](desktop/docs/semantic-capture.md)
 - [事项规则](desktop/docs/scenario-rules.md) · [事项审视](desktop/docs/item-review-rules.md)
 - [0.21.0 发布说明](docs/releases/0.21.0.md)
+- [0.31.0 发布说明](docs/releases/0.31.0.md)
 
 ## 数据与发布范围
 

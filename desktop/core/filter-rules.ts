@@ -1,4 +1,4 @@
-import {isInformation} from './item-kind';
+import {isInformation,isGroup} from './item-kind';
 import {blockedReason} from './item-state';
 import {deadlineTime} from './deadlines';
 import {localDate,shiftDate,type DatePoint,type FilterCondition,type FilterField,type FilterGroup,type FilterOperator,type FilterRule,type ItemFilter,type JournalState,type Task} from './types';
@@ -139,7 +139,7 @@ export function validateRules(value:unknown,state:JournalState):FilterGroup{
   let valid=false;
   if(isDateField(r.field))valid=r.op==='period'?typeof r.value==='string'&&Object.hasOwn(periodLabels,r.value):point(r.value)&&(r.op!=='between'||point(r.end));
   else if(r.field==='tags')valid=Array.isArray(r.value)&&r.value.length<=100&&r.value.every(id=>typeof id==='string'&&state.tags.some(t=>t.id===id));
-  else if(r.field==='itemType')valid=['task','note','event'].includes(r.value as string);
+  else if(r.field==='itemType')valid=['task','note','event','group'].includes(r.value as string);
   else if(r.field==='status')valid=['open','done','cancelled','handed-off'].includes(r.value as string);
   else if(r.field==='responsibility')valid=['self','handed-off','following'].includes(r.value as string);
   else if(r.field==='completionBy')valid=['self','other','shared','unknown'].includes(r.value as string);
@@ -158,6 +158,7 @@ export function validateRules(value:unknown,state:JournalState):FilterGroup{
 export function matchesRules(r:FilterRule,t:Task,index:OutlineIndex,now:string):boolean{
  if(r.kind==='group')return r.mode==='all'?r.children.every(c=>matchesRules(c,t,index,now)):r.children.some(c=>matchesRules(c,t,index,now));
  const field=r.field;
+ if(isGroup(t)&&['status','availability','plannedDate','dueAt','completedAt','focusDate','estimateMinutes','actualMinutes','responsibility','assignee','completionBy','handedOffAt','actionable'].includes(field))return false;
  if(isInformation(t)&&field==='status')return r.op==='is-not';
  if(isInformation(t)&&['plannedDate','dueAt','completedAt','focusDate','status','availability','estimateMinutes','actualMinutes'].includes(field))return false;
  if(isDateField(field)){
@@ -190,7 +191,7 @@ export function describeRule(r:FilterRule,state:JournalState,now?:string):string
  let value='';if(r.op!=='set'&&r.op!=='unset'){
   if(isDateField(r.field))value=r.op==='period'?periodLabels[r.value as keyof typeof periodLabels]:datePointLabel(r.value as DatePoint,now)+(r.op==='between'?` 至 ${datePointLabel(r.end as DatePoint,now)}`:'');
   else if(r.field==='tags')value=(r.value as string[]).map(id=>state.tags.find(t=>t.id===id)?.name??'已移除标签').join('、')||'尚未选择标签';
-  else if(r.field==='itemType')value=r.value==='note'?'笔记／信息':r.value==='event'?'事件':'事项';
+  else if(r.field==='itemType')value=r.value==='note'?'笔记／信息':r.value==='event'?'事件':r.value==='group'?'分组':'事项';
   else if(r.field==='responsibility')value=({self:'本人负责','handed-off':'已交接',following:'待他人跟进'})[r.value as 'self'|'handed-off'|'following'];
   else if(r.field==='completionBy')value=({self:'本人完成',other:'他人完成',shared:'共同完成',unknown:'未注明'})[r.value as 'self'|'other'|'shared'|'unknown'];
   else if(r.field==='availability')value=r.value==='paused'?'已暂停（含父级影响）':'可做安排';

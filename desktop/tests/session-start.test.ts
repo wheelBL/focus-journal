@@ -99,8 +99,8 @@ test('editing an already due timer clears its old alert and preserves a fresh ta
 test('schema 16 SQLite migration backs up old evidence and persists new target offsets through reload',()=>{
  const {s,clock}=setup(),taskId=add(s);s.execute({type:'session.manual',payload:{taskId,date:'2026-10-21',minutes:12,summary:'已有投入'}});const old=s.snapshot().state;old.schemaVersion=16;
  const dir=mkdtempSync(path.resolve('qa-data/session-start-migration-')),file=path.join(dir,'journal.sqlite'),store=new SqliteJournalStore(file);store.save(old);store.close();
- const upgraded=new JournalService(new SqliteJournalStore(file),clock);assert.deepEqual(upgraded.snapshot().state,{...old,schemaVersion:19});
- const backups=readdirSync(path.join(dir,'backups'));assert.equal(backups.length,1);assert.match(backups[0],/before-schema-16-to-19/);
+ const upgraded=new JournalService(new SqliteJournalStore(file),clock);assert.deepEqual(upgraded.snapshot().state,{...old,schemaVersion:20});
+ const backups=readdirSync(path.join(dir,'backups'));assert.equal(backups.length,1);assert.match(backups[0],/before-schema-16-to-20/);
  const db=new DatabaseSync(path.join(dir,'backups',backups[0]),{readOnly:true});try{assert.equal((db.prepare('PRAGMA user_version').get() as any).user_version,16);assert.deepEqual(JSON.parse((db.prepare("SELECT data FROM records WHERE kind='sessions'").get() as any).data),old.sessions[0]);}finally{db.close();}
  const id=upgraded.execute({type:'focus.start',payload:{taskId,startedAt:at('09:20:00')}}).timer!.sessionId;clock.advance(3*minute);upgraded.shutdown();clock.advance(60*minute);
  const reload=new JournalService(new SqliteJournalStore(file),clock);assert.equal(reload.snapshot().timer!.targetOffsetMs,40*minute);assert.equal(reload.snapshot().timer!.durationMs,43*minute);assert.equal(readout(reload,id).value,'22:00');assert.equal(readdirSync(path.join(dir,'backups')).length,1);reload.shutdown();

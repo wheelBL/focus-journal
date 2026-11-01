@@ -1,6 +1,6 @@
 import {localDate,shiftDate,type Recurrence,type Task,type JournalState} from './types';
 import {day} from './validation';
-import {isEvent,isNote} from './item-kind';
+import {isEvent,isNote,isGroup} from './item-kind';
 
 const ordinal=(date:string)=>Date.parse(`${date}T00:00:00Z`)/86400000;
 export const dateDistance=(from:string,to:string)=>ordinal(to)-ordinal(from);
@@ -49,7 +49,7 @@ export function shiftOccurrence(value:string|null|undefined,days:number):string|
 }
 export function configureRecurrence(task:Task,value:unknown,now:string){
  if(value===null){task.recurrence=null;return;}
- if(isNote(task)||task.status!=='open'||task.deletedAt||task.archived)throw new Error('请为未完成事项或事件设置重复。');
+ if(isNote(task)||isGroup(task)||task.status!=='open'||task.deletedAt||task.archived)throw new Error('请为未完成事项或事件设置重复。');
  const rule=validateRecurrence(value);
  if(isEvent(task)&&rule.mode!=='calendar')throw new Error('事件按固定日历重复。');
  if(isEvent(task)){

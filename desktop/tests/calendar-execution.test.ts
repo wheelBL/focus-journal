@@ -69,7 +69,7 @@ test('archive validation rejects duplicate IDs, invalid owners and active archiv
 test('schema 15 gets a pre-migration SQLite backup and deleted evidence survives reopen',()=>{
  const folder=mkdtempSync(join(tmpdir(),'focus-schema16-')),file=join(folder,'journal.sqlite');try{
   let store=new SqliteJournalStore(file);const legacy=emptyState();legacy.schemaVersion=15;store.save(legacy);store.close();
-  store=new SqliteJournalStore(file);let s=new JournalService(store);assert.equal(s.snapshot().state.schemaVersion,19);assert.ok(readdirSync(join(folder,'backups')).some(n=>n.startsWith('before-schema-15-to-19-')));
+  store=new SqliteJournalStore(file);let s=new JournalService(store);assert.equal(s.snapshot().state.schemaVersion,20);assert.ok(readdirSync(join(folder,'backups')).some(n=>n.startsWith('before-schema-15-to-20-')));
   const id=s.execute({type:'task.save',payload:{title:'持久记录',parentId:null}}).state.tasks.at(-1)!.id,record=s.execute({type:'session.manual',payload:{taskId:id,date:'2026-10-19',minutes:12}}).state.sessions[0];s.execute({type:'session.delete',payload:{id:record.id}});s.shutdown();
   s=new JournalService(new SqliteJournalStore(file));assert.equal(s.snapshot().state.deletedSessions[0].id,record.id);assert.equal(s.execute({type:'session.restore',payload:{id:record.id}}).state.sessions[0].durationMs,720000);s.shutdown();
  }finally{rmSync(folder,{recursive:true,force:true});}

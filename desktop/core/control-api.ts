@@ -13,7 +13,7 @@ const choice=(...values:unknown[]):Schema=>({enum:values});
 const obj=(properties:Record<string,Schema>,required:string[]=[]):Schema=>({type:'object',properties,required,additionalProperties:false});
 interface Definition {description:string;payload:Schema;map?:(p:Record<string,unknown>,s:Snapshot)=>Command}
 const define=(description:string,properties:Record<string,Schema>,required:string[]=[]):Definition=>({description,payload:obj(properties,required)});
-const itemFields={title:{...str(),minLength:1},description:str(10000),itemType:choice('task','note','event'),parentId:nullable(id),tagNames:{type:'array',items:str(80),maxItems:50} as Schema,plannedDate:date,dueAt:date,estimateMinutes:nullable(num(1)),remindAt:date,eventAt:date,eventEnd:date};
+const itemFields={title:{...str(),minLength:1},description:str(10000),itemType:choice('task','note','event','group'),parentId:nullable(id),tagNames:{type:'array',items:str(80),maxItems:50} as Schema,plannedDate:date,dueAt:date,estimateMinutes:nullable(num(1)),remindAt:date,eventAt:date,eventEnd:date};
 export const controlCommands:Record<string,Definition>={
  'item.handoff':define('将本人责任交接给他人并以 handed-off 关闭；不计完成。仅处理明确选择的本项或子项，相关计时需 confirmTimers。',{id,ids:{type:'array',items:id,maxItems:1000},assignee:str(120),note:str(2000),followUp:bool,followUpAt:date,at:date,confirmTimers:bool},['id','assignee']),
  'item.reclaim':define('重新接手本项或明确选择的子项，不启动计时。',{id,ids:{type:'array',items:id,maxItems:1000}},['id']),

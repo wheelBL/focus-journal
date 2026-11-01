@@ -41,6 +41,7 @@
 | type | payload 示例 |
 | --- | --- |
 | `item.create` | `{"title":"写周报","description":"总结本周进展","tagNames":["工作"],"dueAt":"2026-10-23"}` |
+| `item.create` | `{"title":"工作领域","itemType":"group","parentId":null}` |
 | `item.create` | `{"title":"参考资料","itemType":"note","parentId":"父项ID"}` |
 | `item.create` | `{"title":"团队交流","itemType":"event","eventAt":"2026-10-21T14:00:00+08:00","eventEnd":"2026-10-21T15:00:00+08:00"}` |
 | `outline.patch` | `{"id":"事项ID","field":"description","value":"补充说明"}` |
@@ -63,9 +64,9 @@
 | `review.save` | `{"taskId":"事项ID","outcome":"完成初稿","reason":"资料查找超时","adjustment":"下次先列提纲"}` |
 | `break.start` / `break.finish` / `break.continue` / `break.stop` | `{}`（开始休息可传 sessionId） |
 
-创建时省略 parentId 使用当前有效收件箱，传 null 放到最外层。项目是事项的 `isProject` 标记，使用 `outline.patch` 设置；没有另一个项目类型。名称按正文保存，不隐式解析日期语义。笔记没有计时、截止或完成状态。
+创建时省略 parentId 使用当前有效收件箱，传 null 放到最外层。项目是事项的 `isProject` 标记，使用 `outline.patch` 设置；没有另一个项目类型。名称按正文保存，不隐式解析日期语义。笔记和分组没有计时、截止或完成状态。分组可以嵌套任意层并承载子项；历史直接投入保留，不能新增分组投入。
 
-`outline.patch` 每次修改一个字段：title、description、isProject、plannedDate、dueAt、estimateMinutes、itemType（信息转为 task）。原始估计已有值或已有投入时，请通过 estimate.add 调整剩余估计。日期为 `YYYY-MM-DD`；精确时刻推荐带时区的 ISO 8601。截止 `2026-10-23` 表示 **10 月 23 日零点之前完成，不含当天**。
+`outline.patch` 每次修改一个字段：title、description、isProject、plannedDate、dueAt、estimateMinutes、itemType（task 与 group 互转，信息可转为 task）。转换为分组时，运行或暂停中的计时必须先结束；须先移除计划、截止、有效提醒、重复和启用的审视等执行安排。转换项目会移除项目标记并保留层级、身份与历史。原始估计、已关闭的提醒和审视安排保存在 groupHistory，转回事项时恢复。原始估计已有值或已有投入时，请通过 estimate.add 调整剩余估计。日期为 `YYYY-MM-DD`；精确时刻推荐带时区的 ISO 8601。截止 `2026-10-23` 表示 **10 月 23 日零点之前完成，不含当天**。
 
 父项完成时若存在未完成子项，需要显式传 `children:"done"` 或 `children:"cancelled"`；整支删除需 `confirmBranch:true`。删除进入回收站，可恢复。移动、完成和删除同样保留原始身份与投入；这些行为可能影响相关计时器，AI 应先读取事项及计时状态再决定。复盘、估计、手动投入均复用应用规则。
 

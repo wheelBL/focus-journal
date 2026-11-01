@@ -25,6 +25,8 @@
     "core",
     "electron",
     "scripts/preview-api.ts",
+    "tests/groups.test.ts",
+    "tests/groups-integrity.test.ts",
     "tests/core.test.ts",
     "tests/outline.test.ts",
     "tests/items.test.ts",

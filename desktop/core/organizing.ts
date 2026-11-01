@@ -25,7 +25,7 @@ export function deleteTag(s:JournalState,id:unknown){
 // Restore only organizing fields; live timer segments, completions and work records are never rolled back.
 export function organizingUndo(before:JournalState,after:JournalState):(state:JournalState)=>void{
  const changes:{id:string;key:string;before:unknown;after:unknown}[]=[];
- for(const a of before.tasks){const b=after.tasks.find(t=>t.id===a.id);if(!b)continue;for(const key of ['itemType','title','description','isProject','tagIds','plannedDate','dueAt','eventAt','eventEnd','focusDate','recurrence'] as const)if(JSON.stringify(a[key])!==JSON.stringify(b[key]))changes.push({id:a.id,key,before:structuredClone(a[key]),after:structuredClone(b[key])});}
+ for(const a of before.tasks){const b=after.tasks.find(t=>t.id===a.id);if(!b)continue;for(const key of ['itemType','groupHistory','estimateMinutes','reminder','reviewSchedule','title','description','isProject','tagIds','plannedDate','dueAt','eventAt','eventEnd','focusDate','recurrence'] as const)if(JSON.stringify(a[key])!==JSON.stringify(b[key]))changes.push({id:a.id,key,before:structuredClone(a[key]),after:structuredClone(b[key])});}
  const tagIds=new Set([...before.tags,...after.tags].map(t=>t.id));
  const tags=[...tagIds].filter(id=>JSON.stringify(before.tags.find(t=>t.id===id))!==JSON.stringify(after.tags.find(t=>t.id===id))).map(id=>({id,before:before.tags.find(t=>t.id===id),after:after.tags.find(t=>t.id===id)}));
  const views=before.views.map(v=>({id:v.id,before:v.filter,after:after.views.find(a=>a.id===v.id)?.filter})).filter(v=>JSON.stringify(v.before)!==JSON.stringify(v.after));

@@ -81,8 +81,8 @@ test('schema 6 migration backs up exact timestamps and preserves reminders, view
  const {service,id}=setup();patch(service,id,'2026-10-23T04:15:00.000Z');const legacy=service.snapshot().state;legacy.schemaVersion=6;
  const folder=mkdtempSync(path.join(tmpdir(),'journal-date-migration-'));try{
   const file=path.join(folder,'journal.sqlite'),store=new SqliteJournalStore(file);store.save(legacy);store.close();
-  const upgraded=new JournalService(new SqliteJournalStore(file));assert.deepEqual(upgraded.snapshot().state,{...legacy,schemaVersion:19});upgraded.shutdown();
-  const backups=readdirSync(path.join(folder,'backups'));assert.equal(backups.length,1);assert.match(backups[0],/before-schema-6-to-19/);
+  const upgraded=new JournalService(new SqliteJournalStore(file));assert.deepEqual(upgraded.snapshot().state,{...legacy,schemaVersion:20});upgraded.shutdown();
+  const backups=readdirSync(path.join(folder,'backups'));assert.equal(backups.length,1);assert.match(backups[0],/before-schema-6-to-20/);
   const db=new DatabaseSync(path.join(folder,'backups',backups[0]),{readOnly:true});assert.equal((db.prepare('PRAGMA user_version').get() as any).user_version,6);assert.equal(JSON.parse((db.prepare("select data from records where kind='tasks'").get() as any).data).dueAt,'2026-10-23T04:15:00.000Z');db.close();
  }finally{rmSync(folder,{recursive:true,force:true});}
 });

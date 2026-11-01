@@ -6,8 +6,9 @@ import {isEffortDestination} from './effort-destination';
 
 /** One write path for inspector corrections, manual entry and calendar selection. */
 export function saveManualSession(s:JournalState,p:Record<string,unknown>,now:string):Session{
- const task=s.tasks.find(t=>t.id===p.taskId);if(!task)throw new Error('找不到这个事项。');requireAction(task);
+ const task=s.tasks.find(t=>t.id===p.taskId);if(!task)throw new Error('找不到这个事项。');
  const previous=p.id?s.sessions.find(x=>x.id===p.id):undefined;
+ if(!previous||previous.taskId!==task.id)requireAction(task);
  if(p.id&&!previous)throw new Error('记录不存在。');if(previous&&previous.status!=='ended')throw new Error('请先结束这次专注。');
  if(previous?.taskId!==task.id&&!isEffortDestination(s,task))throw new Error('请先恢复已删除或归档的事项及其父项。');
  if(p.preserveTiming!==undefined&&typeof p.preserveTiming!=='boolean')throw new Error('保留原始时段的选项无效。');

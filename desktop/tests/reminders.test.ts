@@ -68,8 +68,8 @@ test('invalid reminder state in a backup cannot replace the current journal',()=
 test('schema 5 migration creates a backup without changing existing tasks, views, sessions or settings',()=>{
  const dir=mkdtempSync(path.join(tmpdir(),'journal-reminder-upgrade-'));try{
   const {service,clock}=setup();for(const t of service.snapshot().timers)service.execute({type:'focus.stop',payload:{sessionId:t.sessionId}});const legacy=structuredClone(service.snapshot().state);legacy.schemaVersion=5;
-  const file=path.join(dir,'journal.sqlite'),old=new SqliteJournalStore(file);old.save(legacy);old.close();const upgraded=new JournalService(new SqliteJournalStore(file),clock);assert.deepEqual(upgraded.snapshot().state,{...legacy,schemaVersion:19});upgraded.shutdown();
-  const backup=readdirSync(path.join(dir,'backups')).find(f=>f.startsWith('before-schema-5-to-19-'));assert.ok(backup);const db=new DatabaseSync(path.join(dir,'backups',backup),{readOnly:true});assert.equal((db.prepare('PRAGMA user_version').get() as {user_version:number}).user_version,5);db.close();
+  const file=path.join(dir,'journal.sqlite'),old=new SqliteJournalStore(file);old.save(legacy);old.close();const upgraded=new JournalService(new SqliteJournalStore(file),clock);assert.deepEqual(upgraded.snapshot().state,{...legacy,schemaVersion:20});upgraded.shutdown();
+  const backup=readdirSync(path.join(dir,'backups')).find(f=>f.startsWith('before-schema-5-to-20-'));assert.ok(backup);const db=new DatabaseSync(path.join(dir,'backups',backup),{readOnly:true});assert.equal((db.prepare('PRAGMA user_version').get() as {user_version:number}).user_version,5);db.close();
  }finally{rmSync(dir,{recursive:true,force:true});}
 });
 test('reminder bounds stay in the chosen monitor work area, including negative coordinates and small displays',()=>{

@@ -1,3 +1,4 @@
+import {isGroup} from './item-kind';
 import {localDate,shiftDate,type ItemFilter,type JournalState,type Task} from './types';
 import {branchIds,outlineIndex,outlinePath,type OutlineIndex} from './outline';
 import {rulesFor,matchesRules,validateRules,withRules} from './filter-rules';
@@ -29,7 +30,10 @@ export function filterOutline(state:JournalState,f:ItemFilter,now:string,retaine
   const tagNames=(t.tagIds??[]).map(id=>tagLabels.get(id)??'').join(' ');
   if(!!t.deletedAt!==!!f.trash)continue;
   if(q&&!`${t.title} ${t.description??''} ${tagNames}`.toLocaleLowerCase().includes(q))continue;
-  if(!matchesRules(rules,t,index,now))continue;
+  const defaultClosed=['done','cancelled','handed-off'];
+  const defaultVisibility=rules.mode==='all'&&defaultClosed.every(value=>rules.children.some(r=>r.kind==='condition'&&r.field==='status'&&r.op==='is-not'&&r.value===value))&&rules.children.filter(r=>r.kind==='condition'&&r.field==='status').length===3;
+  const itemRules=isGroup(t)&&f.view==='all'&&defaultVisibility?{...rules,children:rules.children.filter(r=>!(r.kind==='condition'&&r.field==='status'&&r.op==='is-not'&&defaultClosed.includes(String(r.value))))}:rules;
+  if(!matchesRules(itemRules,t,index,now))continue;
   matches.add(n.id);
  }
  const retain=retainedId&&index.nodes.has(retainedId)&&!hidden.has(retainedId)?retainedId:null;

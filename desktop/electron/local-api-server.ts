@@ -122,7 +122,7 @@ export async function startLocalApi(options:Options):Promise<RunningLocalApi>{
     }else if(/^\/v1\/items\/[^/]+$/.test(path)){
      listParams([]);let id:string;try{id=decodeURIComponent(path.slice('/v1/items/'.length));}catch{fail(400,'invalid_id','事项 ID 无效。');}
      const task=s.state.tasks.find(t=>t.id===id);if(!task)fail(404,'item_not_found','事项不存在。');
-     const index=outlineIndex(s.state);data={item:task,path:outlinePath(index,id!).map(n=>({id:n.id,title:n.title})),childIds:(index.children.get(id!)??[]).map(n=>n.id),effort:index.stats.get(id!),estimate:task!.itemType==='note'||task!.itemType==='event'?null:estimateProgress(s.state,id!),estimates:s.state.estimates.filter(e=>e.taskId===id),reviews:s.state.reviews.filter(r=>r.taskId===id),blockedReason:blockedReason(index,id!)};
+     const index=outlineIndex(s.state);data={item:task,path:outlinePath(index,id!).map(n=>({id:n.id,title:n.title})),childIds:(index.children.get(id!)??[]).map(n=>n.id),effort:index.stats.get(id!),estimate:task!.itemType==='note'||task!.itemType==='event'||task!.itemType==='group'?null:estimateProgress(s.state,id!),estimates:s.state.estimates.filter(e=>e.taskId===id),reviews:s.state.reviews.filter(r=>r.taskId===id),blockedReason:blockedReason(index,id!)};
     }else if(path==='/v1/timers'){listParams([]);data={timers:s.timers,rest:s.state.settings.rest??null,breakUntil:s.state.settings.breakUntil};}
     else if(path==='/v1/sessions'){
      listParams(['taskId','from','to','offset','limit','deleted']);if(params.has('deleted')&&!['true','false'].includes(params.get('deleted')!))fail(400,'invalid_filter','deleted 应为 true 或 false。');const from=params.get('from'),to=params.get('to');

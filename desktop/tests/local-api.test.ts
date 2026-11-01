@@ -218,3 +218,6 @@ test('unavailable token encryption never starts or saves an open endpoint',async
  const dir=mkdtempSync(path.resolve('qa-evidence/local-api-unavailable-')),s=new JournalService(new Store()),c=new LocalApiController(s,path.join(dir,'local-api.json'),{encrypt:()=>{throw Error('unavailable');},decrypt:()=>{throw Error('unavailable');}},()=>{},'test');
  try{await assert.rejects(c.configure({enabled:true,port:await freePort(),access:'write'}),/密钥保护/);assert.equal(c.status().running,false);assert.equal(c.status().enabled,false);}finally{c.dispose();s.shutdown();}
 });
+
+
+test('API groups reject execution and appear in all-items search',async()=>{const h=await setup();try{const created=await h.command('item.create',{title:'API 分组',itemType:'group',parentId:null});assert.equal(created.status,200);const id=created.body.data.createdItemIds[0];assert.equal((await h.get('/items?status=all&query=API')).body.data.items.find((t:any)=>t.id===id).itemType,'group');assert.equal((await h.get('/items')).body.data.items.some((t:any)=>t.id===id),false);assert.equal((await h.command('focus.start',{taskId:id})).status,422);assert.equal((await h.command('item.create',{title:'非法',itemType:'group',dueAt:'2026-10-23'})).status,422);assert.equal((await h.command('outline.patch',{id,field:'itemType',value:'task'})).status,200);}finally{h.close();}});

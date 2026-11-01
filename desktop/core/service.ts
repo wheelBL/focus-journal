@@ -17,7 +17,7 @@ import {configureRecurrence,generateTaskSuccessors,validateRecurrence,localDay,a
 import {applyBatch,isBatchLifecycle,batchImpact} from './batch';
 import {text,required,number,day,deadline,instant,validateSchedule} from './validation';
 import {createCapture,validateInformation} from './capture-command';
-import {captureItem,isNote,isEvent,isTask,requireAction} from './item-kind';
+import {captureItem,isNote,isEvent,isTask,isGroup,requireAction} from './item-kind';
 import {effectiveItemReminder,scheduledItems,reminderTime,setItemReminder,validateItemReminder} from './item-reminders';
 import {isDateDeadline,deadlineTime} from './deadlines';
 import {blockedReason} from './item-state';
@@ -150,7 +150,7 @@ export class JournalService {
           effectiveItemReminder(task)!.state=command.type==='item-reminder.snooze'?'snoozed':'dismissed';effectiveItemReminder(task)!.snoozedUntil=command.type==='item-reminder.snooze'?new Date(this.clock.now()+300000).toISOString():null;if(command.type==='item-reminder.dismiss'&&!task.ownership)advanceEventReminder(task,now);break;
         }
         case 'item-review.configure': {
-          const task=this.task(s,p.id),enabled=p.enabled===true;if(enabled&&(task.status!=='open'||task.deletedAt))throw new Error('请先重新打开或恢复事项，再开启审视。');
+          const task=this.task(s,p.id),enabled=p.enabled===true;if(isGroup(task))throw new Error('分组不设置审视安排。');if(enabled&&(task.status!=='open'||task.deletedAt))throw new Error('请先重新打开或恢复事项，再开启审视。');
           task.reviewSchedule=validateReviewSchedule({enabled,nextDate:enabled?day(p.nextDate):null,interval:p.interval,lastReviewedAt:task.reviewSchedule?.lastReviewedAt??null});
           if(enabled&&p.pause===true){task.availability='paused';const ids=branchIds(outlineIndex(s),task.id);for(const a of this.active(s))if((a.taskId!==null&&ids.has(a.taskId))&&a.status==='running'){a.status='paused';a.updatedAt=now;}}break;
         }
@@ -180,8 +180,8 @@ export class JournalService {
           break;
         }
         case 'outline.create': {
-          const captured=captureItem(typeof p.title==='string'?p.title:'',p.kind==='note'?'note':p.kind==='event'?'event':'task'),title=required(captured.title),parentId=p.parentId==null?null:required(p.parentId,100);assertParentAvailable(s,parentId);
-          if(!['item','task','project','note','event',undefined].includes(p.kind as string|undefined))throw new Error('事项类型无效。');
+          const captured=captureItem(typeof p.title==='string'?p.title:'',p.kind==='note'?'note':p.kind==='event'?'event':p.kind==='group'?'group':'task'),title=required(captured.title),parentId=p.parentId==null?null:required(p.parentId,100);assertParentAvailable(s,parentId);
+          if(!['item','task','project','note','event','group',undefined].includes(p.kind as string|undefined))throw new Error('事项类型无效。');
           const id=randomUUID(),order=(outlineIndex(s).children.get(parentId)??[]).length;
           s.tasks.push({id,projectId:null,title,itemType:captured.itemType,eventAt:isEvent(captured)?localDate(now):null,isProject:p.kind==='project'&&isTask(captured),description:'',archived:false,tagIds:[],outcome:'',nextAction:'',estimateMinutes:null,plannedDate:null,dueAt:null,status:'open',createdAt:now,startedAt:null,completedAt:null,parentId,order});s.settings.selectedTaskId=id;
           if(p.afterId){const anchor=outlineIndex(s).nodes.get(String(p.afterId));if(!anchor||anchor.parentId!==parentId)throw new Error('新增位置已经改变。');moveRelative(s,id,anchor.id,'after');}break;
@@ -189,7 +189,7 @@ export class JournalService {
         case 'outline.patch': {
           const task=this.task(s,p.id);
           if(!['title','description','itemType'].includes(String(p.field)))requireAction(task);
-          if(p.field==='itemType'){if(p.value!=='task'||isTask(task))throw new Error('仅支持将信息条目转为事项。');task.itemType='task';task.eventAt=null;task.eventEnd=null;task.recurrence=null;}
+          if(p.field==='itemType'){if(p.value==='group'&&isTask(task)){if(this.active(s).some(r=>r.taskId===task.id))throw new Error('请先结束此事项的计时，再转为分组。');if(task.status!=='open'||task.availability==='paused'||task.plannedDate||task.dueAt||task.focusDate||task.reminder&&task.reminder.state!=='dismissed'||task.recurrence||task.reviewSchedule?.enabled||task.ownership)throw new Error('请先移除执行安排和审视安排，并恢复未结束状态，再转为分组。');task.groupHistory={initialEstimateMinutes:task.estimateMinutes,reminder:task.reminder??null,reviewSchedule:task.reviewSchedule??null};task.estimateMinutes=null;task.reminder=null;task.reviewSchedule=null;task.itemType='group';task.isProject=false;}else if(p.value==='task'&&!isTask(task)){if(isGroup(task)&&task.groupHistory){task.estimateMinutes=task.groupHistory.initialEstimateMinutes;task.reminder=task.groupHistory.reminder;task.reviewSchedule=task.groupHistory.reviewSchedule;delete task.groupHistory;}task.itemType='task';task.eventAt=null;task.eventEnd=null;task.recurrence=null;}else throw new Error('不支持此类型转换。');}
           else if(p.field==='title')task.title=required(p.value);
           else if(p.field==='description')task.description=text(p.value);
           else if(p.field==='isProject'){if(typeof p.value!=='boolean')throw new Error('项目标记无效。');task.isProject=p.value;}
@@ -451,7 +451,7 @@ export class JournalService {
 export function parseJournalBackup(content:string):JournalState {
   let parsed:unknown;try{parsed=JSON.parse(content);}catch{throw new Error('文件不是有效 JSON。');}
   const data=parsed as {format?:string;version?:number;state?:JournalState};
-  if(!data||data.format!=='focus-journal'||![1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19].includes(data.version??0)||!data.state)throw new Error('这不是支持的专注记备份。');
+  if(!data||data.format!=='focus-journal'||![1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20].includes(data.version??0)||!data.state)throw new Error('这不是支持的专注记备份。');
   validateState(data.state);return migrateOutline(data.state);
 }
 function validateState(s:JournalState) {
@@ -459,7 +459,7 @@ function validateState(s:JournalState) {
   const bool=(v:unknown)=>{if(typeof v!=='boolean')invalid();};
   const stamp=(v:unknown)=>{if(instant(v)!==v)invalid();};
   const nullableStamp=(v:unknown)=>{if(v!==null)stamp(v);};
-  if(!s||typeof s!=='object'||![1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19].includes(s.schemaVersion))throw new Error('备份版本不受支持。');
+  if(!s||typeof s!=='object'||![1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20].includes(s.schemaVersion))throw new Error('备份版本不受支持。');
   for(const k of ['projects','tasks','sessions','notes','estimates','reviews','audit'] as const){
     if(!Array.isArray(s[k])||s[k].length>100000)invalid();
     const ids=new Set();
@@ -475,7 +475,8 @@ function validateState(s:JournalState) {
   for(const t of s.tasks){
     if(t.status==='handed-off'&&s.schemaVersion<19)invalid();validateOwnership(t);if(t.ownership)validateItemReminder(t.ownership.reminder);if(s.schemaVersion>=19&&t.status==='open'&&t.ownership)invalid();
     required(t.title);text(t.outcome);text(t.nextAction);
-    if(t.itemType!==undefined&&!['task','note','event'].includes(t.itemType))invalid();if(t.updatedAt!==undefined)stamp(t.updatedAt);
+    if(t.groupHistory!==undefined){const h=t.groupHistory;if(!isGroup(t)||!h||typeof h!=='object'||Array.isArray(h)||Object.keys(h).sort().join(',')!=='initialEstimateMinutes,reminder,reviewSchedule')invalid();if(h.initialEstimateMinutes!==null)number(h.initialEstimateMinutes);validateItemReminder(h.reminder);if(h.reminder&&h.reminder.state!=='dismissed')invalid();if(h.reviewSchedule){validateReviewSchedule(h.reviewSchedule);if(h.reviewSchedule.enabled)invalid();}}
+    if(t.itemType!==undefined&&!['task','note','event','group'].includes(t.itemType)||t.itemType==='group'&&s.schemaVersion<20)invalid();if(t.updatedAt!==undefined)stamp(t.updatedAt);
 
     if(!(s.schemaVersion>=13&&t.projectId===null)&&!projectIds.has(t.projectId as string)||!['open','done','cancelled','handed-off'].includes(t.status))invalid();
     if(t.estimateMinutes!==null)number(t.estimateMinutes);

@@ -20,7 +20,7 @@ test('handoff is neither completion nor deletion, stops only explicitly selected
 test('other completion is attributed independently and legacy completed items remain unknown',()=>{
  const h=setup(),id=h.add('交给他人');h.service.execute({type:'item.handoff',payload:{id,assignee:'张三',followUp:true}});h.service.execute({type:'task.status',payload:{id,status:'done'}});assert.equal(h.get(id).completionBy,'other');
  h.service.execute({type:'item.completion',payload:{id,by:'shared'}});assert.equal(h.get(id).completionBy,'shared');h.service.execute({type:'item.undo'});assert.equal(h.get(id).completionBy,'other');
- const backup=JSON.parse(h.service.exportJson());backup.version=17;backup.state.schemaVersion=17;delete backup.state.activities;delete backup.state.tasks.find((t:any)=>t.id===id).completionBy;const restored=parseJournalBackup(JSON.stringify(backup));assert.equal(restored.schemaVersion,19);assert.equal(restored.tasks.find(t=>t.id===id)!.completionBy,undefined);assert.deepEqual(restored.activities,[]);
+ const backup=JSON.parse(h.service.exportJson());backup.version=17;backup.state.schemaVersion=17;delete backup.state.activities;delete backup.state.tasks.find((t:any)=>t.id===id).completionBy;const restored=parseJournalBackup(JSON.stringify(backup));assert.equal(restored.schemaVersion,20);assert.equal(restored.tasks.find(t=>t.id===id)!.completionBy,undefined);assert.deepEqual(restored.activities,[]);
 });
 test('follow-up reminder is separate, supports snooze, and reclaim restores the original reminder',()=>{
  const h=setup(),id=h.add('等待资料'),original=new Date(h.clock.time+1000).toISOString();h.service.execute({type:'item-reminder.set',payload:{id,at:original}});
@@ -37,7 +37,7 @@ test('activity commits with mutations, failed writes and timer ticks never fabri
 });
 test('schema 19 backs up old SQLite and preserves activities and ownership through backup and sync without replaying actions',()=>{
  const dir=mkdtempSync(path.resolve('qa-data/ownership-migration-')),file=path.join(dir,'journal.sqlite'),old=emptyState();old.schemaVersion=17;delete old.activities;let store=new SqliteJournalStore(file);store.save(old);store.close();
- store=new SqliteJournalStore(file);const service=new JournalService(store);assert.ok(readdirSync(path.join(dir,'backups')).some(n=>n.includes('17-to-19')));const id=service.execute({type:'task.save',payload:{title:'交接',parentId:'inbox'}}).state.tasks.at(-1)!.id;service.execute({type:'item.handoff',payload:{id,assignee:'张三'}});
+ store=new SqliteJournalStore(file);const service=new JournalService(store);assert.ok(readdirSync(path.join(dir,'backups')).some(n=>n.includes('17-to-20')));const id=service.execute({type:'task.save',payload:{title:'交接',parentId:'inbox'}}).state.tasks.at(-1)!.id;service.execute({type:'item.handoff',payload:{id,assignee:'张三'}});
  const snapshot=service.snapshot().state,remote=parseSyncDocument(syncDocument(snapshot)).state;assert.equal(fingerprint(remote),fingerprint(snapshot));assert.equal(remote.activities!.length,snapshot.activities!.length);assert.equal(remote.tasks.find(t=>t.id===id)!.ownership!.assignee,'张三');service.shutdown();
  const restored=new JournalService(new SqliteJournalStore(file));assert.equal(restored.snapshot().state.activities!.length,snapshot.activities!.length);restored.shutdown();
 });
@@ -54,7 +54,7 @@ test('schema 17 migration preserves populated legacy tasks, effort, estimates, r
  const file=path.join(mkdtempSync(path.resolve('qa-data/populated-migration-')),'journal.sqlite');let store=new SqliteJournalStore(file);store.save(old);store.close();
  store=new SqliteJournalStore(file);const upgraded=new JournalService(store);const current=upgraded.snapshot().state;
  for(const field of ['tasks','projects','sessions','estimates','reviews','notes','tags','views','moves','audit','deletedSessions','itemReviews'] as const)assert.deepEqual(current[field],old[field],field);
- assert.equal(current.schemaVersion,19);assert.deepEqual(current.activities,[]);assert.equal(current.tasks.find(t=>t.id===id)!.completionBy,undefined);upgraded.shutdown();
+ assert.equal(current.schemaVersion,20);assert.deepEqual(current.activities,[]);assert.equal(current.tasks.find(t=>t.id===id)!.completionBy,undefined);upgraded.shutdown();
 });
 
 test('handoff is closed in all unfinished/deadline queues, while follow-up and unselected children stay independent',()=>{
@@ -79,7 +79,7 @@ test('schema 18 delegated items migrate to closed with an exact backup, without 
  assert.equal(task.status,'handed-off');assert.equal(task.completedAt,null);assert.equal(task.completionBy,undefined);assert.deepEqual(task.ownership,old.tasks.find(t=>t.id===id)!.ownership);assert.deepEqual(state.activities,old.activities);
  assert.equal(state.sessions[0].status,'ended');assert.equal(state.sessions[0].durationMs,37000);assert.deepEqual(state.sessions[0].segments,old.sessions[0].segments);assert.equal(state.sessions[0].end,old.sessions[0].updatedAt);
  assert.equal(filterOutline(state,state.views.at(-1)!.filter,service.snapshot().now).matches.has(id),true);assert.equal(fingerprint(parseSyncDocument(syncDocument(state)).state),fingerprint(state));
- const backup=readdirSync(path.join(path.dirname(file),'backups')).find(n=>n.includes('18-to-19'))!;assert.ok(backup);const original=new DatabaseSync(path.join(path.dirname(file),'backups',backup),{readOnly:true});try{const raw=original.prepare("SELECT data FROM records WHERE kind='tasks' AND id=?").get(id) as {data:string};assert.equal(JSON.parse(raw.data).status,'open');assert.equal(JSON.parse(raw.data).ownership.assignee,'同事');}finally{original.close();service.shutdown();}
+ const backup=readdirSync(path.join(path.dirname(file),'backups')).find(n=>n.includes('18-to-20'))!;assert.ok(backup);const original=new DatabaseSync(path.join(path.dirname(file),'backups',backup),{readOnly:true});try{const raw=original.prepare("SELECT data FROM records WHERE kind='tasks' AND id=?").get(id) as {data:string};assert.equal(JSON.parse(raw.data).status,'open');assert.equal(JSON.parse(raw.data).ownership.assignee,'同事');}finally{original.close();service.shutdown();}
 });
 
 test('handoff does not generate recurring successors; actual other completion creates a fresh personal occurrence',()=>{

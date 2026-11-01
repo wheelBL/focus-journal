@@ -119,3 +119,6 @@ test('AI remaining-estimate preview subtracts recorded effort and preserves unkn
  const entry=plan(s,[{type:'estimate.add',payload:{taskId:'child',remainingMinutes:15,reason:'已完成大部分'}}]).entries[0];assert.match(entry.view.before,/30/);assert.equal(entry.view.before.includes('50'),false);assert.match(entry.view.after,/15 分钟/);
  child.estimateMinutes=null;const unknown=plan(s,[{type:'estimate.add',payload:{taskId:'child',remainingMinutes:15}}]).entries[0];assert.match(unknown.view.before,/未设置|未估计/);
 });
+
+
+test('AI context represents groups and rejects group execution proposals',()=>{const s=snapshot();s.state.tasks.push(task('group','root',{itemType:'group'}));const context=buildAiContext(s,{kind:'item',itemId:'root'}),item=JSON.parse(context.content).items.find((t:any)=>t.id==='group');assert.equal(item.type,'group');assert.equal(item.status,null);assert.equal(item.remainingEstimateMinutes,null);assert.throws(()=>plan(s,[patch('group','dueAt','2026-10-23')]));assert.throws(()=>plan(s,[{type:'estimate.add',payload:{taskId:'group',remainingMinutes:15}}]));const result=plan(s,[{type:'item.create',payload:{title:'子分组',itemType:'group',parentId:'group'}}]);assert.equal(result.entries.length,1);});

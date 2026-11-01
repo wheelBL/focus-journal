@@ -12,7 +12,7 @@ export function readOutlineCreation(key:string,state:JournalState,now:string,fal
  const usable=(id:unknown)=>state.tasks.find(t=>t.id===id&&t.status==='open'&&!t.deletedAt&&!t.archived);
  const original=saved.creator.parentId,parentId=original===null?null:usable(original)?.id??fallbackParent;
  const after=state.tasks.find(t=>t.id===saved.creator.afterId&&(t.parentId??null)===parentId&&!t.deletedAt&&!t.archived);
- const creator:OutlineCreator={parentId,afterId:after?.id??null,itemType:['task','note','event'].includes(saved.creator.itemType)?saved.creator.itemType:'task'};
+ const creator:OutlineCreator={parentId,afterId:after?.id??null,itemType:['task','note','event','group'].includes(saved.creator.itemType)?saved.creator.itemType:'task'};
  return {creator,capture,relocated:original!==parentId};
 }
 export function writeOutlineCreation(key:string,creator:OutlineCreator|null,capture:CaptureDraftState){

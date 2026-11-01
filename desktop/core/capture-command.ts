@@ -7,11 +7,11 @@ import {required,text,number,day,deadline,instant} from './validation';
 import {captureDraftErrors} from './capture-validation';
 import {attachTag} from './organizing';
 import {setItemReminder} from './item-reminders';
-import {isTask,isNote,isEvent} from './item-kind';
+import {isTask,isNote,isEvent,isGroup} from './item-kind';
 
 /** Validation and writes share the service's single SQLite transaction. */
 export function createCapture(s:JournalState,p:Record<string,unknown>,now:string):Task{
- const d=p.draft as CaptureDraft;if(!d||!['task','note','event'].includes(d.itemType))throw new Error('记录类型无效。');
+ const d=p.draft as CaptureDraft;if(!d||!['task','note','event','group'].includes(d.itemType))throw new Error('记录类型无效。');
  const errors=captureDraftErrors(d);if(errors.length)throw new Error(errors.join(' '));
  let parentId=p.parentId==null?null:required(p.parentId,100);
  if(d.parentQuery){const matches=captureDestinations(s,required(d.parentQuery,2000));if(matches.length!==1)throw new Error(matches.length?'归属有重名，请填写完整路径。':'找不到归属，请检查路径。');parentId=matches[0].id;}
@@ -26,7 +26,9 @@ export function createCapture(s:JournalState,p:Record<string,unknown>,now:string
 export function validateInformation(s:JournalState){
  const recorded=new Set([...s.sessions,...s.estimates,...s.reviews].map(r=>r.taskId));
  for(const t of s.tasks){
-  if(!isTask(t)&&(t.isProject||t.status!=='open'||t.estimateMinutes!==null||t.plannedDate||t.dueAt||t.startedAt||t.completedAt||t.focusDate||recorded.has(t.id)))throw new Error('已有执行安排或投入记录，不能还原为笔记或事件；原记录已保留。');
+  if(t.groupHistory&&!isGroup(t))throw new Error('分组历史只能属于分组。');
+  if(!isTask(t)&&!isGroup(t)&&(t.isProject||t.status!=='open'||t.estimateMinutes!==null||t.plannedDate||t.dueAt||t.startedAt||t.completedAt||t.focusDate||recorded.has(t.id)))throw new Error('已有执行安排或投入记录，不能还原为笔记或事件；原记录已保留。');
+  if(isGroup(t)&&(t.isProject||t.status!=='open'||t.availability==='paused'||t.estimateMinutes!==null||t.plannedDate||t.dueAt||t.completedAt||t.focusDate||t.reminder||t.recurrence||t.reviewSchedule||t.ownership||s.sessions.some(r=>r.taskId===t.id&&r.status!=='ended')))throw new Error('分组不能有执行安排或运行中的计时。');
   if(isNote(t)&&t.reminder)throw new Error('笔记不设置提醒，请改为事项或事件。');
   if(!isEvent(t)&&(t.eventAt||t.eventEnd))throw new Error('事件时间只用于事件。');
   if(isEvent(t)){if(!t.eventAt)throw new Error('请设置事件日期。');deadline(t.eventAt);if(t.eventEnd&& (t.eventAt.length===10||Date.parse(instant(t.eventEnd))<=Date.parse(t.eventAt)))throw new Error('事件结束必须晚于开始时刻。');}

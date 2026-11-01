@@ -1,4 +1,4 @@
-import {isInformation} from './item-kind';
+import {isInformation,isGroup} from './item-kind';
 import type {JournalState,Project,Task,FilterRule} from './types';
 import {JOURNAL_SCHEMA_VERSION} from './types';
 
@@ -21,9 +21,10 @@ export function outlineIndex(state:JournalState):OutlineIndex {
   const ordered:OutlineNode[]=[],stack=[...(children.get(null)??[])].reverse(),seen=new Set<string>();
   while(stack.length){const node=stack.pop()!;if(seen.has(node.id))continue;seen.add(node.id);ordered.push(node);const nested=children.get(node.id)??[];for(let i=nested.length-1;i>=0;i--)stack.push(nested[i]);}
   const effort=new Map<string,number>();for(const s of state.sessions)if(s.taskId!==null)effort.set(s.taskId,(effort.get(s.taskId)??0)+s.durationMs);
+  const hidden=new Set<string>();for(const n of ordered){const t=n.record as Task;if(t.deletedAt||t.archived||n.parentId&&hidden.has(n.parentId))hidden.add(n.id);}
   const stats=new Map<string,OutlineStats>();
   for(let i=ordered.length-1;i>=0;i--){const n=ordered[i],task='status' in n.record?n.record as Task:null;
-    const ownMs=effort.get(n.id)??0,value:OutlineStats={tasks:task&&!isInformation(task)?1:0,done:task?.status==='done'?1:0,ownMs,totalMs:ownMs,childEstimate:0,ownEstimate:task?.estimateMinutes??null};
+    const ownMs=effort.get(n.id)??0,value:OutlineStats={tasks:task&&!hidden.has(n.id)&&!isInformation(task)?1:0,done:task&&!hidden.has(n.id)&&!isInformation(task)&&task.status==='done'?1:0,ownMs,totalMs:ownMs,childEstimate:0,ownEstimate:task?.estimateMinutes??null};
     for(const child of children.get(n.id)??[]){const c=stats.get(child.id)!;value.tasks+=c.tasks;value.done+=c.done;value.totalMs+=c.totalMs;value.childEstimate+=c.ownEstimate??c.childEstimate;}
     stats.set(n.id,value);
   }
@@ -91,7 +92,7 @@ export function assertParentAvailable(state:JournalState,parentId:string|null){
   for(const n of outlinePath(index,parentId)){
     if((n.record as Task).deletedAt)throw new Error('请先从回收站恢复父事项。');
     if((n.record as Project).archived)throw new Error('请先恢复已归档的父项目。');
-    if('status' in n.record&&(n.record as Task).status!=='open'&&(n.record as Task).status!=='handed-off')throw new Error('请先重新打开父任务，再放入子项。');
+    if('status' in n.record&&!isGroup(n.record as Task)&&(n.record as Task).status!=='open'&&(n.record as Task).status!=='handed-off')throw new Error('请先重新打开父任务，再放入子项。');
   }
 }
 export function currentPosition(state:JournalState,id:string):OutlinePosition{

@@ -1,14 +1,16 @@
-import {isInformation} from './item-kind';
+import {isInformation,isGroup} from './item-kind';
 import {outlineIndex,outlinePath,type OutlineIndex} from './outline';
 import {deadlineTime} from './deadlines';
 import {taskMs,type JournalState,type Task,type Estimate} from './types';
 
 export function blockedReason(index:OutlineIndex,id:string):string|null {
+ if(isGroup(index.nodes.get(id)?.record as Task))return '分组无需计时，可先转为事项。';
  if(isInformation(index.nodes.get(id)?.record as Task))return '笔记／信息与事件无需计时，可先转为事项。';
  for(const node of outlinePath(index,id).reverse()){
   const task=node.record as Task,who=node.id===id?'此事项':`父级「${task.title}」`;
   if(task.deletedAt)return `${who}在回收站中，请先恢复。`;
   if(task.archived)return `${who}已归档，请先恢复。`;
+  if(isGroup(task))continue;
   if(task.status==='handed-off'&&node.id===id)return '此事项已交接关闭，请先重新接手再计时。';
   if(task.status!=='open'&&task.status!=='handed-off')return `${who}${task.status==='done'?'已完成':'已取消'}，请先重新打开。`;
   if(task.availability==='paused')return `${who}已暂停，恢复事项后才能计时。`;

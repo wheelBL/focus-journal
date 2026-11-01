@@ -83,8 +83,8 @@ test('schema 13 backup preserves every old record before schema 14 opens and per
  const dir=mkdtempSync(path.join(folder,'migration-')),file=path.join(dir,'journal.sqlite'),clock=new Clock(),store=new SqliteJournalStore(file),s=new JournalService(store,clock);
  const taskId=add(s);s.execute({type:'focus.start',payload:{taskId}});clock.advance(60000);stop(s,s.snapshot().timer!.sessionId);
  const legacy=structuredClone(s.snapshot().state);legacy.schemaVersion=13;store.save(legacy);store.close();
- const upgraded=new JournalService(new SqliteJournalStore(file),clock);assert.deepEqual(upgraded.snapshot().state,{...legacy,schemaVersion:19});
- const name=readdirSync(path.join(dir,'backups')).find(n=>n.startsWith('before-schema-13-to-19-'))!;assert.ok(name);
+ const upgraded=new JournalService(new SqliteJournalStore(file),clock);assert.deepEqual(upgraded.snapshot().state,{...legacy,schemaVersion:20});
+ const name=readdirSync(path.join(dir,'backups')).find(n=>n.startsWith('before-schema-13-to-20-'))!;assert.ok(name);
  const db=new DatabaseSync(path.join(dir,'backups',name),{readOnly:true});assert.equal((db.prepare('PRAGMA user_version').get() as any).user_version,13);assert.deepEqual(JSON.parse((db.prepare("SELECT data FROM records WHERE kind='sessions'").get() as any).data),legacy.sessions[0]);db.close();
  const id=start(upgraded);clock.advance(1000);stop(upgraded,id);upgraded.shutdown();const reopened=new JournalService(new SqliteJournalStore(file),clock);assert.equal(reopened.snapshot().state.sessions.at(-1)!.taskId,null);assert.equal(readdirSync(path.join(dir,'backups')).length,1);reopened.shutdown();
 });

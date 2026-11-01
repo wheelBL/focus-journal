@@ -3,7 +3,7 @@ import {localDate} from './types';
 import {instant,required,text} from './validation';
 import {createCapture} from './capture-command';
 import {defaultCaptureParent} from './capture-destination';
-import {isInformation,isNote,isEvent} from './item-kind';
+import {isInformation,isNote,isEvent,isGroup} from './item-kind';
 import {setItemReminder,reminderEligible} from './item-reminders';
 import {configureRecurrence} from './recurrence';
 import {saveManualSession} from './manual-session';
@@ -19,11 +19,11 @@ export function saveCalendarSelection(s:JournalState,p:Record<string,unknown>,no
  if(task){
   if(task.deletedAt||task.archived)throw new Error('请先恢复这个事项，再添加记录。');
   if(mode==='event')throw new Error('新事件请填写名称；修改事件请打开原事件。');
-  if(mode==='effort'&&isInformation(task)||mode==='reminder'&&isNote(task))throw new Error('请选择可以记录投入或设置提醒的事项。');
+  if(mode==='effort'&&isInformation(task)||mode==='reminder'&&(isNote(task)||isGroup(task)))throw new Error('请选择可以记录投入或设置提醒的事项。');
   if(mode==='reminder'&&!reminderEligible(s,task))throw new Error('事项或父项已关闭，请先恢复再设置提醒。');
  }else{
   const draft:CaptureDraft=p.draft as CaptureDraft??{title:required(p.title),description:'',itemType:mode==='event'?'event':'task',parentQuery:null,tagNames:[],plannedDate:null,dueAt:null,estimateMinutes:null,remindAt:null,eventAt:mode==='event'?start:null,eventEnd:mode==='event'?end:null};
-  if(mode==='effort'&&isInformation(draft)||mode==='reminder'&&isNote(draft)||mode==='event'&&!isEvent(draft))throw new Error('记录类型与日历操作不符，请选择事项或事件。');
+  if(mode==='effort'&&isInformation(draft)||mode==='reminder'&&(isNote(draft)||isGroup(draft))||mode==='event'&&!isEvent(draft))throw new Error('记录类型与日历操作不符，请选择事项或事件。');
   task=createCapture(s,{parentId:Object.hasOwn(p,'parentId')?p.parentId:defaultCaptureParent(s),draft:{...draft,...mode==='event'?{eventAt:start,eventEnd:end}:{} }},now);
  }
  if(mode==='effort')saveManualSession(s,{taskId:task.id,date:localDate(start),minutes:1,start,end,summary:text(p.summary??'')},now);

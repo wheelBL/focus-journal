@@ -87,7 +87,7 @@ for(const version of [1,2] as const)test(`schema ${version} upgrades with a comp
   for(const task of legacy.tasks){delete task.dueAt;if(version===1){delete task.parentId;delete task.order;}}
   if(version===1)for(const project of legacy.projects){delete project.parentId;delete project.order;}
   const file=path.join(dir,'journal.sqlite'),oldStore=new SqliteJournalStore(file);oldStore.save(legacy);oldStore.close();
-  const upgraded=new JournalService(new SqliteJournalStore(file),clock),state=upgraded.snapshot().state;assert.equal(state.schemaVersion,19);
+  const upgraded=new JournalService(new SqliteJournalStore(file),clock),state=upgraded.snapshot().state;assert.equal(state.schemaVersion,20);
   for(const kind of ['sessions','notes','estimates','reviews','audit'] as const)assert.deepEqual(state[kind],legacy[kind]);
   for(const original of [...legacy.projects,...legacy.tasks]){const next=[...state.projects,...state.tasks].find(n=>n.id===original.id)!;for(const key of Object.keys(original))assert.deepEqual((next as any)[key],(original as any)[key]);}
   assert.equal(state.tasks.filter((t:{id:string})=>t.id!=='inbox')[0].dueAt,null);upgraded.shutdown();
