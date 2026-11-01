@@ -15,10 +15,12 @@ Windows 11 与 macOS 上的本地工作日志，把 **估计 → 实践 → 复�
 | 设备 | 下载 |
 | --- | --- |
 | Windows 11 x64 | [ZIP](https://github.com/wheelBL/focus-journal/releases/download/v0.31.0/FocusJournal-0.31.0-Windows-x64.zip) |
-| Mac，M 系列芯片 | [DMG](https://github.com/wheelBL/focus-journal/releases/download/v0.30.0/FocusJournal-0.30.0-macOS-arm64.dmg) · [ZIP](https://github.com/wheelBL/focus-journal/releases/download/v0.30.0/FocusJournal-0.30.0-macOS-arm64.zip) |
-| Mac，Intel 芯片 | [DMG](https://github.com/wheelBL/focus-journal/releases/download/v0.30.0/FocusJournal-0.30.0-macOS-x64.dmg) · [ZIP](https://github.com/wheelBL/focus-journal/releases/download/v0.30.0/FocusJournal-0.30.0-macOS-x64.zip) |
+| Mac，M 系列芯片 | [DMG](https://github.com/wheelBL/focus-journal/releases/download/v0.31.0/FocusJournal-0.31.0-macOS-arm64.dmg) · [ZIP](https://github.com/wheelBL/focus-journal/releases/download/v0.31.0/FocusJournal-0.31.0-macOS-arm64.zip) |
+| Mac，Intel 芯片 | [Actions 产物](https://github.com/wheelBL/focus-journal/actions/runs/41316432197#artifacts)：选择 `FocusJournal-macOS-x64-dmg` 或 `FocusJournal-macOS-x64-zip` |
 
 Windows 解压整个文件夹，双击 **专注记.exe**；Mac 安装说明见下文。无需安装 Node.js。
+
+macOS 构建成功后，DMG、ZIP 和校验值直接保存在 [GitHub Actions](https://github.com/wheelBL/focus-journal/actions/workflows/macos.yml) 的 Artifacts 中，无需再复制到 Release。下载 Actions 产物需登录 GitHub，产物有保留期限；已经发布到 Release 的包继续保留。当前 Windows 包为本机构建，下载入口仍为 Release。
 
 - 系统：Windows 11 x64；macOS 14 或更新系统，提供 Apple Silicon 与 Intel 两种包。macOS 原生启动测试使用 macOS 15。
 - 更新：先在旧版托盘中选择“退出专注记”，再运行新版。数据保存在用户数据目录中，升级数据结构前自动备份。
