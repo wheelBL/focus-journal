@@ -20,7 +20,7 @@ Windows 11 与 macOS 上的本地工作日志，把 **估计 → 实践 → 复�
 
 Windows 解压整个文件夹，双击 **专注记.exe**；Mac 安装说明见下文。无需安装 Node.js。
 
-macOS 构建成功后，DMG、ZIP 和校验值直接保存在 [GitHub Actions](https://github.com/wheelBL/focus-journal/actions/workflows/macos.yml) 的 Artifacts 中，无需再复制到 Release。下载 Actions 产物需登录 GitHub，产物有保留期限；已经发布到 Release 的包继续保留。当前 Windows 包为本机构建，下载入口仍为 Release。
+后续 Windows 与 macOS 下载包统一由 GitHub Actions 构建：[Windows](https://github.com/wheelBL/focus-journal/actions/workflows/windows.yml) · [macOS](https://github.com/wheelBL/focus-journal/actions/workflows/macos.yml)。打开成功的运行，在 Artifacts 中选择 `FocusJournal-Windows-x64-zip` 或对应 Mac 芯片的包。下载 Actions 产物需登录 GitHub，产物有保留期限；上表已发布的版本继续保留，不重复上传。
 
 - 系统：Windows 11 x64；macOS 14 或更新系统，提供 Apple Silicon 与 Intel 两种包。macOS 原生启动测试使用 macOS 15。
 - 更新：先在旧版托盘中选择“退出专注记”，再运行新版。数据保存在用户数据目录中，升级数据结构前自动备份。
@@ -108,6 +108,8 @@ node scripts/package-windows.mjs --versioned
 ```
 
 输出为 `desktop/release/win-<package.json 中的版本号>/专注记.exe`。本地 API 与同步测试使用回环 HTTP 服务，需要环境允许监听 `127.0.0.1`；同步测试还需要 Git。第三方组件许可证会在打包时生成并复制到产物中。
+
+本地构建用于快速开发与人工体验验证。提交到 `main` 后，Windows Actions 在干净的 Windows x64 runner 上安装锁定依赖，运行业务、界面、API、同步与 Worker 测试，再打包正式版与隔离 QA 版。实际启动 QA EXE、验证操作和重启后，核对正式版业务代码一致，逐文件验证 ZIP，生成 SHA-256 和源码提交信息；全部通过才保存下载包，无需从本机手动上传。Windows 包保留 30 天，验证证据保留 14 天，也可通过 Run workflow 手动重跑。CI 使用 Windows Server 2025；Windows 11 的个人桌面体验仍以本地验证为准。
 
 自动测试覆盖业务规则、组件交互、本机 API、同步与预览 Worker。原生窗口检查脚本位于 `desktop/scripts/check-*.ts`，使用隔离配置，结束时必须正常退出测试实例。`check-local-api.ts` 另需 Python 3，可通过 `PYTHON` 环境变量指定路径。
 

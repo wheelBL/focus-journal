@@ -1,0 +1,72 @@
+name: Windows build and native verification
+on:
+  push:
+    branches: [main]
+    paths: ['desktop/**', '.github/workflows/windows.yml', 'THIRD_PARTY_NOTICES.txt']
+  pull_request:
+    paths: ['desktop/**', '.github/workflows/windows.yml', 'THIRD_PARTY_NOTICES.txt']
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: windows-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  windows:
+    name: Windows x64
+    runs-on: windows-2025
+    timeout-minutes: 25
+    defaults:
+      run:
+        working-directory: desktop
+    env:
+      npm_config_registry: https://registry.npmjs.org
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: desktop/package-lock.json
+      - run: npm ci
+      - run: npm test
+      - run: npm run test:ui
+      - run: npm run test:api
+      - run: npm run test:sync
+      - run: npm run build
+      - run: npm run test:sites
+      - name: Package production and isolated QA applications
+        run: |
+          node scripts/package-windows.mjs --versioned
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          node scripts/package-windows.mjs --release-qa --smoke
+      - name: Seed synthetic QA data
+        run: node --import tsx scripts/seed-release-qa.ts
+      - name: Verify packaged operations and restart
+        run: node scripts/run-windows-smoke.mjs
+      - name: Verify production code matches tested code
+        run: node scripts/verify-release.mjs
+      - name: Archive and verify download
+        run: ./scripts/archive-windows.ps1
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
+        with:
+          name: FocusJournal-Windows-x64-zip
+          path: |
+            desktop/release/FocusJournal-*-Windows-x64.zip
+            desktop/release/SHA256SUMS-Windows-x64.txt
+            desktop/release/build-provenance-Windows-x64.json
+          if-no-files-found: error
+          compression-level: 0
+          retention-days: 30
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
+        if: always()
+        with:
+          name: Windows-x64-verification
+          path: |
+            desktop/qa-evidence/release-*/packaged-*.json
+            desktop/qa-evidence/release-*/windows-*.log
+            desktop/qa-evidence/release-*/windows-*.err
+            desktop/qa-evidence/release-*/production-check.json
+            desktop/qa-evidence/release-*/archive-check.json
+            desktop/qa-evidence/release-*/*.png
+          retention-days: 14
