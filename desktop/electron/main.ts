@@ -1,4 +1,5 @@
 import {mainWindowChrome,applicationMenu} from './desktop-platform';
+import {prepareWorkspace,finishWorkspaceStartup} from './workspace-startup';
 import type {DesktopEditAction} from '../core/desktop-platform';
 import {UsageStore} from './usage-store';
 import {AiController} from './ai-controller';
@@ -12,7 +13,7 @@ import {SyncController} from './sync-controller';
 import {GitCodeRemote} from './gitcode-remote';
 import {FileSyncPersistence,atomicWrite,SyncError} from './sync-storage';
 import type {SyncInput} from '../core/sync-types';
-import { mkdirSync, writeFileSync, readFileSync, existsSync, appendFileSync } from 'node:fs';
+import { mkdirSync, writeFileSync, readFileSync, existsSync, appendFileSync,realpathSync } from 'node:fs';
 import path from 'node:path';
 import {ReminderWindow} from './reminder-window';
 import {timerMenu,breakMenu} from './timer-menu';
@@ -22,20 +23,23 @@ import { localDate, type Command } from '../core/types';
 
 let win:BrowserWindow|null=null, tray:Tray|null=null, service:JournalService;
 let quitting=false,closed=false;
-const flag=(name:string)=>{const i=process.argv.indexOf(name);return i>=0?process.argv[i+1]:undefined;};
 const demo=process.argv.includes('--demo');
 const treePrototype=process.argv.includes('--tree-prototype');
-const explicitData=flag('--data-dir');
-if(explicitData)app.setPath('userData',path.resolve(explicitData));
 app.setName('专注记');if(process.platform==='win32')app.setAppUserModelId('local.focusjournal.desktop');
-if(!app.requestSingleInstanceLock())app.quit();
-else {
+const workspace=(()=>{try{return prepareWorkspace();}catch(error){dialog.showErrorBox('无法确定专注记工作区',error instanceof Error?error.message:'数据目录不可用；未创建空白工作区。');app.quit();return null;}})();
+if(workspace&&!app.requestSingleInstanceLock()){
+  if(workspace.mode==='migrate')dialog.showErrorBox('请先退出旧版本','原工作区正在使用中。请在旧版托盘选择“退出专注记”，再启动新版。原数据尚未迁移或修改。');
+  app.quit();
+}
+else if(workspace) {
   app.on('second-instance',(_event,argv)=>{if(argv.includes('--quit')){app.quit();return;}win?.show();win?.focus();});
-  app.whenReady().then(()=>{
+  app.whenReady().then(async()=>{
+    if(process.argv.includes('--quit')){app.quit();return;}
+    if(!await finishWorkspaceStartup(workspace))return;
     const dataDir=app.getPath('userData');mkdirSync(dataDir,{recursive:true});
     const appearance=new AppearanceController(path.join(dataDir,'appearance.json'),path.join(__dirname,'../dist/client/index.html'));
     const log=(event:string,details:unknown='')=>{try{appendFileSync(path.join(dataDir,'startup.log'),`${new Date().toISOString()} ${event} ${JSON.stringify(details)}\n`);}catch{/* Diagnostics must not interrupt the journal. */}};
-    log('start',{version:app.getVersion(),electron:process.versions.electron,node:process.versions.node,packaged:app.isPackaged,demo});
+    log('start',{version:app.getVersion(),electron:process.versions.electron,node:process.versions.node,packaged:app.isPackaged,demo,dataDirectory:dataDir,physicalDirectory:realpathSync.native(dataDir),workspace:workspace.explicit?'explicit':'default'});
     service=new JournalService(new SqliteJournalStore(path.join(dataDir,'journal.sqlite')),undefined,demo,app.getVersion());
     if(treePrototype)service.seedTreeDemo();else if(demo)service.seedDemo();
     const backups=path.join(dataDir,'backups');mkdirSync(backups,{recursive:true});

@@ -39,6 +39,7 @@
     "tests/local-api.test.ts",
     "tests/local-api-sync.test.ts",
     "tests/session-start.test.ts",
-    "tests/calendar-execution.test.ts"
+    "tests/calendar-execution.test.ts",
+    "tests/workspace-location.test.ts"
   ]
 }

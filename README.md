@@ -10,7 +10,7 @@ Windows 11 与 macOS 上的本地工作日志，把 **估计 → 实践 → 复�
 
 ## 下载与运行
 
-当前版本为 **0.30.0**，源码和下载包见 [Releases](https://github.com/wheelBL/focus-journal/releases/tag/v0.30.0)。
+最近公开发布版本为 **0.30.0**，源码和下载包见 [Releases](https://github.com/wheelBL/focus-journal/releases/tag/v0.30.0)。
 
 | 设备 | 下载 |
 | --- | --- |
@@ -22,6 +22,7 @@ Windows 解压整个文件夹，双击 **专注记.exe**；Mac 安装说明见�
 
 - 系统：Windows 11 x64；macOS 14 或更新系统，提供 Apple Silicon 与 Intel 两种包。macOS 原生启动测试使用 macOS 15。
 - 更新：先在旧版托盘中选择“退出专注记”，再运行新版。数据保存在用户数据目录中，升级数据结构前自动备份。
+- Windows 0.30.1 起使用固定的 `%USERPROFILE%\.focus-journal`，不随启动入口改变。首次升级保留原目录并校验迁移；发现不同的旧工作区时明确选择。详见[统一工作区规则](desktop/docs/workspace-location.md)。
 - 关闭主窗口后继续在托盘运行；完全退出请使用托盘菜单或设置中的“保存并退出”。
 - 发布包目前未做 Windows 代码签名。校验值随 Releases 中的 `SHA256SUMS.txt` 提供。
 - 不要只移动 EXE，必须保留同目录的运行库、`resources` 和许可证文件。
