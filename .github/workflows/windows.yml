@@ -29,6 +29,8 @@ jobs:
           cache: npm
           cache-dependency-path: desktop/package-lock.json
       - run: npm ci
+      - name: Install the pinned Electron runtime
+        run: node node_modules/electron/install.js
       - run: npm test
       - run: npm run test:ui
       - run: npm run test:api
