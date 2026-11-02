@@ -47,7 +47,7 @@ test('calendar remembers viewed hours across navigation, keeps them through zoom
   await h.mount();await h.click(h.label('日历'));
   const scroll=()=>h.query('.calendar-scroll');
   await h.action(()=>{scroll().scrollTop=18*48;scroll().dispatchEvent(new Event('scroll'));});
-  await h.click(h.label('事项'));await h.click(h.label('日历'));assert.equal(scroll().scrollTop,18*48);
+  await h.click(h.label('任务'));await h.click(h.label('日历'));assert.equal(scroll().scrollTop,18*48);
   await h.input(h.label('时间刻度'),'72');assert.equal(scroll().scrollTop,18*72);
   await h.click(h.button('日',h.query('.segmented')));assert.equal(scroll().scrollTop,7*72);
   await h.action(()=>{scroll().scrollTop=10*72;scroll().dispatchEvent(new Event('scroll'));});

@@ -35,7 +35,7 @@ for (const restart of [false, true]) {
       execFileSync('taskkill.exe', ['/PID', String(child.pid), '/T', '/F'], {windowsHide: true, stdio: 'pipe', timeout: 10000});
     } catch { child.kill(); }
   };
-  const timeout = setTimeout(() => { timedOut = true; stopOwnedTree(); }, 60000);
+  const timeout = setTimeout(() => { timedOut = true; stopOwnedTree(); }, 105000);
   let code;
   try {
     code = await new Promise((resolve, reject) => {

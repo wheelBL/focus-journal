@@ -13,7 +13,7 @@ test('capture, nested work, switching, lifecycle and period review form a cohere
    clock.advance(50000);await key(window,'n',{ctrlKey:true});await input(query('dialog input[maxlength="120"]'),'转去核对');assert.equal(label('新事项计时方式').value,'switch');await click(button('保存并开始',query('dialog')));assert.equal(get(quick).status,'open');assert.equal(s.snapshot().state.sessions[0].durationMs,50000);assert.equal(s.snapshot().state.sessions[0].status,'ended');assert.equal(s.snapshot().timers.length,1);
   });
   await t.test('future plan can start now and explicit switching is distinct from parallel start',async()=>{
-   await click(label('事项'));await click(label('开始下周开始也能提前做',query('[role=tree]')));assert.equal(s.snapshot().timers.filter(t=>!t.paused).length,2);assert.equal(get(future).plannedDate,'2026-10-26');assert.match(query('.toast').textContent,/每次只做一件/);
+   await click(label('任务'));await click(label('开始下周开始也能提前做',query('[role=tree]')));assert.equal(s.snapshot().timers.filter(t=>!t.paused).length,2);assert.equal(get(future).plannedDate,'2026-10-26');assert.match(query('.toast').textContent,/每次只做一件/);
    await context(label('校验字段',query('[role=tree]')));await click(button('切换计时到此项',query('[role=menu]')));assert.equal(s.snapshot().timers.filter(t=>!t.paused).length,1);assert.equal(s.snapshot().timers[0].taskId,child);assert.equal(get(future).status,'open');
   });
   await t.test('flat results keep paths and automatic sorting still permits a structural drag with history intact',async()=>{
@@ -30,9 +30,9 @@ test('capture, nested work, switching, lifecycle and period review form a cohere
    await context(label('整理接口',query('[role=tree]')));await click(button('移入回收站',query('[role=menu]')));d=query('dialog');assert.match(d.textContent,/原层级、日期、标签和历史投入保留/);await click(button('确认移入回收站',d));assert.ok(get(parent).deletedAt);await click(button('回收站'));assert.ok(label('校验字段',query('[role=tree]')));
    await context(label('整理接口',query('[role=tree]')));await click(button('恢复整支',query('[role=menu]')));await click(button('确认从回收站恢复',query('dialog')));assert.equal(get(parent).deletedAt,null);assert.equal(get(child).parentId,parent);assert.equal(s.snapshot().timers.length,0);await click(button('回收站'));
   });
-  await t.test('global search locates the item in its hierarchy and remaining estimate keeps unknown initial effort honest',async()=>{
-   await input(label('搜索任务和笔记'),'校验字段');await click(button('校验字段',query('.search-page')));let d=query('dialog');assert.match(d.textContent,/初始估计.*未记录/);await click(button('调整剩余估计',d));await input(label('当前估计剩余'),'20');await click(button('保存调整',query('dialog')));assert.equal(get(child).estimateMinutes,null);assert.equal(s.snapshot().state.estimates.at(-1).remainingMinutes,20);
-   await click(button('校验字段',query('.search-page')));await click(button('在事项中定位',query('dialog')));assert.equal(label('校验字段',query('[role=tree]')).getAttribute('aria-selected'),'true');assert.match(query('.node-breadcrumb').textContent,/交付项目.*整理接口/);
+  await t.test('global search previews without leaving context, locates the hierarchy and keeps unknown initial effort honest',async()=>{
+   await input(label('搜索任务和笔记'),'校验字段');await click(button('校验字段',query('.search-page')));let preview=query('.external-detail-drawer:not([hidden])');assert.equal(document.querySelector('dialog'),null);await click(button('复盘',preview));assert.match(preview.textContent,/初始估计.*未记录/);await click(button('调整剩余估计',preview));await input(label('当前估计剩余'),'20');await click(button('保存调整',query('dialog')));assert.equal(get(child).estimateMinutes,null);assert.equal(s.snapshot().state.estimates.at(-1).remainingMinutes,20);assert.ok(query('.search-page'));
+   await click(button('校验字段',query('.search-page')));preview=query('.external-detail-drawer:not([hidden])');await click(button('前往所在位置',preview));assert.equal(label('校验字段',query('[role=tree]')).getAttribute('aria-selected'),'true');assert.match(query('.node-breadcrumb').textContent,/交付项目.*整理接口/);
   });
   await t.test('period review filters project and tag, separates completion/cancellation, and can plan a next step',async()=>{
    await command({type:'task.status',payload:{id:child,status:'done'}});await command({type:'session.manual',payload:{taskId:future,date:'2026-10-19',minutes:20}});await command({type:'task.status',payload:{id:future,status:'cancelled'}});

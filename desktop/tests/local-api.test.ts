@@ -237,3 +237,17 @@ test('API supports recurring reminder conversion and explicit handling without t
   assert.equal((await h.command('task.status',{id,status:'done'})).status,422);assert.equal((await h.command('outline.patch',{id,field:'itemType',value:'task'})).status,200);
  }finally{h.close();}
 });
+test('API content commands preserve related records and independently repeating reminders',async()=>{const h=await setup();try{
+ const group=(await h.command('item.create',{title:'group',itemType:'group',parentId:null})).body.data.createdItemIds[0];
+ const note=(await h.command('item.create',{title:'note',itemType:'note',parentId:group})).body.data.createdItemIds[0];
+ const created=await h.command('note.create-task',{id:note,title:'task'});assert.equal(created.status,200);const task=created.body.data.createdItemIds[0];
+ assert.equal(h.s.snapshot().state.tasks.find(t=>t.id===task)!.parentId,group);assert.deepEqual(h.s.snapshot().state.tasks.find(t=>t.id===note)!.relatedTaskIds,[task]);
+ assert.equal((await h.command('note.update',{id:note,title:'updated',description:'body'})).status,200);
+ assert.equal((await h.command('note.link-task',{id:note,taskId:task,extra:true})).status,400);
+ const at=new Date(h.clock.time).toISOString(),rule={mode:'calendar',unit:'month',interval:1,anchor:'2026-10-20',weekdays:[],until:null};
+ assert.equal((await h.command('reminder.schedule',{id:task,at,rule})).status,200);h.s.tick();assert.equal((await h.command('item-reminder.dismiss',{id:task})).status,200);
+ let record=h.s.snapshot().state.tasks.find(t=>t.id===task)!;assert.equal(record.recurrence??null,null);assert.equal(record.reminder!.at,'2026-11-20T06:00:00.000Z');assert.equal(record.status,'open');
+ assert.equal((await h.command('reminder.stop',{id:task})).status,200);record=h.s.snapshot().state.tasks.find(t=>t.id===task)!;assert.equal(record.reminderRecurrence,null);assert.equal(record.reminder!.state,'dismissed');
+ const reminder=await h.command('reminder.create',{title:'direct',parentId:group,at,rule:null});assert.equal(reminder.status,200);assert.equal(h.s.snapshot().state.tasks.find(t=>t.id===reminder.body.data.createdItemIds[0])!.reminderHistory,undefined);
+ assert.equal((await h.command('note.unlink-task',{id:note,taskId:task})).status,200);
+}finally{h.close();}});

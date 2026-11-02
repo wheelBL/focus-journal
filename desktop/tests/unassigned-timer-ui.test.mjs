@@ -4,7 +4,7 @@ import {appDom} from './app-dom.mjs';
 
 test('global quick timer works from Items; pause and finish create an item without replacing time evidence',async()=>{
  const h=await appDom();try{
-  await h.mount();await h.click(h.label('事项'));const count=h.service.snapshot().state.tasks.length;
+  await h.mount();await h.click(h.label('任务'));const count=h.service.snapshot().state.tasks.length;
   await h.click(h.button('先计时'));assert.ok(document.querySelector('.today-page'));assert.equal(h.service.snapshot().state.tasks.length,count);
   const id=h.service.snapshot().timer.sessionId;h.clock.advance(60000);await h.click(h.button('暂停',h.query('.unassigned-timer')));
   h.clock.advance(120000);await h.click(h.button('恢复专注',h.query('.unassigned-timer')));h.clock.advance(60000);
@@ -33,7 +33,7 @@ test('defer, calendar inspection and period review retain unassigned effort; ass
 
 test('assignment errors retain the draft and original session; dock ends the chosen unassigned timer',async()=>{
  const h=await appDom();try{
-  h.add('已有事项');await h.mount();await h.click(h.button('先计时'));h.clock.advance(60000);await h.click(h.label('事项'));
+  h.add('已有事项');await h.mount();await h.click(h.button('先计时'));h.clock.advance(60000);await h.click(h.label('任务'));
   const id=h.service.snapshot().timer.sessionId;await h.click(h.label('结束未关联事项计时'));const real=window.journal.command;window.journal.command=async c=>{if(c.type==='session.assign')throw Error('模拟磁盘写入失败');return real(c);};
   await h.input(h.label('这段时间做了什么'),'应保留的输入');await h.click(h.button('保存并关联'));
   assert.match(h.query('dialog [role=alert]').textContent,/写入失败/);assert.equal(h.label('这段时间做了什么').value,'应保留的输入');assert.equal(h.service.snapshot().state.sessions.find(s=>s.id===id).taskId,null);

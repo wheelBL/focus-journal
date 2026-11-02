@@ -9,7 +9,7 @@ test('appearance changes preserve active timing, selected tree and unsaved captu
   const id=h.add('夜间继续工作');await h.mount();await h.command({type:'focus.start',payload:{taskId:id}});
   await h.input(h.label('快速添加事项名称'),'还没有保存的想法');const before=h.service.exportJson();
   await h.input(h.label('切换外观'),'dark');assert.equal(document.documentElement.dataset.theme,'dark');assert.equal(h.label('快速添加事项名称').value,'还没有保存的想法');assert.equal(h.service.exportJson(),before);
-  await h.click(h.label('事项'));await h.click(h.query(`[data-outline-id="${id}"]`));await h.input(h.label('切换外观'),'light');
+  await h.click(h.label('任务'));await h.click(h.query(`[data-outline-id="${id}"]`));await h.input(h.label('切换外观'),'light');
   assert.equal(document.documentElement.dataset.theme,'light');assert.equal(h.query('.outline-row.selected').dataset.outlineId,id);assert.equal(h.service.exportJson(),before);assert.equal(preferences.length,2);
   await h.click(h.label('设置'));await h.input(h.label('动效偏好'),'reduce');assert.equal(document.documentElement.dataset.motion,'reduce');assert.equal(preferences.at(-1).motion,'reduce');assert.equal(h.service.exportJson(),before);
  }finally{await h.close();}

@@ -1,6 +1,6 @@
 import {localDate,shiftDate,type Recurrence,type Task,type JournalState} from './types';
 import {day} from './validation';
-import {isEvent,isNote,isGroup,isReminder} from './item-kind';
+import {isEvent,isNote,isGroup,isReminder,isTask} from './item-kind';
 
 const ordinal=(date:string)=>Date.parse(`${date}T00:00:00Z`)/86400000;
 export const dateDistance=(from:string,to:string)=>ordinal(to)-ordinal(from);
@@ -123,7 +123,7 @@ export function recurrenceLabel(rule:Recurrence){
 
 /** Advance from the original calendar anchor, independent of snoozes. */
 export function advancePureReminder(task:Task,now:string){
- const rule=task.recurrence,r=task.reminder;if(!isReminder(task)||!rule||!r)return;
+ const rule=isReminder(task)?task.recurrence:isTask(task)?task.reminderRecurrence:null,r=task.reminder;if(!rule||!r)return;
  const currentDay=localDay(r.at),today=localDay(now);let date=nextOccurrence(rule,shiftDate(today,-1));
  while(date){const at=shiftOccurrence(r.at,dateDistance(currentDay,date))!;if(Date.parse(at)>Date.parse(now)){task.reminder={at,state:'scheduled',snoozedUntil:null};return;}date=nextOccurrence(rule,date);}
  r.state='dismissed';r.snoozedUntil=null;

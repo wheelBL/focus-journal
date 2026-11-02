@@ -67,7 +67,7 @@ export async function checkAiUi({win,js,click,button,key,input,capture,check,set
   check(!!probe&&probe.authorized&&probe.body.model===model&&JSON.stringify(probe.body.messages)===JSON.stringify([{role:'user',content:'Reply with OK.'}])&&!probe.body.tools,'AI 连接测试只发送 OK 探针，不发送工作记录');
   check(journalContent(service.snapshot())===baseline,'AI 连接配置与测试不改变事项或投入');
   await js(`window.journalAppearance.set({theme:'light',motion:'reduce'})`);await settle();await capture('20-ai-settings-light');
-  await click('.top-navigation [aria-label="事项"]');await button('全部事项','.context-nav');await input('[aria-label="在事项树中搜索"]',target.title);
+  await click('.top-navigation [aria-label="任务"]');await button('全部事项','.context-nav');await input('[aria-label="在事项树中搜索"]',target.title);
   const selector=`[data-outline-id="${target.id}"]`;await until(`!!document.querySelector(${JSON.stringify(selector)})`);await click(selector+' .tree-title>.editable-value');
   if(!await js(`!!document.querySelector('.task-inspector')`))await button('详情','.outline-tools');
   await click('.inspector-more-actions > button');await button('AI 帮我梳理','.task-inspector');await until(`document.querySelector('[aria-label="AI 分析范围"]')?.value==='item'&&!!document.querySelector('.ai-context')`);

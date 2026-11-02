@@ -31,7 +31,7 @@ export function validateInformation(s:JournalState){
   if(t.reminderHistory&&!isReminder(t))throw new Error('提醒历史只能属于提醒。');
   if(isReminder(t)&&t.reminder&&Object.keys(t.reminder).sort().join(',')!=='at,snoozedUntil,state')throw new Error('提醒状态无效。');
   if(isReminder(t)&&t.recurrence&&Object.keys(t.recurrence).sort().join(',')!=='anchor,interval,mode,unit,until,weekdays')throw new Error('提醒重复规则无效。');
-  if(isReminder(t)&&(!t.reminderHistory||!t.reminder))throw new Error('提醒缺少时间或来源记录。');
+  if(isReminder(t)&&!t.reminder)throw new Error('提醒缺少时间。');
   if(isReminder(t)&&(t.isProject||t.status!=='open'||t.availability==='paused'||t.estimateMinutes!==null||t.plannedDate||t.dueAt||t.completedAt||t.focusDate||t.reviewSchedule||t.ownership||s.sessions.some(r=>r.taskId===t.id&&r.status!=='ended')||t.recurrence&&t.recurrence.mode!=='calendar'))throw new Error('提醒不能有执行安排或运行中的计时。');
   if(isGroup(t)&&(t.isProject||t.status!=='open'||t.availability==='paused'||t.estimateMinutes!==null||t.plannedDate||t.dueAt||t.completedAt||t.focusDate||t.reminder||t.recurrence||t.reviewSchedule||t.ownership||s.sessions.some(r=>r.taskId===t.id&&r.status!=='ended')))throw new Error('分组不能有执行安排或运行中的计时。');
   if(isNote(t)&&t.reminder)throw new Error('笔记不设置提醒，请改为事项或事件。');

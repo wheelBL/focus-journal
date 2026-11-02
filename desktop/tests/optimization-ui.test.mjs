@@ -13,7 +13,7 @@ test('editing an unrelated preview field cannot silently discard an unrecognized
 
 test('tree range selection has a stable anchor, contracts when reversed and clears on a different filter',async()=>{
  const h=await appDom();try{
-  const ids=['甲','乙','丙','丁'].map(title=>h.add(title));await h.mount();await h.click(h.label('事项'));await h.input(h.label('视图排序'),'manual');const row=id=>h.query(`[data-outline-id="${id}"]`),selected=()=>[...document.querySelectorAll('.batch-selected')].map(e=>e.dataset.outlineId),shiftClick=id=>h.action(()=>row(id).dispatchEvent(new MouseEvent('click',{bubbles:true,shiftKey:true})));
+  const ids=['甲','乙','丙','丁'].map(title=>h.add(title));await h.mount();await h.click(h.label('任务'));await h.input(h.label('视图排序'),'manual');const row=id=>h.query(`[data-outline-id="${id}"]`),selected=()=>[...document.querySelectorAll('.batch-selected')].map(e=>e.dataset.outlineId),shiftClick=id=>h.action(()=>row(id).dispatchEvent(new MouseEvent('click',{bubbles:true,shiftKey:true})));
   await h.click(row(ids[0]));await shiftClick(ids[3]);assert.deepEqual(selected(),ids);await shiftClick(ids[1]);assert.deepEqual(selected(),ids.slice(0,2));
   await h.click(row(ids[0]));await h.key(row(ids[0]),'ArrowDown',{shiftKey:true});await h.key(row(ids[1]),'ArrowDown',{shiftKey:true});await h.key(row(ids[2]),'ArrowUp',{shiftKey:true});assert.deepEqual(selected(),ids.slice(0,2));
   await h.input(h.label('在事项树中搜索'),'丁');assert.equal(document.querySelector('.batch-toolbar'),null);assert.equal(h.get(ids[0]).status,'open');
@@ -24,7 +24,7 @@ test('relative date views roll into a new local day without a data edit or manua
  const h=await appDom();try{
   const a=h.add('今天计划','inbox',{plannedDate:'2026-10-19'}),b=h.add('明天计划','inbox',{plannedDate:'2026-10-20'});
   const view=h.service.execute({type:'view.save',payload:{name:'当天计划',filter:{...emptyFilter(),planned:'today'}}}).state.views[0];window.journal.clock=async()=>h.service.clockSnapshot();
-  await h.mount();await h.click(h.label('事项'));await h.input(h.label('常用视图'),view.id);assert.ok(document.querySelector(`[data-outline-id="${a}"]`));assert.equal(document.querySelector(`[data-outline-id="${b}"]`),null);
+  await h.mount();await h.click(h.label('任务'));await h.input(h.label('常用视图'),view.id);assert.ok(document.querySelector(`[data-outline-id="${a}"]`));assert.equal(document.querySelector(`[data-outline-id="${b}"]`),null);
   h.clock.advance(86400000);await h.action(()=>new Promise(r=>setTimeout(r,1200)));assert.equal(document.querySelector(`[data-outline-id="${a}"]`),null);assert.ok(document.querySelector(`[data-outline-id="${b}"]`));
  }finally{await h.close();}
 });
@@ -32,7 +32,7 @@ test('relative date views roll into a new local day without a data edit or manua
 test('minute boundaries update visible deadline state without loading the complete journal',async()=>{
  const h=await appDom();try{
   const id=h.add('即将到期','inbox',{dueAt:new Date('2026-10-19T14:01:00').toISOString()});let loads=0;
-  window.journal.snapshot=async()=>{loads++;return h.service.snapshot();};window.journal.clock=async()=>h.service.clockSnapshot();await h.mount();await h.click(h.label('事项'));const before=loads;assert.equal(document.querySelector(`[data-outline-id="${id}"] .tree-deadline.overdue`),null);
+  window.journal.snapshot=async()=>{loads++;return h.service.snapshot();};window.journal.clock=async()=>h.service.clockSnapshot();await h.mount();await h.click(h.label('任务'));const before=loads;assert.equal(document.querySelector(`[data-outline-id="${id}"] .tree-deadline.overdue`),null);
   h.clock.advance(120000);await h.action(()=>new Promise(r=>setTimeout(r,1200)));assert.ok(document.querySelector(`[data-outline-id="${id}"] .tree-deadline.overdue`));assert.equal(loads,before);
  }finally{await h.close();}
 });

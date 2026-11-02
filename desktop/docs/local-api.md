@@ -17,6 +17,8 @@
 
 ## 查询
 
+0.33.0 新增内容命令：`note.update`、`note.create-task`、`note.link-task`、`note.unlink-task`、`reminder.create`、`reminder.update`、`reminder.schedule`、`reminder.stop`、`inbox.organize`。精确输入字段以 `/openapi.json` 为准。笔记生成任务保留原文并建立关联；收件箱整理原子地修改类型、正文、归属及提醒。任务自身重复使用 `recurrence`，附带提醒重复使用 `reminderRecurrence`，不可混用。确认或停止提醒不等于完成任务。
+
 | 方法和路径 | 结果 |
 | --- | --- |
 | `GET /status` | 当前时间、本地日期、时区、版本、权限和支持的命令说明 |

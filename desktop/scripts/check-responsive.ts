@@ -69,7 +69,7 @@ async function main(){try{
   }
  }
  // Source-state capture: same item, hierarchy and density as selected concept 3.
- await click('.nav-item[aria-label="事项"]');await until('.tree-page');win.setContentSize(1487,1058);win.webContents.setZoomFactor(1);await settle();
+ await click('.nav-item[aria-label="任务"]');await until('.tree-page');win.setContentSize(1487,1058);win.webContents.setZoomFactor(1);await settle();
  await run(`(()=>{const e=document.querySelector('[aria-label="视图排序"]');Object.getOwnPropertyDescriptor(HTMLSelectElement.prototype,'value').set.call(e,'manual');e.dispatchEvent(new Event('change',{bubbles:true}));document.querySelector('[data-outline-id="design"]').click();})()`);await settle();
  await run(`document.querySelector('.outline-scroll').scrollTop=0`);await settle();
  writeFileSync(path.join(output,'source-state.png'),await capture());
@@ -97,7 +97,7 @@ async function main(){try{
  writeFileSync(path.join(output,'keyboard-timer-summary.png'),await capture());
  clockTime=time;clockMono=0;
  service.importJson(stable);await win.webContents.reload();await until('.tree-page');
- await click('.nav-item[aria-label="事项"]');await until('.tree-page');win.setContentSize(900,640);win.webContents.setZoomFactor(1.25);await settle();
+ await click('.nav-item[aria-label="任务"]');await until('.tree-page');win.setContentSize(900,640);win.webContents.setZoomFactor(1.25);await settle();
  await run(`Array.from(document.querySelectorAll('.filter-controls button')).find(b=>b.textContent==='筛选').click()`);await settle();
  await run(`Array.from(document.querySelectorAll('.filter-controls button')).find(b=>b.textContent==='保存视图').click()`);await settle();
  const nameInput=await run(`(()=>{const e=document.querySelector('[aria-label="常用视图名称"]'),r=e.getBoundingClientRect();return {x:Math.round(r.x+r.width/2),y:Math.round(r.y+r.height/2)};})()`);
@@ -107,7 +107,7 @@ async function main(){try{
  writeFileSync(path.join(output,'save-view-final.png'),await capture());
  const x=Math.round(saveButton.x*scale),y=Math.round(saveButton.y*scale);win.webContents.sendInputEvent({type:'mouseDown',button:'left',clickCount:1,x,y});win.webContents.sendInputEvent({type:'mouseUp',button:'left',clickCount:1,x,y});await settle();
  if(!service.snapshot().state.views.some(v=>v.name==='窗口验证视图'))failures.push('Actual mouse save did not persist view');
- await win.webContents.reload();await until('.tree-page');await click('.nav-item[aria-label="事项"]');await until('.tree-page');
+ await win.webContents.reload();await until('.tree-page');await click('.nav-item[aria-label="任务"]');await until('.tree-page');
  if(!await run(`Array.from(document.querySelector('[aria-label="常用视图"]').options).some(o=>o.textContent==='窗口验证视图')`))failures.push('Saved view missing after reload');
  const savedView=service.snapshot().state.views.find(v=>v.name==='窗口验证视图');if(savedView)service.execute({type:'view.delete',payload:{id:savedView.id}});
  if(service.exportJson()!==stable)failures.push('Resizing changed journal data');
@@ -119,7 +119,7 @@ async function main(){try{
  const semantic=service.snapshot().state.tasks.at(-1)!;if(semantic.title!=='写周报'||semantic.estimateMinutes!==50||!semantic.dueAt)failures.push('Semantic renderer save failed');
  await run(`document.querySelector('[aria-label="快速添加事项名称"]').focus()`);await win.webContents.insertText('- 接口备忘 %参考\n正文保留 #标题 与 %原文。\n明天截止只是示例文字。');await settle();await run(`document.querySelector('.toast button')?.click();document.querySelector('.semantic-capture').scrollIntoView({block:'end'})`);await settle();writeFileSync(path.join(output,'multiline-capture.png'),await capture());
  await run(`document.querySelector('.semantic-capture').requestSubmit()`);await settle();
- await click('.nav-item[aria-label="事项"]');await until('.tree-page');await click('[data-outline-id="design"]');
+ await click('.nav-item[aria-label="任务"]');await until('.tree-page');await click('[data-outline-id="design"]');
  await run(`document.querySelector('[data-outline-id="error-flow"]').dispatchEvent(new MouseEvent('click',{bubbles:true,ctrlKey:true}))`);await settle();await run(`Array.from(document.querySelectorAll('.batch-toolbar button')).find(b=>b.textContent.includes('整理所选')).click()`);await settle();
  writeFileSync(path.join(output,'batch-impact.png'),await capture());await click('dialog [aria-label="关闭"]');
  await run(`document.querySelector('[aria-label="收起详情"]').click();document.querySelector('[aria-label="折叠设计异常处理"]').click()`);await settle();await win.webContents.reload();await until('.tree-page');
@@ -129,7 +129,7 @@ async function main(){try{
  const large=emptyState(),template=service.snapshot().state.tasks.find(t=>t.id==='later-0')!;
  for(let i=0;i<5000;i++)large.tasks.push({...structuredClone(template),id:`perf-${i}`,title:`性能验证事项 ${i}`,projectId:'inbox',parentId:'inbox',isProject:false,order:i,tagIds:[],reviewSchedule:null,reminder:null,focusDate:null,plannedDate:null,dueAt:null,createdAt:new Date(time+i).toISOString()});
  service.importJson(JSON.stringify({format:'focus-journal',version:13,state:migrateOutline(large)}));await run('localStorage.clear()');
- const perfStart=Date.now();await win.webContents.reload();await until('.today-page');const treeStart=Date.now();await click('.nav-item[aria-label="事项"]');await until('[data-outline-id="perf-0"]');
+ const perfStart=Date.now();await win.webContents.reload();await until('.today-page');const treeStart=Date.now();await click('.nav-item[aria-label="任务"]');await until('[data-outline-id="perf-0"]');
  const renderPerformance={items:5000,elapsedMs:Date.now()-perfStart,treeMs:Date.now()-treeStart,rows:await run("document.querySelectorAll('.outline-row').length")};writeFileSync(path.join(output,'large-outline.json'),JSON.stringify(renderPerformance,null,2));
  if(renderPerformance.rows>100)failures.push('Large tree mounted more than the visible row window');
  await click('[data-outline-id="inbox"]');win.webContents.sendInputEvent({type:'keyDown',keyCode:'End'});win.webContents.sendInputEvent({type:'keyUp',keyCode:'End'});await until('[data-outline-id="perf-4999"]');
@@ -152,7 +152,7 @@ async function main(){try{
  service.execute({type:'recurrence.set',payload:{id:'weekly-plan',rule:{...weeklyRule,unit:'day',mode:'completion',weekdays:[1]}}});
  service.execute({type:'focus.start',payload:{taskId:'design',skipEstimate:true}});
  await run('localStorage.clear()');await win.webContents.reload();await until('.today-page');
- await click('.nav-item[aria-label="事项"]');await until('.tree-page');win.setContentSize(1487,1058);win.webContents.setZoomFactor(1);await click('[data-outline-id="design"]');await settle();
+ await click('.nav-item[aria-label="任务"]');await until('.tree-page');win.setContentSize(1487,1058);win.webContents.setZoomFactor(1);await click('[data-outline-id="design"]');await settle();
  const statusState=await run(`({started:document.querySelector('[data-outline-id="design"] .tree-status').textContent,overdue:document.querySelector('[data-outline-id="error-flow"] .overdue-label').textContent,inboxProject:document.querySelector('[data-outline-id="inbox"]').classList.contains('project'),moveControl:!!document.querySelector('.move-control'),details:!!document.querySelector('.task-inspector')})`);
  if(statusState.started!=='正在计时'||statusState.overdue!=='逾期'||statusState.inboxProject||statusState.moveControl||!statusState.details)failures.push('Release item status/Inbox/details scenario failed');
  writeFileSync(path.join(output,'readability-source.png'),await capture());
@@ -206,7 +206,7 @@ async function main(){try{
  async function pointer(selector:string){
   const point=await run(`(()=>{const e=document.querySelector(${JSON.stringify(selector)});e.scrollIntoView({block:'nearest'});const r=e.getBoundingClientRect();return {x:Math.round(r.x+r.width/2),y:Math.round(r.y+r.height/2)}})()`);const z=win.webContents.getZoomFactor();point.x=Math.round(point.x*z);point.y=Math.round(point.y*z);win.webContents.focus();win.webContents.sendInputEvent({type:'mouseMove',...point});await settle();win.webContents.sendInputEvent({type:'mouseDown',button:'left',clickCount:1,...point});win.webContents.sendInputEvent({type:'mouseUp',button:'left',clickCount:1,...point});await settle();
  }
- await click('.nav-item[aria-label="事项"]');await until('.tree-page');await pointer('.quick-timer-start');await until('.unassigned-timer');
+ await click('.nav-item[aria-label="任务"]');await until('.tree-page');await pointer('.quick-timer-start');await until('.unassigned-timer');
  const first=service.snapshot().timer!.sessionId;clockTime+=60000;clockMono+=60000;
  await click('.unassigned-timer .focus-actions .secondary:not(.stop-for-break)');
  await until('.unassigned-timer .focus-actions .secondary:not(.stop-for-break):not(:disabled)');

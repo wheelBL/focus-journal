@@ -1,7 +1,7 @@
 /** Short real-renderer verification of changed operation depth and return paths. */
 export async function checkOperationFlows({win,js,click,button,key,input,capture,check,settle,until,service}:any){
  await js(`window.journalAppearance.set({theme:'light',motion:'reduce'})`);
- await click('.top-navigation [aria-label="事项"]');await button('全部事项','.context-nav');await settle();
+ await click('.top-navigation [aria-label="任务"]');await button('全部事项','.context-nav');await settle();
  await click('[aria-label="视图选项"]');await capture('30-view-options');
  check(await js(`document.querySelector('.action-popover-panel:not([hidden])').textContent.includes('展开全部')&&document.querySelector('.action-popover-panel:not([hidden])').textContent.includes('折叠全部')`),'展开与折叠以文字直接呈现，视图操作只进入一层');await key('Escape');
  await button('新增事项','.tree-page-header');await input('[aria-label="新事项名称"]','操作验证：保留新增草稿');await button('新增事项','.tree-page-header');
@@ -22,7 +22,7 @@ export async function checkOperationFlows({win,js,click,button,key,input,capture
  await click('.top-navigation [aria-label="今日"]');await settle();await capture('35-today');
  await button('补记时间','.today-page');await until(`!!document.querySelector('dialog [aria-label="实际开始"]')`);await capture('36-manual-effort');
  check(await js(`document.querySelector('dialog .manual-duration-preview')?.textContent.includes('将记录')`),'补记在提交前直接显示将计入的实际时长');await key('Escape');
- await js(`window.journalAppearance.set({theme:'dark',motion:'reduce'})`);await click('.top-navigation [aria-label="事项"]');await settle();await capture('37-dark-items');
+ await js(`window.journalAppearance.set({theme:'dark',motion:'reduce'})`);await click('.top-navigation [aria-label="任务"]');await settle();await capture('37-dark-items');
  for(const [width,height] of [[1920,1080],[900,720]]){win.setContentSize(width,height);await settle();check(await js(`document.documentElement.scrollWidth<=innerWidth+1&&[...document.querySelectorAll('.outline-row')].every(row=>Math.abs(row.getBoundingClientRect().height-32)<1)`),`${width}×${height} 操作入口无横向溢出，行高保持 32px`);await capture(`38-items-${width}`);}
  win.setContentSize(1440,940);await js(`window.journalAppearance.set({theme:'light',motion:'reduce'})`);
 }

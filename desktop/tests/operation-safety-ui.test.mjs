@@ -10,7 +10,7 @@ function hold(type){
 
 test('branch completion protects child decisions until a single write finishes and keeps failures retryable',async()=>{
  const h=await appDom();try{
-  const parent=h.add('交付工作'),child=h.add('校对附件',parent);await h.mount();await h.click(h.label('事项'));
+  const parent=h.add('交付工作'),child=h.add('校对附件',parent);await h.mount();await h.click(h.label('任务'));
   await h.click(h.label('完成交付工作',h.query('[role=tree]')));const d=h.query('dialog'),choice=h.label('处理未结束子项');
   assert.equal(h.button('确认完成事项',d).disabled,true);assert.match(d.textContent,/先选择子项的处理方式/);
   await h.input(choice,'done');const gate=hold('task.status');await h.click(h.button('确认完成事项',d));
@@ -25,7 +25,7 @@ test('branch completion protects child decisions until a single write finishes a
 
 test('trash confirmation cannot close mid-save and a failed branch deletion can be safely abandoned',async()=>{
  const h=await appDom();try{
-  const id=h.add('保留我的资料');await h.mount();await h.click(h.label('事项'));await h.context(h.query(`[data-outline-id="${id}"]`));await h.click(h.button('移入回收站',h.query('[role=menu]')));
+  const id=h.add('保留我的资料');await h.mount();await h.click(h.label('任务'));await h.context(h.query(`[data-outline-id="${id}"]`));await h.click(h.button('移入回收站',h.query('[role=menu]')));
   const d=h.query('dialog'),gate=hold('item.change');await h.click(h.button('确认移入回收站',d));await h.action(()=>d.dispatchEvent(new Event('cancel',{cancelable:true})));
   assert.equal(h.query('dialog'),d);assert.equal(h.button('返回',d).disabled,true);assert.equal(gate.calls,1);
   await h.action(gate.fail);assert.ok(!h.get(id).deletedAt);assert.equal(h.button('返回',d).disabled,false);await h.click(h.button('返回',d));assert.equal(document.querySelector('dialog'),null);assert.ok(!h.get(id).deletedAt);

@@ -9,7 +9,7 @@ test('global search supports creation, Escape and IME without losing Today captu
   await h.key(document.body,'k',{ctrlKey:true});assert.equal(document.activeElement,h.label('搜索任务和笔记'));
   await h.input(h.label('搜索任务和笔记'),'准备');await h.key(h.label('搜索任务和笔记'),'Escape');
   assert.equal(h.label('快速添加事项名称').value,'尚未保存的想法');
-  await h.click(h.label('事项'));await h.input(h.label('搜索任务和笔记'),'准备');
+  await h.click(h.label('任务'));await h.input(h.label('搜索任务和笔记'),'准备');
   await h.key(h.label('搜索任务和笔记'),'n',{ctrlKey:true,isComposing:true});assert.equal(document.querySelector('dialog'),null);
   await h.key(h.label('搜索任务和笔记'),'n',{ctrlKey:true});assert.ok(h.query('dialog[aria-label="新建一件事"]'));
   await h.input(h.query('dialog input'),'从搜索中新建');await h.click(h.button('保存事项',h.query('dialog')));

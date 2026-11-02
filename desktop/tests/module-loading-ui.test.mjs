@@ -72,7 +72,7 @@ test('focus settings protect submitted values, show a failed save locally and al
 
 test('a local saved-view modal blocks global creation and search shortcuts behind it',async()=>{
  const h=await appDom();try{
-  h.add('保留焦点');await h.mount();await h.click(h.label('事项'));await h.click(h.button('保存视图'));const dialog=h.query('dialog[open]'),input=h.label('常用视图名称');await h.input(input,'正在编辑的视图');
+  h.add('保留焦点');await h.mount();await h.click(h.label('任务'));await h.click(h.button('保存视图'));const dialog=h.query('dialog[open]'),input=h.label('常用视图名称');await h.input(input,'正在编辑的视图');
   await h.key(input,'n',{ctrlKey:true});assert.equal(h.query('dialog[open]'),dialog);assert.equal(document.querySelectorAll('dialog[open]').length,1);
   await h.key(input,'k',{ctrlKey:true});assert.equal(document.activeElement,input);assert.equal(input.value,'正在编辑的视图');assert.equal(document.querySelector('.inline-creator'),null);
  }finally{await h.close();}

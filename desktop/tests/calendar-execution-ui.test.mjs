@@ -29,7 +29,7 @@ test('Today execution comes before history; focus selection starts work directly
   await h.mount();assert.ok(h.query('.today-execution-grid').compareDocumentPosition(h.query('.today-history'))&window.Node.DOCUMENT_POSITION_FOLLOWING);assert.equal(document.querySelectorAll(`[data-progress-id="${id}"]`).length,1);assert.match(h.query(`[data-progress-id="${id}"]`).textContent,/20 分钟/);assert.equal(document.querySelectorAll('.session-entry').length,2);
   await h.click(h.button('选择重点'));await h.click(h.label('加入今日重点 今天推进',h.query('.today-focus-picker')));await h.click(h.label('开始计时 今天推进',h.query('.today-focus-list')));assert.equal(h.service.snapshot().timers[0].taskId,id);
   await h.command({type:'focus.pause',payload:{taskId:id}});await h.click(h.label('恢复计时 今天推进',h.query('.today-focus-list')));assert.equal(h.service.snapshot().timers[0].paused,false);
-  await h.command({type:'focus.stop',payload:{taskId:id,complete:true}});assert.match(h.query(`[data-progress-id="${id}"]`).textContent,/已完成/);await h.click(h.label('事项'));assert.equal(document.querySelector(`[data-outline-id="${id}"]`),null);assert.ok(h.query(`[data-outline-id="${other}"]`));
+  await h.command({type:'focus.stop',payload:{taskId:id,complete:true}});assert.match(h.query(`[data-progress-id="${id}"]`).textContent,/已完成/);await h.click(h.label('任务'));assert.equal(document.querySelector(`[data-outline-id="${id}"]`),null);assert.ok(h.query(`[data-outline-id="${other}"]`));
  }finally{await h.close();}
 });
 test('completed default migration preserves explicit saved views and later deliberate show-completed choice',async()=>{
@@ -39,6 +39,6 @@ test('completed default migration preserves explicit saved views and later delib
   const old={filter:{...emptyFilter(),showDone:true},activeView:'',selected:id,collapsed:[]};window.localStorage.setItem('test-tree',JSON.stringify(old));assert.equal(readTree('test-tree',state).filter.showDone,false);
   window.localStorage.setItem('test-tree',JSON.stringify({...old,completedDefaultVersion:1}));assert.equal(readTree('test-tree',state).filter.showDone,true);
   state.views.push({id:'saved',name:'全部截止',filter:old.filter});window.localStorage.setItem('test-tree',JSON.stringify({...old,activeView:'saved'}));assert.equal(readTree('test-tree',state).filter.showDone,true);
-  await h.mount();await h.click(h.label('事项'));assert.equal(h.label('显示已完成').checked,false);await h.click(h.label('显示已完成'));assert.ok(h.query(`[data-outline-id="${id}"]`));await h.click(h.label('今日'));await h.click(h.label('事项'));assert.equal(h.label('显示已完成').checked,true);assert.ok(h.query(`[data-outline-id="${id}"]`));
+  await h.mount();await h.click(h.label('任务'));assert.equal(h.label('显示已完成').checked,false);await h.click(h.label('显示已完成'));assert.ok(h.query(`[data-outline-id="${id}"]`));await h.click(h.label('今日'));await h.click(h.label('任务'));assert.equal(h.label('显示已完成').checked,true);assert.ok(h.query(`[data-outline-id="${id}"]`));
  }finally{await h.close();}
 });

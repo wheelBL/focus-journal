@@ -8,7 +8,7 @@ test('end-and-rest is visible for named and unnamed focus; countdown stays on ev
   h.clock.advance(25*60000);await h.click(h.button('结束并休息 5 分钟',h.query('.task-card')));
   assert.equal(h.service.snapshot().timers.length,0);assert.equal(document.querySelector('dialog'),null);
   assert.equal(h.label('休息剩余时间').textContent,'05:00');
-  for(const page of ['事项','日历','回顾','设置','今日']){await h.click(h.label(page));assert.ok(h.label('休息与下一次专注'));assert.equal(h.label('休息剩余时间').textContent,'05:00');}
+  for(const page of ['任务','日历','回顾','设置','今日']){await h.click(h.label(page));assert.ok(h.label('休息与下一次专注'));assert.equal(h.label('休息剩余时间').textContent,'05:00');}
   h.clock.advance(60000);await h.command({type:'break.acknowledge'});assert.equal(h.label('休息剩余时间').textContent,'04:00');
   h.clock.advance(240000);await h.action(()=>h.service.tick());await h.command({type:'break.acknowledge'});
   assert.match(h.label('休息与下一次专注').textContent,/欢迎回来/);assert.match(h.label('休息与下一次专注').textContent,/阅读技术资料/);assert.equal(h.service.snapshot().timers.length,0);

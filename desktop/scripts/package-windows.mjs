@@ -37,6 +37,7 @@ try{
     writeFileSync(path.join(stage,'qa-start.cjs'),`process.argv.push('--demo',${treePrototype?"'--tree-prototype',":''}'--data-dir',${JSON.stringify(dataDir)});require('./dist-electron/main.cjs');\n`);
     if(process.argv.includes('--smoke')){
       copyFileSync(path.join(root,'scripts/packaged-smoke.cjs'),path.join(stage,'qa-release-smoke.cjs'));
+      copyFileSync(path.join(root,'scripts/content-navigation-smoke.cjs'),path.join(stage,'qa-content-navigation.cjs'));
       writeFileSync(path.join(stage,'qa-start.cjs'),`require('./qa-release-smoke.cjs')(${JSON.stringify(dataDir)},${JSON.stringify(path.join(root,`qa-evidence/release-${pkg.version}`))},${JSON.stringify(pkg.version)});\n`,{flag:'a'});
     }
     if(releaseQa)writeFileSync(path.join(stage,'qa-start.cjs'),`require('electron').app.whenReady().then(()=>{const {safeStorage}=require('electron'),fs=require('node:fs'),path=require('node:path');const sample='focus-journal-QA-synthetic-not-a-credential';try{const available=safeStorage.isEncryptionAvailable(),cipher=safeStorage.encryptString(sample),roundtrip=safeStorage.decryptString(cipher)===sample;fs.writeFileSync(path.join(${JSON.stringify(dataDir)},'vault-check.json'),JSON.stringify({available,roundtrip,cipherDiffers:!cipher.includes(Buffer.from(sample)),checkedAt:new Date().toISOString()}));}catch{fs.writeFileSync(path.join(${JSON.stringify(dataDir)},'vault-check.json'),JSON.stringify({available:false,roundtrip:false}));}});\n`,{flag:'a'});
@@ -48,13 +49,13 @@ try{
   'Windows 0.30.1 起统一使用用户目录下的 .focus-journal 文件夹，不随快捷方式、命令行、Codex 或 EXE 所在位置改变。首次升级复制原数据、备份、本机偏好和加密配置，校验成功后才切换；原目录保留。',
   '首次迁移前请退出旧版。发现多份不同的历史工作区时需选择继续使用哪份，不自动合并。数据目录或数据库缺失、损坏时明确报错，不悄悄创建空白数据。升级后请更新仍指向旧版的快捷方式，并使用新版 EXE。',
   '分组：树中右键新增分组或新增子分组；已有事项可转为分组，保留身份、子项、历史投入与估计。分组不计时、不完成，只汇总下面事项；执行与截止视图不将分类计为任务。转换前先结束本项计时并处理仍生效的执行安排。',
-  '数据结构升级至20前自动备份；使用分组后，同步设备请升级至0.31.0或更新版本，旧版不能打开新数据。',
+  '数据结构升级至22前自动备份；任务、笔记和提醒独立入口共享分组，保留原始关系和投入。同步设备请升级至0.33.0或更新版本，旧版不能打开新数据。',
   '顶部或托盘选择“先计时”，无需提前创建事项。结束后可新建或关联已有事项，也可稍后补充。今日的待补充事项保留跨日期记录，日历与投入复盘也可补充；原始起止时间、暂停片段和时长保留，不重复计入。',
   '窗口变化时页面自适应；事项采用紧凑行，日历填满剩余高度，今日执行区、重点选择与进展汇总适应窗口宽度，下方保留时间线。','日历空白处双击创建事项提醒，时间可修改；详情可改期或移除。虚线提醒不计入投入。应用运行时到点显示置顶卡片并按设置发声，退出期间错过的提醒在下次启动补提醒。','日/周日历拖选时段或右键：设置提醒、添加事件、补记投入。补记关联已有事项或一起新建，同步更新事项实际开始和累计投入；提醒与事件不计投入。点击实际时间块可校正并保留修改历史。',
   '交接给他人：事项右键或详情选择交接，填写接手人；可继续跟进并设置独立提醒。交接即关闭本人责任，退出默认待办与逾期清单，不计完成，保留本人投入，子项仅处理明确勾选的部分。已交接、待他人跟进视图可随时查看。',
   '完成归属区分本人、他人、共同完成和未注明；旧已完成记录不推断归属。回顾的活动记录可查看业务变化、轻量操作和AI使用。轻量摘要仅记录操作、入口、结果和版本，无鼠标轨迹或输入值，可暂停、清空和导出。AI文本仅保存在本机，最近保留200次，不进入日志同步。',
   '精简操作层级：事项页的“视图选项”提供保存视图、显示已完成、展开折叠和视图管理；默认筛选不重复占一行，自定义条件仍显示。',
-  '详情计划开始、截止和标签直接编辑；尚未设置的提醒、重复与定期审视在“更多安排”，已有安排仍直接显示。AI 与聚焦分支在“更多操作”。',
+  '详情计划开始、截止、标签和提醒直接编辑；任务重复与提醒重复分别管理。笔记可保留原文生成关联任务；收件箱可以就地整理并进入下一条。',
   '设置每次显示一个分类；切换分类保留未保存的输入，离开设置页前请保存。日历操作说明可按需展开，有已删除投入时才显示恢复入口。',
   '今日先展示当前计时和接下来要做的事，旁边可选择重点并直接开始或恢复；今日进展按事项汇总投入、成果与完成情况，时间线按发生顺序保留。',
   '审视说明、推迟日期和子项选择会随事项保存在本机，切换事项或离开页面后可继续；标记已审视才写入历史，稍后审视保留未提交的说明。',

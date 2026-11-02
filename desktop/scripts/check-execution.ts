@@ -41,7 +41,7 @@ async function main(){try{
   const result=await run(`(()=>{const e=document.querySelector('.today-execution-grid').getBoundingClientRect(),h=document.querySelector('.today-history').getBoundingClientRect();return {overflow:document.documentElement.scrollWidth>innerWidth+1,executionBeforeHistory:e.top<h.top,progressRows:document.querySelectorAll('[data-progress-id="${task}"]').length};})()`);
   checks.push({page:'today',width,height,zoom,...result});if(result.overflow||!result.executionBeforeHistory||result.progressRows!==1)failures.push('Today execution layout');await capture(`today-${width}-${zoom}.png`);
  }
- win.setContentSize(1487,1058);win.webContents.setZoomFactor(1);await pointer('.nav-item[aria-label="事项"]');await until(`!!document.querySelector('[aria-label="显示已完成"]')`);
+ win.setContentSize(1487,1058);win.webContents.setZoomFactor(1);await pointer('.nav-item[aria-label="任务"]');await until(`!!document.querySelector('[aria-label="显示已完成"]')`);
  if(await run(`document.querySelector('[aria-label="显示已完成"]').checked||!!document.querySelector('[data-outline-id="${closed}"]')`))failures.push('Default completed visibility');
  await pointer('.nav-item[aria-label="今日"]');await pointer(`[aria-label="开始计时 撰写本周交付记录"]`);if(!service.snapshot().timers.some(r=>r.taskId===other))failures.push('Focus pointer start');time+=60000;service.execute({type:'focus.pause',payload:{taskId:other}});win.webContents.send('journal:changed');await pointer(`[aria-label="恢复计时 撰写本周交付记录"]`);if(service.snapshot().timers[0].paused)failures.push('Focus pointer resume');service.execute({type:'focus.stop',payload:{taskId:other}});service.execute({type:'break.stop'});win.webContents.send('journal:changed');
  await pointer('.nav-item[aria-label="日历"]');

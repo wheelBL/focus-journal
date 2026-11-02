@@ -61,7 +61,7 @@ async function main(){try{
  }
  win.setContentSize(1487,1058);win.webContents.setZoomFactor(1);await delay(120);
  const added=await command('item.create',{title:'API 联动验证事项',tagNames:['API验证']});if(added.status!==200)throw Error(JSON.stringify(added.body));const id=added.body.data.createdItemIds[0];
- await command('item.focus',{id});await click('[aria-label="事项"]');await until(`!!document.querySelector('[data-outline-id="${id}"] .daily-focus-badge')`);
+ await command('item.focus',{id});await click('[aria-label="任务"]');await until(`!!document.querySelector('[data-outline-id="${id}"] .daily-focus-badge')`);
  const started=await command('focus.start',{taskId:id}),sid=started.body.data.createdSessionIds[0];await until(`document.querySelector('[data-outline-id="${id}"]').textContent.includes('计时中')||document.querySelector('[data-outline-id="${id}"]').textContent.includes('专注中')`);
  await command('focus.pause',{sessionId:sid});await command('focus.stop',{sessionId:sid});await command('session.manual',{taskId:id,date:'2026-10-19',minutes:20,summary:'通过接口补记'});
  if((await get('/items/'+id)).body.data.effort.ownMs<1200000)throw Error('Manual effort missing');

@@ -50,7 +50,7 @@ test('returning after midnight updates relative saved views and picks up journal
  const h=await appDom();try{
   const first=h.add('昨日计划','inbox',{plannedDate:'2026-10-19'}),next=h.add('今日计划','inbox',{plannedDate:'2026-10-20'});
   const view=h.service.execute({type:'view.save',payload:{name:'当天计划',filter:{...emptyFilter(),planned:'today'}}}).state.views[0];window.journal.clock=async()=>h.service.clockSnapshot();const hidden=visibility(h);
-  await h.mount();await h.click(h.label('事项'));await h.input(h.label('常用视图'),view.id);assert.ok(document.querySelector(`[data-outline-id="${first}"]`));
+  await h.mount();await h.click(h.label('任务'));await h.input(h.label('常用视图'),view.id);assert.ok(document.querySelector(`[data-outline-id="${first}"]`));
   await hidden(true);h.clock.advance(86400000);h.service.execute({type:'outline.patch',payload:{id:next,field:'title',value:'后台已更新的今日计划'}});await hidden(false);
   assert.equal(document.querySelector(`[data-outline-id="${first}"]`),null);assert.match(h.query(`[data-outline-id="${next}"]`).textContent,/后台已更新的今日计划/);
  }finally{await h.close();}

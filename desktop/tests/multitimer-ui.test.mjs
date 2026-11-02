@@ -34,7 +34,7 @@ test('full app concurrent timers keep tree, Today, dock and summaries synchroniz
  await action(()=>root.render(React.createElement(App)));
  try{
   await t.test('tree starts a second timer with a nonblocking reminder and keeps both rows active',async()=>{
-   await click(label('事项'));await click(label('开始写作'));clock.advance(10000);await click(label('开始阅读'));
+   await click(label('任务'));await click(label('开始写作'));clock.advance(10000);await click(label('开始阅读'));
    assert.equal(service.snapshot().timers.length,2);assert.equal(document.querySelectorAll('.outline-row.timing').length,2);
    assert.match(query('.toast[role=status]').textContent,/每次只做一件事情/);assert.equal(label('开始练习').disabled,false);
    await click(label('开始写作'));assert.equal(service.snapshot().timers.length,2);
@@ -69,7 +69,7 @@ test('full app concurrent timers keep tree, Today, dock and summaries synchroniz
   await t.test('recovered sessions are visible individually and preserving records across page switches',async()=>{
    service.execute({type:'focus.start',payload:{taskId:a}});service.execute({type:'focus.start',payload:{taskId:c}});clock.advance(5000);service.suspend();await action(()=>changed());
    await click(label('今日'));assert.equal(document.querySelectorAll('.recovery-notice').length,2);
-   const count=service.snapshot().state.sessions.length;await click(label('事项'));await click(label('今日'));assert.equal(service.snapshot().state.sessions.length,count);
+   const count=service.snapshot().state.sessions.length;await click(label('任务'));await click(label('今日'));assert.equal(service.snapshot().state.sessions.length,count);
    assert.equal(label('查看日期').value,localDate(clock.now()));
   });
  }finally{await action(()=>root.unmount());service.shutdown();dom.window.close();}

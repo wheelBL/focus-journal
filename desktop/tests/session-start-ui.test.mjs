@@ -40,7 +40,7 @@ test('named timing exposes the same editor in Today, the dock and item details; 
   const taskId=h.add('已经做了40分钟'),other=h.add('并行的事');await h.mount();await h.command({type:'focus.start',payload:{taskId}});await h.command({type:'focus.start',payload:{taskId:other}});
   const before=h.service.snapshot().timers.find(t=>t.taskId===other);await h.click(h.label('调整开始时间 已经做了40分钟',h.query('.today-page')));await h.click(h.button('40 分钟前'));await h.click(h.button('保存并继续计时'));
   assert.deepEqual(h.service.snapshot().timers.find(t=>t.taskId===other),before);assert.equal(h.service.snapshot().timers.find(t=>t.taskId===taskId).durationMs,40*60000);
-  await h.click(h.label('事项'));assert.ok(h.label('调整开始时间 已经做了40分钟',h.query('.timer-dock')));
+  await h.click(h.label('任务'));assert.ok(h.label('调整开始时间 已经做了40分钟',h.query('.timer-dock')));
   await h.click(h.query(`[data-outline-id="${taskId}"]`));assert.ok(h.label('调整开始时间 已经做了40分钟',h.query('.task-inspector')));
   await h.click(h.label('调整开始时间 已经做了40分钟',h.query('.task-inspector')));assert.match(h.query('dialog').textContent,/已经做了40分钟/);await h.click(h.button('取消'));
  }finally{await h.close();}

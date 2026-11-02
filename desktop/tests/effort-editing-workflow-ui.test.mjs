@@ -55,7 +55,7 @@ test('manual entry does not guess Inbox without context and searches item paths 
 test('a zero-second ended record can still be corrected without inventing time',async()=>{
  const h=await appDom();try{
   const taskId=h.add('零时长成果');h.service.execute({type:'focus.start',payload:{taskId}});h.service.execute({type:'focus.stop',payload:{taskId}});const original=h.service.snapshot().state.sessions[0];assert.equal(original.durationMs,0);
-  await h.mount();await h.click(h.label('事项'));await h.click(h.query(`[data-outline-id="${taskId}"]`));await h.click(h.query('[data-inspector-tab="records"]'));await h.click(h.button('校正',h.query('.task-inspector')));await h.input(h.label('这段时间的进展'),'只补充记录说明');await h.input(h.label('校正原因'),'补写说明');assert.equal(h.button('保存记录',h.query('dialog')).disabled,false);await h.click(h.button('保存记录',h.query('dialog')));
+  await h.mount();await h.click(h.label('任务'));await h.click(h.query(`[data-outline-id="${taskId}"]`));await h.click(h.query('[data-inspector-tab="records"]'));await h.click(h.button('校正',h.query('.task-inspector')));await h.input(h.label('这段时间的进展'),'只补充记录说明');await h.input(h.label('校正原因'),'补写说明');assert.equal(h.button('保存记录',h.query('dialog')).disabled,false);await h.click(h.button('保存记录',h.query('dialog')));
   const saved=h.service.snapshot().state.sessions[0];assert.equal(document.querySelector('dialog'),null);assert.equal(saved.summary,'只补充记录说明');assert.equal(saved.durationMs,0);assert.deepEqual(saved.segments,original.segments);
  }finally{await h.close();}
 });

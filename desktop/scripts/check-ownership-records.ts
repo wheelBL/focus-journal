@@ -1,5 +1,5 @@
 export async function checkOwnershipRecords({win,js,click,button,input,key,capture,check,settle,until,service,usage}:any){
- await js(`window.journalAppearance.set({theme:'light',motion:'reduce'})`);await click('.top-navigation [aria-label="事项"]');await button('全部事项','.context-nav');
+ await js(`window.journalAppearance.set({theme:'light',motion:'reduce'})`);await click('.top-navigation [aria-label="任务"]');await button('全部事项','.context-nav');
  const task=service.snapshot().state.tasks.find((t:any)=>t.title==='梳理任务树与详情的操作动线'),row=`[data-outline-id="${task.id}"]`;
  const before=service.snapshot().state.sessions.filter((r:any)=>r.taskId===task.id).reduce((n:number,r:any)=>n+r.durationMs,0);
  await click(row+' .tree-title>.editable-value',1,'right');await button('交接给他人…','[role=menu]');await until(`!!document.querySelector('[aria-label="接手人"]')`);await input('[aria-label="接手人"]','协作同事');await click('[aria-label="继续跟进"]');

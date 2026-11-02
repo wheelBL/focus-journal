@@ -56,8 +56,8 @@ test('conversion undo restores the whole task, while later changes block partial
 test('schema 20 is backed up before upgrade without altering contents and reminders do not count as tasks',()=>{
  const folder=mkdtempSync(path.resolve('qa-data/pure-reminder-migration-'));let service:JournalService|undefined;
  try{const file=path.join(folder,'journal.sqlite'),old=new SqliteJournalStore(file),state=emptyState();state.schemaVersion=20;old.save(state);old.close();service=new JournalService(new SqliteJournalStore(file),new Clock());
-  const backup=readdirSync(path.join(folder,'backups')).find(n=>n.startsWith('before-schema-20-to-21-'));assert.ok(backup);const db=new DatabaseSync(path.join(folder,'backups',backup),{readOnly:true});try{assert.equal((db.prepare('PRAGMA user_version').get() as {user_version:number}).user_version,20);}finally{db.close();}
-  assert.equal(service.snapshot().state.schemaVersion,21);const parent=cmd(service,'outline.create',{title:'parent',parentId:null}).state.tasks.at(-1)!.id;const child=cmd(service,'outline.create',{title:'reminder',parentId:parent}).state.tasks.at(-1)!.id;cmd(service,'reminder.convert',{id:child,at:'2026-01-31T01:00:00.000Z',rule:null});assert.equal(outlineIndex(service.snapshot().state).stats.get(parent)!.tasks,1);
+  const backup=readdirSync(path.join(folder,'backups')).find(n=>n.startsWith('before-schema-20-to-22-'));assert.ok(backup);const db=new DatabaseSync(path.join(folder,'backups',backup),{readOnly:true});try{assert.equal((db.prepare('PRAGMA user_version').get() as {user_version:number}).user_version,20);}finally{db.close();}
+  assert.equal(service.snapshot().state.schemaVersion,22);const parent=cmd(service,'outline.create',{title:'parent',parentId:null}).state.tasks.at(-1)!.id;const child=cmd(service,'outline.create',{title:'reminder',parentId:parent}).state.tasks.at(-1)!.id;cmd(service,'reminder.convert',{id:child,at:'2026-01-31T01:00:00.000Z',rule:null});assert.equal(outlineIndex(service.snapshot().state).stats.get(parent)!.tasks,1);
  }finally{service?.shutdown();rmSync(folder,{recursive:true,force:true});}
 });
 

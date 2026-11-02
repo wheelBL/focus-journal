@@ -9,7 +9,7 @@ module.exports=(dataDir,output,expectedVersion)=>{
  const check=(ok,label)=>{if(!ok)throw Error(label);checks.push(label);};
  const run=(w,code)=>w.webContents.executeJavaScript(code);
  const until=async(fn,label)=>{for(let i=0;i<100;i++){if(await fn())return;await wait(40);}throw Error(label);};
- const timeout=setTimeout(()=>{failures.push('Packaged smoke timeout');app.quit();},45000);
+ const timeout=setTimeout(()=>{failures.push('Packaged smoke timeout');app.quit();},90000);
  app.on('will-quit',()=>{clearTimeout(timeout);const remainingWindows=BrowserWindow.getAllWindows().length;if(!finished)failures.push('Smoke did not finish');if(remainingWindows)failures.push('Windows remain at exit');fs.writeFileSync(path.join(output,restart?'packaged-restart.json':'packaged-smoke.json'),JSON.stringify({version:app.getVersion(),checks,failures,diagnostics,remainingWindows,dataDir,packaged:app.isPackaged},null,2));});
  void app.whenReady().then(async()=>{try{
   await until(()=>BrowserWindow.getAllWindows().some(w=>!w.webContents.getURL().includes('panel=')),'Main window missing');
@@ -92,14 +92,14 @@ module.exports=(dataDir,output,expectedVersion)=>{
   const groupCreated=await run(main,`window.journal.command({type:'outline.create',payload:{title:'发布验证：工作分类',kind:'group',parentId:null}})`),groupId=groupCreated.state.tasks.at(-1).id;
   const subgroupCreated=await run(main,`window.journal.command({type:'outline.create',payload:{title:'发布验证：嵌套分类',kind:'group',parentId:${JSON.stringify(groupId)}}})`),subgroupId=subgroupCreated.state.tasks.at(-1).id;
   const groupChild=await run(main,`window.journal.command({type:'outline.create',payload:{title:'发布验证：分类中的实际工作',parentId:${JSON.stringify(subgroupId)}}})`),childId=groupChild.state.tasks.at(-1).id;
-  check(groupChild.state.schemaVersion===21&&groupChild.state.tasks.find(t=>t.id===subgroupId).parentId===groupId,'Packaged groups persist explicit type and arbitrary nested identities');
+  check(groupChild.state.schemaVersion===22&&groupChild.state.tasks.find(t=>t.id===subgroupId).parentId===groupId,'Packaged groups persist explicit type and arbitrary nested identities');
   check(await run(main,`window.journal.command({type:'focus.start',payload:{taskId:${JSON.stringify(groupId)}}}).then(()=>false,()=>true)`),'Packaged backend refuses execution on a group');
   const childStarted=await run(main,`window.journal.command({type:'focus.start',payload:{taskId:${JSON.stringify(childId)}}})`);
   check(childStarted.timers.some(t=>t.taskId===childId),'A task under nested groups remains executable');
   await run(main,`window.journal.command({type:'focus.stop',payload:{taskId:${JSON.stringify(childId)}}})`);
   await run(main,`window.journal.command({type:'break.stop'})`);
   main.setContentSize(1440,900);
-  await run(main,`document.querySelector('.top-navigation [aria-label="事项"]').click()`);
+  await run(main,`document.querySelector('.top-navigation [aria-label="任务"]').click()`);
   await until(()=>run(main,`!!document.querySelector('[data-outline-id="${groupId}"]')`),'Group row missing');
   await run(main,`document.querySelector('[data-outline-id="${groupId}"]').click()`);
   await until(()=>run(main,`document.querySelector('.task-inspector')?.textContent.includes('分组详情')`),'Group inspector missing');
@@ -154,8 +154,12 @@ module.exports=(dataDir,output,expectedVersion)=>{
   await run(reminderCard,`window.reminder.action('dismiss','item:'+${JSON.stringify(reminderId)})`);
   const reminderItem=await run(main,`window.journal.snapshot().then(s=>s.state.tasks.find(t=>t.id===${JSON.stringify(reminderId)}))`);
   check(reminderItem.status==='open'&&reminderItem.reminder.at>new Date().toISOString(),'Recurring reminder advances without marking task complete');
-  await until(()=>run(main,`!!document.querySelector('[data-outline-id="${reminderId}"]')`),'Reminder row missing');
-  check(await run(main,`(()=>{const row=document.querySelector('[data-outline-id="${reminderId}"]');return !row.querySelector('input[type=checkbox],.row-start')&&row.textContent.includes('循环提醒');})()`),'Reminder row has its own label and no execution controls');
+  await until(()=>run(main,`!document.querySelector('[data-outline-id="${reminderId}"]')`),'Pure reminder must leave task-only tree');
+  await run(main,`document.querySelector('.top-navigation [aria-label="提醒"]').click()`);
+  await until(()=>run(main,`!!document.querySelector('.content-reminder-row')&&document.querySelector('.reminders-page').textContent.includes('发布验证：循环提醒')`),'Reminder missing in independent reminder page');
+  check(await run(main,`!document.querySelector('.reminders-page input[type=checkbox][aria-label*="完成"],.reminders-page .row-start')`),'Pure reminder has no task completion or timer controls');
+  await run(main,`document.querySelector('.top-navigation [aria-label="任务"]').click()`);
+  await until(()=>run(main,`!!document.querySelector('.outline-scroll')`),'Task tree did not return');
   const originalBounds=main.getBounds();main.setMinimumSize(900,500);main.setSize(1100,600);
   const menuId=await run(main,`window.journal.command({type:'task.save',payload:{title:'发布验证：长菜单',parentId:null}}).then(s=>s.state.tasks.at(-1).id)`);
   await until(()=>run(main,`!!document.querySelector('[data-outline-id="${menuId}"]')`),'Menu test row missing');
@@ -172,14 +176,15 @@ module.exports=(dataDir,output,expectedVersion)=>{
   await run(main,`window.journal.command({type:'inbox-review.settings',payload:{enabled:true,time:'00:00'}})`);
   await until(()=>run(reminderCard,`!!document.querySelector('button')&&document.body.textContent.includes('整理收件箱')`),'Inbox review card missing');
   await run(reminderCard,`window.reminder.action('open','inbox-review')`);
-  await until(()=>run(main,`!!document.querySelector('[aria-label="收件箱整理提醒设置"]')&&document.querySelector('.tree-page-header h1').textContent.startsWith('收件箱')`),'Inbox card did not open its dedicated view');
+  await until(()=>run(main,`!!document.querySelector('[aria-label="收件箱整理提醒设置"]')&&!!document.querySelector('.inbox-page')`),'Inbox card did not open its dedicated view');
   check(await run(main,`!document.querySelector('[data-outline-id="inbox"]')&&document.body.textContent.includes('待整理笔记')`),'Dedicated Inbox shows contents without the container row');
   fs.writeFileSync(path.join(output,'inbox-view.png'),(await main.webContents.capturePage()).toPNG());
   await run(main,`window.journal.command({type:'inbox-review.settings',payload:{enabled:false,time:'09:00'}})`);
+  await require('./qa-content-navigation.cjs')({main,run,until,check,wait,output,groupId,childId});
   await run(main,`window.journalAppearance.set({theme:'dark',motion:'reduce'})`);
   await run(main,`document.querySelector('.top-navigation [aria-label="今日"]').click()`);
   await until(()=>run(main,`!!document.querySelector('.today-page')`),'Today did not return after groups');
   const saved=await run(main,'window.journal.snapshot()');fs.writeFileSync(path.join(output,'persisted-evidence.json'),JSON.stringify({tasks:saved.state.tasks,sessions:saved.state.sessions,deletedSessions:saved.state.deletedSessions,activities:saved.state.activities}));
   finished=true;
- }catch(e){failures.push(String(e));for(const w of BrowserWindow.getAllWindows())diagnostics.push({title:w.getTitle(),visible:w.isVisible(),minimized:w.isMinimized(),url:w.webContents.getURL(),bounds:w.getBounds()});}finally{clearTimeout(timeout);app.quit();}});
+ }catch(e){failures.push(String(e));for(const w of BrowserWindow.getAllWindows()){diagnostics.push({title:w.getTitle(),visible:w.isVisible(),minimized:w.isMinimized(),url:w.webContents.getURL(),bounds:w.getBounds()});try{if(!w.webContents.getURL().includes('panel='))fs.writeFileSync(path.join(output,'failure.png'),(await w.webContents.capturePage()).toPNG());}catch{}}}finally{clearTimeout(timeout);app.quit();}});
 };

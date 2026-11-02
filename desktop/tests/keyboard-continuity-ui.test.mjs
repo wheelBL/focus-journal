@@ -10,7 +10,7 @@ function holdPatch(){
 
 test('inline rename returns keyboard focus to the tree for the next action after save, cancel and unchanged Enter',async()=>{
  const h=await appDom();try{
-  const first=h.add('第一项'),second=h.add('第二项');await h.mount();await h.click(h.label('事项'));await h.input(h.label('视图排序'),'manual');
+  const first=h.add('第一项'),second=h.add('第二项');await h.mount();await h.click(h.label('任务'));await h.input(h.label('视图排序'),'manual');
   const row=id=>h.query(`[data-outline-id="${id}"]`);
   await h.click(row(first));await h.action(()=>row(first).focus());await h.key(document.activeElement,'F2');await h.input(document.activeElement,'第一项已改名');await h.key(document.activeElement,'Enter');
   assert.equal(document.activeElement,row(first));assert.equal(h.get(first).title,'第一项已改名');
@@ -24,7 +24,7 @@ test('inline rename returns keyboard focus to the tree for the next action after
 
 test('inspector inline fields return to their own trigger and preserve multiline and IME input',async()=>{
  const h=await appDom();try{
-  const id=h.add('说明事项');await h.mount();await h.click(h.label('事项'));await h.click(h.query(`[data-outline-id="${id}"]`));
+  const id=h.add('说明事项');await h.mount();await h.click(h.label('任务'));await h.click(h.query(`[data-outline-id="${id}"]`));
   await h.click(h.label('事项说明：未填写'));await h.input(document.activeElement,'第一行\n第二行');
   await h.key(document.activeElement,'Enter',{ctrlKey:true,isComposing:true});assert.ok(document.activeElement.matches('textarea'));assert.equal(h.get(id).description,'');
   await h.key(document.activeElement,'Enter',{ctrlKey:true});assert.equal(document.activeElement.getAttribute('aria-label'),'事项说明：第一行\n第二行');assert.equal(h.get(id).description,'第一行\n第二行');
@@ -34,7 +34,7 @@ test('inspector inline fields return to their own trigger and preserve multiline
 
 for(const outcome of ['success','failure'])test(`delayed inline ${outcome} preserves focus moved to another field`,async()=>{
  const h=await appDom();let gate;try{
-  const id=h.add('保存中的事项');await h.mount();await h.click(h.label('事项'));const row=h.query(`[data-outline-id="${id}"]`);
+  const id=h.add('保存中的事项');await h.mount();await h.click(h.label('任务'));const row=h.query(`[data-outline-id="${id}"]`);
   await h.click(row);await h.action(()=>row.focus());await h.key(document.activeElement,'F2');await h.input(document.activeElement,'提交名称');gate=holdPatch();
   await h.key(document.activeElement,'Enter');const search=h.label('在事项树中搜索');await h.action(()=>search.focus());assert.equal(gate.calls,1);
   await h.action(outcome==='success'?gate.finish:gate.fail);assert.equal(document.activeElement,search);
@@ -44,7 +44,7 @@ for(const outcome of ['success','failure'])test(`delayed inline ${outcome} prese
 
 test('blur saves an inline draft without moving focus back into the edited row',async()=>{
  const h=await appDom();let gate;try{
-  const id=h.add('自动保存事项');await h.mount();await h.click(h.label('事项'));const row=h.query(`[data-outline-id="${id}"]`);
+  const id=h.add('自动保存事项');await h.mount();await h.click(h.label('任务'));const row=h.query(`[data-outline-id="${id}"]`);
   await h.click(row);await h.action(()=>row.focus());await h.key(document.activeElement,'F2');await h.input(document.activeElement,'离开后保存');gate=holdPatch();
   const search=h.label('在事项树中搜索');await h.action(()=>search.focus());assert.equal(gate.calls,1);await h.action(gate.finish);
   assert.equal(h.get(id).title,'离开后保存');assert.equal(document.activeElement,search);
@@ -53,7 +53,7 @@ test('blur saves an inline draft without moving focus back into the edited row',
 
 test('inspector tabs use one tab stop and arrow navigation while preserving selection across items',async()=>{
  const h=await appDom();try{
-  const first=h.add('第一项详情'),second=h.add('第二项详情');await h.mount();await h.click(h.label('事项'));await h.click(h.query(`[data-outline-id="${first}"]`));
+  const first=h.add('第一项详情'),second=h.add('第二项详情');await h.mount();await h.click(h.label('任务'));await h.click(h.query(`[data-outline-id="${first}"]`));
   const tabs=()=>[...h.label('详情内容').querySelectorAll('[role=tab]')],active=()=>tabs().find(tab=>tab.getAttribute('aria-selected')==='true');
   assert.deepEqual(tabs().map(tab=>tab.tabIndex),[0,-1,-1]);await h.action(()=>active().focus());
   for(const [key,title] of [['ArrowRight','投入 0'],['ArrowRight','复盘'],['ArrowRight','内容'],['ArrowLeft','复盘'],['Home','内容'],['End','复盘']]){

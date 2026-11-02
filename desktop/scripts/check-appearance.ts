@@ -60,7 +60,7 @@ async function main(){try{
  if(process.env.JOURNAL_QA_SIMPLIFY_ONLY==='1'){
   await js(`window.journalAppearance.set({theme:'light',motion:'reduce'})`);await capture('01-items');
   await click('.top-navigation [aria-label="今日"]');await capture('01b-today');
-  await js(`window.journalAppearance.set({theme:'dark',motion:'reduce'})`);await click('.top-navigation [aria-label="事项"]');await capture('08-dark-items');
+  await js(`window.journalAppearance.set({theme:'dark',motion:'reduce'})`);await click('.top-navigation [aria-label="任务"]');await capture('08-dark-items');
   await click('[aria-label=设置]');await until(`!!document.querySelector('#settings-appearance')`);await capture('10-dark-settings');
   await click('.top-navigation [aria-label="日历"]');await until(`!!document.querySelector('.calendar-page')`);await capture('12-dark-calendar');
   await js(`window.journalAppearance.set({theme:'light',motion:'reduce'})`);
@@ -82,7 +82,7 @@ async function main(){try{
  check(await js(`document.querySelector(${JSON.stringify(captureInput)}).getBoundingClientRect().height<=40`),'今日空白快速记录保持紧凑');
  await click(captureInput);check(await js(`document.querySelector(${JSON.stringify(captureInput)}).getBoundingClientRect().height>=60&&getComputedStyle(document.querySelector('.semantic-capture .capture-toolbar')).display!=='none'`),'输入时展开快速记录并显示保存操作');await click('.today-page h1');
  await js(`document.querySelector('.today-history').scrollIntoView({block:'end'})`);await capture('01c-timeline');
- await click('.top-navigation [aria-label="事项"]');await settle();
+ await click('.top-navigation [aria-label="任务"]');await settle();
  const branch=row('打磨事项工作区');
  await click(branch+' .tree-chevron');await until(`document.querySelector(${JSON.stringify(branch)}).getAttribute('aria-expanded')==='false'`);
  await click(branch+' .tree-chevron');await settle();
@@ -115,7 +115,7 @@ async function main(){try{
  check(await js(`document.querySelector('.today-history')&&document.querySelector('.today-plan')&&document.querySelectorAll('.today-timer').length===2`),'今日保留重点、并行计时、进展与时间线');
  await button('暂停','.today-timer');check(service.snapshot().timers.some(t=>t.paused),'今日暂停计时立即生效');
  await button('恢复专注','.today-timer');check(service.snapshot().timers.every(t=>!t.paused),'今日恢复计时立即生效');
- await click('.top-navigation [aria-label="事项"]');await settle();
+ await click('.top-navigation [aria-label="任务"]');await settle();
  await click(row('梳理任务树与详情的操作动线')+' .tree-title>.editable-value');await button('投入 2','.task-inspector');await capture('05-effort-details');
  check(await js(`!!document.querySelector('.inspector-records')`),'详情可查看累计投入与记录');await button('内容','.task-inspector');
  check(await js('window.__thingsMotion.detail>0'),'切换详情有局部内容动效');

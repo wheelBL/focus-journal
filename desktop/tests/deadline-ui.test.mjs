@@ -35,7 +35,7 @@ test('deadline precision works across tree, inspector, Today planning and task c
  const root=createRoot(query('#root'));await action(()=>root.render(React.createElement(App)));
  try{
   await t.test('tree opens date-only editor, switches to exact time and does not save a cancelled draft',async()=>{
-   await click(label('事项'));await openDeadline('截止时间 日期任务');let editor=label('截止时间 日期任务编辑');
+   await click(label('任务'));await openDeadline('截止时间 日期任务');let editor=label('截止时间 日期任务编辑');
    assert.equal(label('截止时间 日期任务',editor).type,'date');assert.match(editor.textContent,/不含当天/);assert.equal(label('截止时间 日期任务',editor).value,'2026-10-23');
    await input(label('截止时间 日期任务方式',editor),'datetime-local');await input(label('截止时间 日期任务',editor),'2026-10-23T15:30');await click(button('保存截止',editor));
    assert.equal(get(dateId).dueAt,new Date('2026-10-23T15:30').toISOString());assert.match(query('button[aria-label^="截止时间 日期任务："]').textContent,/15:30/);

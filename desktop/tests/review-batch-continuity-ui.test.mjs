@@ -14,7 +14,7 @@ function reviewItems(h){
 }
 function queueButton(h,title){return [...h.query('.review-queue').querySelectorAll('button')].find(button=>button.querySelector('strong')?.textContent===title);}
 async function openBatch(h,first,second){
- await h.click(h.label('事项'));const row=id=>h.query(`[data-outline-id="${id}"]`);await h.click(row(first));await h.action(()=>row(second).dispatchEvent(new MouseEvent('click',{bubbles:true,ctrlKey:true})));await h.click(h.button('整理所选…'));
+ await h.click(h.label('任务'));const row=id=>h.query(`[data-outline-id="${id}"]`);await h.click(row(first));await h.action(()=>row(second).dispatchEvent(new MouseEvent('click',{bubbles:true,ctrlKey:true})));await h.click(h.button('整理所选…'));
 }
 const positionKey=h=>`focus-journal-item-review-position.${encodeURIComponent(h.service.snapshot().dataPath)}`;
 
@@ -78,7 +78,7 @@ test('batch organization protects pending input and close, then retains failure 
 test('cancelling an unsaved batch makes no changes; a late batch response does not clear a newer selection',async()=>{
  const h=await appDom();try{
   const first=h.add('此前选择'),second=h.add('此前另一选择'),third=h.add('后来选择');await h.mount();await openBatch(h,first,second);await h.input(h.label('批量标签'),'放弃的标签');const before=h.service.exportJson();await h.click(h.button('返回',h.query('dialog')));assert.equal(h.service.exportJson(),before);
-  await h.click(h.button('整理所选…'));await h.input(h.label('批量标签'),'已提交的标签');const gate=holdCommand('items.batch');await h.click(h.button('确认添加标签'));await h.click(h.label('今日'));await h.click(h.label('事项'));const row=id=>h.query(`[data-outline-id="${id}"]`);await h.click(row(second));await h.action(()=>row(third).dispatchEvent(new MouseEvent('click',{bubbles:true,ctrlKey:true})));assert.match(h.query('.batch-toolbar').textContent,/已选 2 条/);
+  await h.click(h.button('整理所选…'));await h.input(h.label('批量标签'),'已提交的标签');const gate=holdCommand('items.batch');await h.click(h.button('确认添加标签'));await h.click(h.label('今日'));await h.click(h.label('任务'));const row=id=>h.query(`[data-outline-id="${id}"]`);await h.click(row(second));await h.action(()=>row(third).dispatchEvent(new MouseEvent('click',{bubbles:true,ctrlKey:true})));assert.match(h.query('.batch-toolbar').textContent,/已选 2 条/);
   await h.action(gate.finish);gate.restore();assert.match(h.query('.batch-toolbar').textContent,/已选 2 条/);assert.ok(row(third).classList.contains('batch-selected'));assert.equal(h.get(third).tagIds?.length??0,0);
  }finally{await h.close();}
 });

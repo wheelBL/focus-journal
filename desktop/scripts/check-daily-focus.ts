@@ -34,7 +34,7 @@ async function check(){try{
  win=new BrowserWindow({show:false,width:1487,height:1058,frame:false,webPreferences:{preload:path.join(root,'dist-electron/preload.cjs'),contextIsolation:true,nodeIntegration:false,sandbox:true,offscreen:true,backgroundThrottling:false}});
  win.webContents.on('console-message',(_e,level,message)=>{if(level>=3)failures.push(message);});
  await win.webContents.session.clearStorageData({storages:['localstorage']});await win.loadFile(path.join(root,'dist/client/index.html'));await until(`!!document.querySelector('.today-page')`);await run('document.fonts.ready');
- await click('.nav-item[aria-label="事项"]');await click(`[data-outline-id="${focus}"] .tree-title .editable-value`);
+ await click('.nav-item[aria-label="任务"]');await click(`[data-outline-id="${focus}"] .tree-title .editable-value`);
  await click('[aria-label="加入今日重点 完成方案初稿与关键交互说明"]');await until(`!!document.querySelector('[data-outline-id="${focus}"] .daily-focus-badge')`);
  const first=await run(`document.querySelector('.outline-row[aria-level="1"]').dataset.outlineId`);if(first!==parent)throw Error('Focused branch was not promoted');
  for(const [width,height,zoom] of [[1487,1058,1],[900,640,1.25],[1060,720,1.5]]){
@@ -53,7 +53,7 @@ async function check(){try{
  }
  win.setContentSize(1487,1058);win.webContents.setZoomFactor(1);await delay(100);
  service.execute({type:'focus.stop',payload:{taskId:focus,complete:true}});changed();await until(`document.querySelector('[aria-label="今日重点清单"]').textContent.includes('已完成 2 / 3')`);
- await click('.nav-item[aria-label="事项"]');await run(`(()=>{const b=[...document.querySelectorAll('[aria-label="事项视图"] button')].find(e=>e.querySelector('span')?.textContent==='今日重点');b.dataset.qaClick='focus-view';})()`);await click('[data-qa-click="focus-view"]');await until(`!document.querySelector('[data-outline-id="${parent}"]')`);
+ await click('.nav-item[aria-label="任务"]');await run(`(()=>{const b=[...document.querySelectorAll('[aria-label="事项视图"] button')].find(e=>e.querySelector('span')?.textContent==='今日重点');b.dataset.qaClick='focus-view';})()`);await click('[data-qa-click="focus-view"]');await until(`!document.querySelector('[data-outline-id="${parent}"]')`);
  win.webContents.reload();await until(`!!document.querySelector('[data-outline-id="${paused}"]')`);
  if(await run(`!!document.querySelector('[data-outline-id="${focus}"]')`))throw Error('Completed item reappeared after reload');
  time=Date.parse('2026-10-21T00:00:00+08:00');changed();await until(`!document.querySelector('[data-outline-id="${paused}"]')`);

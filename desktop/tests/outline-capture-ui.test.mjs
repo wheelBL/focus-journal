@@ -4,7 +4,7 @@ import {appDom} from './app-dom.mjs';
 
 test('outline capture, note information and automatic order work through actual components',async t=>{
  const h=await appDom(),{add,get,service,mount,click,key,input,label,query,button,context,action,command}=h;
- const a=add('第一件事'),b=add('第二件事');await mount();await click(label('事项'));
+ const a=add('第一件事'),b=add('第二件事');await mount();await click(label('任务'));
  const row=id=>query(`[data-outline-id="${id}"]`),last=()=>service.snapshot().state.tasks.at(-1);
  const submit=()=>action(()=>label('新事项名称').form.requestSubmit());
  try{
@@ -24,16 +24,15 @@ test('outline capture, note information and automatic order work through actual 
   let note;
   await t.test('hyphen capture and context entry create information with tags and body but no task controls',async()=>{
    await click(row(a));await key(row(a),'Insert');await input(label('新事项名称'),'- 参考信息');await key(label('新事项名称'),'Enter',{ctrlKey:true});note=last().id;assert.equal(get(note).itemType,'note');assert.equal(get(note).title,'参考信息');
-   assert.equal(row(note).querySelector('input[type="checkbox"]'),null);assert.equal(row(note).querySelector('.row-start'),null);assert.equal(row(note).querySelector('.tree-estimate .editable-value'),null);
-   const inspector=query('.task-inspector');assert.ok(!inspector.textContent.includes('初始估计'));assert.ok(!inspector.textContent.includes('计划开始'));
-   await click(label('笔记内容：未填写'));await input(label('笔记内容'),'接口响应字段参考');await key(label('笔记内容'),'Enter',{ctrlKey:true});await input(label('自定义标签'),'资料');await action(()=>label('自定义标签').form.requestSubmit());assert.equal(get(note).description,'接口响应字段参考');assert.equal(get(note).tagIds.length,1);
-   await key(row(note),' ');await key(row(note),'Enter',{ctrlKey:true});assert.equal(service.snapshot().timers.length,0);assert.equal(get(note).status,'open');
-   await context(row(note));await click(button('新增子笔记'));await input(label('新事项名称'),'子参考');await key(label('新事项名称'),'Enter',{ctrlKey:true});assert.equal(last().itemType,'note');assert.equal(last().parentId,note);
+   assert.equal(document.querySelector(`[data-outline-id="${note}"]`),null);await click(label('笔记'));const noteRow=[...query('[aria-label="笔记列表"]').querySelectorAll('.content-note-row')].find(el=>el.querySelector('strong')?.textContent==='参考信息');assert.ok(noteRow);await click(noteRow);
+   assert.equal(noteRow.querySelector('input[type="checkbox"]'),null);assert.equal(noteRow.querySelector('.row-start'),null);assert.equal(noteRow.querySelector('.tree-estimate .editable-value'),null);const editor=query('[aria-label="笔记详情"]');assert.ok(!editor.textContent.includes('初始估计'));assert.ok(!editor.textContent.includes('计划开始'));
+   await input(label('笔记正文'),'接口响应字段参考');await key(label('笔记正文'),'Enter',{ctrlKey:true});await input(label('自定义标签'),'资料');await action(()=>label('自定义标签').form.requestSubmit());assert.equal(get(note).description,'接口响应字段参考');assert.equal(get(note).tagIds.length,1);assert.equal(service.snapshot().timers.length,0);assert.equal(get(note).status,'open');
+   await click(label('任务'));await context(row(a));await click(button('新增子笔记'));await input(label('新事项名称'),'子参考');await key(label('新事项名称'),'Enter',{ctrlKey:true});assert.equal(last().itemType,'note');assert.equal(last().parentId,a);assert.equal(document.querySelector(`[data-outline-id="${last().id}"]`),null);
   });
-  await t.test('information type filter and global search find notes; conversion preserves identity and content',async()=>{
-   await click(button('筛选'));await input(label('筛选条目类型'),'note');assert.ok(row(note));assert.equal(document.querySelector(`[data-outline-id="${b}"]`),null);
-   await click(row(note));await click(button('转为事项'));assert.equal(get(note).itemType,'task');assert.equal(get(note).description,'接口响应字段参考');assert.ok(row(note));assert.match(query('.retained-notice').textContent,/不符合/);
-   await click(button('清除筛选'));assert.ok(label('开始参考信息'));await input(label('搜索任务和笔记'),'接口响应字段参考');assert.ok(button('参考信息'));await input(label('搜索任务和笔记'),'');await click(label('事项'));
+  await t.test('dedicated note filtering and global search find notes; conversion preserves identity and content',async()=>{
+   await click(label('笔记'));await input(label('按标签筛选笔记'),get(note).tagIds[0]);const rows=[...query('[aria-label="笔记列表"]').querySelectorAll('.content-note-row')];assert.equal(rows.length,1);assert.match(rows[0].textContent,/参考信息/);assert.equal(rows.some(el=>el.textContent.includes('重新命名')),false);await click(rows[0]);
+   await click(button('笔记更多操作'));await click(button('转为任务'));assert.equal(get(note).itemType,'task');assert.equal(get(note).description,'接口响应字段参考');assert.equal(get(note).tagIds.length,1);await click(label('任务'));assert.ok(row(note));assert.ok(label('开始参考信息'));
+   await input(label('搜索任务和笔记'),'接口响应字段参考');assert.ok(button('参考信息'));await input(label('搜索任务和笔记'),'');await click(label('任务'));
   });
   await t.test('automatic sorting does not mutate stored order, holds positions during typing, and is saved with a view',async()=>{
    await input(label('视图排序'),'smart');const before=get(a).order;await command({type:'outline.patch',payload:{id:a,field:'dueAt',value:'2026-10-18'}});const visible=()=>[...query('[role="tree"]').querySelectorAll('[data-outline-id]')].map(n=>n.dataset.outlineId);

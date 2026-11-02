@@ -6,7 +6,7 @@ import {condition,group,withRules} from '../core/filter-rules.ts';
 
 test('default outline is quiet, secondary controls remain keyboard-accessible, and completion stays reversible',async()=>{
  const h=await appDom();try{
-  const id=h.add('验证视图选项');await h.mount();await h.click(h.label('事项'));
+  const id=h.add('验证视图选项');await h.mount();await h.click(h.label('任务'));
   assert.equal(document.querySelector('.filter-summary'),null);
   assert.equal([...document.querySelectorAll('.filter-controls button')].some(e=>e.textContent==='清除筛选'),false);
   const trigger=h.label('视图选项'),panel=h.query('.action-popover-panel');assert.equal(panel.hidden,true);
@@ -19,7 +19,7 @@ test('default outline is quiet, secondary controls remain keyboard-accessible, a
 
 test('saved-view disclosure saves full custom conditions and never hides nested OR logic',async()=>{
  const h=await appDom();try{
-  h.add('有安排');await h.mount();await h.click(h.label('事项'));
+  h.add('有安排');await h.mount();await h.click(h.label('任务'));
   const rules=group([group([condition('status','is-not','done'),condition('title','contains','安排')],'any')]);
   await h.command({type:'view.save',payload:{name:'组合规则',filter:withRules(emptyFilter(),rules)}});
   await h.click(h.button('组合规则',h.query('[aria-label="事项视图"]')));assert.match(h.query('.filter-summary').textContent,/安排/);

@@ -40,7 +40,7 @@ async function check(){try{
  win=new BrowserWindow({show:false,width:1487,height:1058,frame:false,webPreferences:{preload:path.join(root,'dist-electron/preload.cjs'),contextIsolation:true,nodeIntegration:false,sandbox:true,offscreen:true,backgroundThrottling:false}});
  win.webContents.on('console-message',(_e,level,message)=>{if(level>=3)failures.push(message);});
  await win.webContents.session.clearStorageData({storages:['localstorage']});await win.loadFile(path.join(root,'dist/client/index.html'));await until(`!!document.querySelector('.today-page')`);await run('document.fonts.ready');
- await click('.nav-item[aria-label="事项"]');await until(`!!document.querySelector('[aria-label="常用视图"]')`);
+ await click('.nav-item[aria-label="任务"]');await until(`!!document.querySelector('[aria-label="常用视图"]')`);
  await run(`(()=>{const s=document.querySelector('[aria-label="常用视图"]');Object.getOwnPropertyDescriptor(HTMLSelectElement.prototype,'value').set.call(s,${JSON.stringify(service.snapshot().state.views[0].id)});s.dispatchEvent(new Event('change',{bubbles:true}));})()`);
  await until(`!!document.querySelector('.closed-filter-hint')`);await capture('date-view-includes-closed.png');
  await button('只看未完成');await until(`!document.querySelector('[data-outline-id="${parent}"]')`);await button('更新当前视图');

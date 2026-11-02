@@ -1,12 +1,12 @@
 export type Id = string;
-export const JOURNAL_SCHEMA_VERSION=21;
+export const JOURNAL_SCHEMA_VERSION=22;
 export interface Project { id: Id; name: string; description: string; archived: boolean; createdAt: string; parentId?: Id | null; order?: number }
 export interface Task {
-  reminderHistory?:{estimateMinutes:number|null;plannedDate:string|null;dueAt:string|null;focusDate:string|null;reviewSchedule:ReviewSchedule|null;reminder:ItemReminder|null;recurrence:Recurrence|null;isProject:boolean};
+  reminderHistory?:{reminderRecurrence?:Recurrence|null;estimateMinutes:number|null;plannedDate:string|null;dueAt:string|null;focusDate:string|null;reviewSchedule:ReviewSchedule|null;reminder:ItemReminder|null;recurrence:Recurrence|null;isProject:boolean};
   groupHistory?:{initialEstimateMinutes:number|null;reminder:ItemReminder|null;reviewSchedule:ReviewSchedule|null};
   ownership?:import('./activity').Ownership|null;completionBy?:import('./activity').CompletionBy;
-  id: Id; projectId: Id|null; title: string; itemType?:'task'|'note'|'event'|'group'|'reminder'; eventAt?:string|null; eventEnd?:string|null; focusDate?:string|null; updatedAt?:string; isProject?: boolean; description?: string; archived?: boolean; availability?:'active'|'paused'; deletedAt?:string|null; reviewSchedule?:ReviewSchedule|null; reminder?:ItemReminder|null; tagIds?: Id[]; outcome: string; nextAction: string; parentId?: Id | null; order?: number;
-  recurrence?:Recurrence|null; recurrenceNextId?:Id|null; recurrencePreviousId?:Id|null;
+  id: Id; projectId: Id|null; title: string; relatedTaskIds?:Id[]; itemType?:'task'|'note'|'event'|'group'|'reminder'; eventAt?:string|null; eventEnd?:string|null; focusDate?:string|null; updatedAt?:string; isProject?: boolean; description?: string; archived?: boolean; availability?:'active'|'paused'; deletedAt?:string|null; reviewSchedule?:ReviewSchedule|null; reminder?:ItemReminder|null; tagIds?: Id[]; outcome: string; nextAction: string; parentId?: Id | null; order?: number;
+  reminderRecurrence?:Recurrence|null; recurrence?:Recurrence|null; recurrenceNextId?:Id|null; recurrencePreviousId?:Id|null;
   estimateMinutes: number | null; plannedDate: string | null; /** YYYY-MM-DD means before local midnight; ISO means an exact time. */ dueAt?: string | null; status: 'open' | 'done' | 'cancelled' | 'handed-off';
   createdAt: string; startedAt: string | null; completedAt: string | null;
 }
@@ -49,7 +49,7 @@ export type FilterRule = FilterCondition|FilterGroup;
 export interface ItemFilter { trash?:boolean; view: 'all'|'actions'|'unplanned'|'done'; query: string; showDone: boolean; scopeId: Id|null; tagIds: Id[]; tagMode: 'all'|'any'; planned: 'any'|'today'|'through-today'|'unplanned'; completed: 'any'|'today'|'this-week'; due: 'any'|'today'|'this-week'|'overdue'; projectsOnly: boolean; rules?:FilterGroup; sort?:'smart'|'manual'|'due'|'planned'|'title'|'created' }
 export interface SavedView { id: Id; name: string; filter: ItemFilter }
 export interface JournalState {
-  schemaVersion: 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10 | 11 | 12 | 13 | 14 | 15 | 16 | 17 | 18 | 19 | 20 | 21; activities?:import('./activity').BusinessActivity[];itemReviews:ItemReviewLog[]; moves:MoveRecord[]; tags: Tag[]; views: SavedView[]; projects: Project[]; tasks: Task[]; sessions: Session[]; deletedSessions:DeletedSession[]; notes: Note[];
+  schemaVersion: 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10 | 11 | 12 | 13 | 14 | 15 | 16 | 17 | 18 | 19 | 20 | 21 | 22; activities?:import('./activity').BusinessActivity[];itemReviews:ItemReviewLog[]; moves:MoveRecord[]; tags: Tag[]; views: SavedView[]; projects: Project[]; tasks: Task[]; sessions: Session[]; deletedSessions:DeletedSession[]; notes: Note[];
   estimates: Estimate[]; reviews: Review[]; audit: Audit[]; settings: Settings;
 }
 export interface TimerView { sessionId: Id; taskId: Id | null; durationMs: number; targetMinutes: number; targetOffsetMs?:number; paused: boolean; recovered: boolean }

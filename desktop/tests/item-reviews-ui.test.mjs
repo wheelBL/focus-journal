@@ -11,7 +11,7 @@ test('full review flow isolates scope, distinguishes browsing from review, and p
  await h.mount();
  try{
   await t.test('an existing work search stays separate from a complete, expanded review subtree',async()=>{
-   await click(label('事项'));await input(label('在事项树中搜索'),'工作视图只看我');assert.ok(label('工作视图只看我',query('[role=tree]')));assert.equal(document.querySelector(`[data-outline-id="${parent}"]`),null);
+   await click(label('任务'));await input(label('在事项树中搜索'),'工作视图只看我');assert.ok(label('工作视图只看我',query('[role=tree]')));assert.equal(document.querySelector(`[data-outline-id="${parent}"]`),null);
    await click(label('回顾'));assert.equal(query('[role=tab][aria-selected=true]').textContent,'事项审视 · 3');
    const tree=query('[role=tree]');for(const name of ['要审视的项目','正在推进的子项','暂时不执行的子项','更深一层'])assert.ok(label(name,tree));assert.equal(tree.querySelector(`[data-outline-id="${done}"]`),null);assert.equal(tree.querySelector(`[data-outline-id="${other}"]`),null);
    assert.equal(label('开始暂时不执行的子项',tree).disabled,true);await click(label('暂时不执行的子项',tree));assert.match(query('.task-inspector').textContent,/此事项已暂停/);
@@ -41,7 +41,7 @@ test('full review flow isolates scope, distinguishes browsing from review, and p
    const tree=query('[role=tree]');await context(label('要审视的项目',tree));await click(button('定期审视…',query('[role=menu]')));let dialog=query('dialog');await input(label('审视频率',dialog),'months');await input(label('审视间隔',dialog),'1');assert.match(dialog.textContent,/目标月份没有同一日/);await click(label('同时暂停事项',dialog));await click(button('暂停并保存审视',dialog));assert.equal(get(parent).availability,'paused');assert.equal(get(child).availability,'active');assert.equal(s.snapshot().state.itemReviews.filter(r=>!r.undoneAt).length,0);
    await click(query('.review-decision-actions details summary'));await click(button('暂时放下，下次再看…'));dialog=query('dialog');assert.equal(label('开启定期审视',dialog).checked,true);assert.equal(label('同时暂停事项',dialog).checked,true);await click(button('暂停并保存审视',dialog));
    await click(label('正在推进的子项（已澄清）',tree));assert.match(query('.task-inspector').textContent,/父级.*暂停/);assert.equal(query('.regular-review-settings').open,false);
-   await click(label('事项'));assert.equal(label('在事项树中搜索').value,'工作视图只看我');assert.equal(document.querySelector(`[data-outline-id="${parent}"]`),null);
+   await click(label('任务'));assert.equal(label('在事项树中搜索').value,'工作视图只看我');assert.equal(document.querySelector(`[data-outline-id="${parent}"]`),null);
   });
   await t.test('upcoming/all views advance after a mark or deferral and effort review remains separate',async()=>{
    await click(label('回顾'));await input(label('审视队列范围'),'all');await click(button('已审视，查看下一项'));assert.equal(get(parent).availability,'paused');assert.equal(get(parent).reviewSchedule.nextDate,'2026-11-19');assert.match(query('.review-current-top').textContent,/正在推进的子项/);

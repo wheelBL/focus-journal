@@ -44,7 +44,7 @@ test('unavailable local draft storage never turns a committed capture into a sav
 
 test('inline edits block late typing, Escape and duplicate writes; failure leaves an editable draft',async()=>{
  const h=await appDom();try{
-  const id=h.add('原始名称');await h.mount();await h.click(h.label('事项'));const row=h.query(`[data-outline-id="${id}"]`);await h.key(row,'F2');const input=h.label('名称 原始名称');await h.input(input,'提交的改名');
+  const id=h.add('原始名称');await h.mount();await h.click(h.label('任务'));const row=h.query(`[data-outline-id="${id}"]`);await h.key(row,'F2');const input=h.label('名称 原始名称');await h.input(input,'提交的改名');
   const gate=holdCommand('outline.patch');await h.key(input,'Enter');assert.equal(input.readOnly,true);assert.match(h.query('.inline-editor [role=status]').textContent,/正在保存/);
   await h.input(input,'不应被接受的改名');await h.key(input,'Escape');await h.key(input,'Enter');assert.equal(h.label('名称 原始名称').value,'提交的改名');assert.equal(gate.calls,1);
   await h.action(()=>gate.fail('名称保存失败'));assert.equal(input.readOnly,false);assert.match(h.query('.inline-editor [role=alert]').textContent,/名称保存失败/);assert.equal(document.activeElement,input);assert.equal(h.get(id).title,'原始名称');
@@ -55,7 +55,7 @@ test('inline edits block late typing, Escape and duplicate writes; failure leave
 
 test('outline creation preserves the intended parent while pending and advertised row shortcuts work',async()=>{
  const h=await appDom();try{
-  const a=h.add('第一项'),b=h.add('第二项');await h.mount();await h.click(h.label('事项'));const row=id=>h.query(`[data-outline-id="${id}"]`);
+  const a=h.add('第一项'),b=h.add('第二项');await h.mount();await h.click(h.label('任务'));const row=id=>h.query(`[data-outline-id="${id}"]`);
   assert.match(h.label('拖动第二项').title,/Tab 缩进、Shift\+Tab/);assert.doesNotMatch(h.label('拖动第二项').title,/Alt/);
   await h.input(h.label('视图排序'),'manual');await h.key(row(b),'Tab');assert.equal(h.get(b).parentId,a);await h.key(row(b),'Tab',{shiftKey:true});assert.equal(h.get(b).parentId,'inbox');
   await h.key(row(b),'Insert',{ctrlKey:true});const input=h.label('新事项名称');await h.input(input,'保留父级的新事项');const gate=holdCommand('capture.create');await h.action(()=>input.form.requestSubmit());
@@ -86,7 +86,7 @@ for(const flow of ['task','review','view'])test(`${flow} dialog locks pending dr
   if(flow==='task'){
    await h.key(window,'n',{ctrlKey:true});input=h.query('dialog input[maxlength="120"]');command='capture.create';
   }else{
-   await h.click(h.label('事项'));
+   await h.click(h.label('任务'));
    if(flow==='review'){await h.click(h.query(`[data-outline-id="${id}"]`));await h.click(h.button('复盘',h.query('.task-inspector')));await h.click(h.button('记录复盘与调整'));input=h.query('dialog textarea');command='review.save';}
    else{await h.click(h.label('视图选项'));assert.equal(h.query('.filter-controls .action-popover-panel').hidden,false);await h.click(h.button('保存视图'));input=h.label('常用视图名称');command='view.save';}
   }
