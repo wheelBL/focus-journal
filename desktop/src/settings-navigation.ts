@@ -3,6 +3,7 @@ import {motionAllowed} from './appearance';
 export const settingsSections=[
  {id:'appearance',label:'外观与动效'},
  {id:'focus',label:'专注与休息'},
+ {id:'shortcuts',label:'快捷键'},
  {id:'reminders',label:'到时提醒'},
  {id:'capture',label:'快速记录'},
  {id:'ai',label:'AI 助手'},

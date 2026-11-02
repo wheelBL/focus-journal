@@ -38,6 +38,7 @@ try{
     if(process.argv.includes('--smoke')){
       copyFileSync(path.join(root,'scripts/packaged-smoke.cjs'),path.join(stage,'qa-release-smoke.cjs'));
       copyFileSync(path.join(root,'scripts/content-navigation-smoke.cjs'),path.join(stage,'qa-content-navigation.cjs'));
+      copyFileSync(path.join(root,'scripts/shortcut-smoke.cjs'),path.join(stage,'qa-shortcuts.cjs'));
       writeFileSync(path.join(stage,'qa-start.cjs'),`require('./qa-release-smoke.cjs')(${JSON.stringify(dataDir)},${JSON.stringify(path.join(root,`qa-evidence/release-${pkg.version}`))},${JSON.stringify(pkg.version)});\n`,{flag:'a'});
     }
     if(releaseQa)writeFileSync(path.join(stage,'qa-start.cjs'),`require('electron').app.whenReady().then(()=>{const {safeStorage}=require('electron'),fs=require('node:fs'),path=require('node:path');const sample='focus-journal-QA-synthetic-not-a-credential';try{const available=safeStorage.isEncryptionAvailable(),cipher=safeStorage.encryptString(sample),roundtrip=safeStorage.decryptString(cipher)===sample;fs.writeFileSync(path.join(${JSON.stringify(dataDir)},'vault-check.json'),JSON.stringify({available,roundtrip,cipherDiffers:!cipher.includes(Buffer.from(sample)),checkedAt:new Date().toISOString()}));}catch{fs.writeFileSync(path.join(${JSON.stringify(dataDir)},'vault-check.json'),JSON.stringify({available:false,roundtrip:false}));}});\n`,{flag:'a'});
@@ -56,6 +57,7 @@ try{
   '完成归属区分本人、他人、共同完成和未注明；旧已完成记录不推断归属。回顾的活动记录可查看业务变化、轻量操作和AI使用。轻量摘要仅记录操作、入口、结果和版本，无鼠标轨迹或输入值，可暂停、清空和导出。AI文本仅保存在本机，最近保留200次，不进入日志同步。',
   '精简操作层级：事项页的“视图选项”提供保存视图、显示已完成、展开折叠和视图管理；默认筛选不重复占一行，自定义条件仍显示。',
   '详情计划开始、截止、标签和提醒直接编辑；任务重复与提醒重复分别管理。笔记可保留原文生成关联任务；收件箱可以就地整理并进入下一条。',
+  'Ctrl+F 搜索当前任务、笔记或提醒列表；Ctrl+K 搜索全部内容。设置 → 快捷键可以改键、清除和恢复默认，保存后立即生效，仅保存在本机。全局快速记录仍单独设置。',
   '设置每次显示一个分类；切换分类保留未保存的输入，离开设置页前请保存。日历操作说明可按需展开，有已删除投入时才显示恢复入口。',
   '今日先展示当前计时和接下来要做的事，旁边可选择重点并直接开始或恢复；今日进展按事项汇总投入、成果与完成情况，时间线按发生顺序保留。',
   '审视说明、推迟日期和子项选择会随事项保存在本机，切换事项或离开页面后可继续；标记已审视才写入历史，稍后审视保留未提交的说明。',
@@ -109,7 +111,7 @@ try{
   '默认使用 focus-journal 分支保存 focus-journal.json；建议使用个人私有仓库，无需安装 Git。配置后从左侧一键同步。先暂停正在计时的事项；下载后计时器保持暂停。',
   '这版按整份日志同步，适合多台电脑轮流使用：一台收工先同步，另一台先同步再工作。双方都有修改时需选择保留哪份；下载前自动备份本机，上传保留远端 Git 历史，不强制推送。',
   '连接测试不上传日志；日志载入前会校验。断网仍可在本机工作，稍后重试同步。提醒音量和其他设备偏好各自保留。',
-  '更新时如旧版仍运行，请先在旧版设置中保存并退出，再启动新版，已有个人数据自动读取。','Ctrl+Z 撤销整理操作；撤销记录限本次打开期间，计时、投入记录和完成状态不回退。','计划开始：打算哪一天开始，可留空；实际开始由计时或补记产生，两者独立。','截止时间：支持“某日之前（不含当天）”或精确到分钟，也可留空。选择 10 月 23 日表示 10 月 23 日 00:00 前完成；下周一前完成归入本周视图。','只填名称即可保存或开始，估计可暂空，不要求下一步行动或预期产出。','快速新建可选择切换或并行计时；切换结束其他运行投入，不完成事项。','事项暂停影响整支执行；子项自己的暂停安排保留，恢复不会自动恢复计时。完成、取消、回收站有影响预览，状态撤销保留时间记录。','回顾 → 事项审视：在详情或右键菜单设置一次、每隔 N 天/周/月的审视。到期进入安静队列，只有点击已审视才记录。稍后仅改日期，跳过仅改变浏览位置。','审视完整子树不受工作筛选影响，父子周期独立。可明确选择子项一起审视、撤销最近标记；暂停不停止审视，完成或取消停止未来审视。','回顾 → 投入复盘：看本周完成与推进，按项目、事项、标签筛选，累计时长和去重覆盖分别计算。',qa?'这是独立测试工作区；关闭窗口会保存并退出，不留托盘。':'关闭窗口后保留在托盘，计时继续。需要完全退出时，在设置中选择“保存并退出专注记”，或使用托盘退出菜单。','升级自动保留原有数据，并在升级数据结构前创建 SQLite 备份。','设置中可备份全部数据、恢复备份、打开数据文件夹。',''].join('\r\n'));
+  '更新时如旧版仍运行，请先在旧版托盘中选择退出专注记，再启动新版，已有个人数据自动读取。','Ctrl+Z 撤销整理操作；撤销记录限本次打开期间，计时、投入记录和完成状态不回退。','计划开始：打算哪一天开始，可留空；实际开始由计时或补记产生，两者独立。','截止时间：支持“某日之前（不含当天）”或精确到分钟，也可留空。选择 10 月 23 日表示 10 月 23 日 00:00 前完成；下周一前完成归入本周视图。','只填名称即可保存或开始，估计可暂空，不要求下一步行动或预期产出。','快速新建可选择切换或并行计时；切换结束其他运行投入，不完成事项。','事项暂停影响整支执行；子项自己的暂停安排保留，恢复不会自动恢复计时。完成、取消、回收站有影响预览，状态撤销保留时间记录。','回顾 → 事项审视：在详情或右键菜单设置一次、每隔 N 天/周/月的审视。到期进入安静队列，只有点击已审视才记录。稍后仅改日期，跳过仅改变浏览位置。','审视完整子树不受工作筛选影响，父子周期独立。可明确选择子项一起审视、撤销最近标记；暂停不停止审视，完成或取消停止未来审视。','回顾 → 投入复盘：看本周完成与推进，按项目、事项、标签筛选，累计时长和去重覆盖分别计算。',qa?'这是独立测试工作区；关闭窗口会保存并退出，不留托盘。':'关闭窗口后保留在托盘，计时继续。需要完全退出时，在侧栏底部或托盘菜单中选择“退出专注记”。已提交的操作自动保存，退出时保存并暂停计时；未提交的表单不会自动提交。','升级自动保留原有数据，并在升级数据结构前创建 SQLite 备份。','设置中可备份全部数据、恢复备份、打开数据文件夹。',''].join('\r\n'));
   mkdirSync(path.join(output,'tools'),{recursive:true});
   copyFileSync(path.join(root,'tools/journal-api.py'),path.join(output,'tools/journal-api.py'));
   copyFileSync(path.join(root,'docs/local-api.md'),path.join(output,'API使用说明.md'));

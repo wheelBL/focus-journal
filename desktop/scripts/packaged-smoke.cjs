@@ -3,7 +3,7 @@ const {app,BrowserWindow}=require('electron');
 const fs=require('node:fs'),path=require('node:path');
 module.exports=(dataDir,output,expectedVersion)=>{
  const restart=process.argv.includes('--restart-verification');
- const checks=[],failures=[],diagnostics=[];let finished=false;
+ const checks=[],failures=[],diagnostics=[];let finished=false,quitFromSidebar=false;
  fs.mkdirSync(output,{recursive:true});
  const wait=ms=>new Promise(r=>setTimeout(r,ms));
  const check=(ok,label)=>{if(!ok)throw Error(label);checks.push(label);};
@@ -28,7 +28,12 @@ module.exports=(dataDir,output,expectedVersion)=>{
    const usage=await run(main,'window.journal.usage.snapshot()');
    check(usage.operations.some(r=>r.operation==='qa.verify'&&r.version===expectedVersion),'Restart preserves local lightweight records with actual app version');
    check((await run(main,'window.journalAppearance.get()')).theme==='dark','Restart preserves device appearance');
-   await until(()=>run(main,`document.documentElement.dataset.theme==='dark'`),'Restart dark theme missing');finished=true;return;
+   await until(()=>run(main,`document.documentElement.dataset.theme==='dark'`),'Restart dark theme missing');
+   check(await run(main,`JSON.parse(localStorage.getItem('journal.shortcuts.v1'))['search-current']==='Primary+G'`),'Restart preserves custom keyboard settings');
+   await run(main,`document.querySelector('.top-navigation [aria-label="任务"]').click()`);
+   await until(()=>run(main,`!!document.querySelector('[aria-label="在事项树中搜索"]')`),'Restart task search missing');
+   main.focus();main.webContents.sendInputEvent({type:'keyDown',keyCode:'G',modifiers:['control']});main.webContents.sendInputEvent({type:'keyUp',keyCode:'G',modifiers:['control']});await wait(80);
+   check(await run(main,`document.activeElement===document.querySelector('[aria-label="在事项树中搜索"]')`),'Restart activates configured current-list shortcut');finished=true;return;
   }
   for(const timer of before.timers)await run(main,`window.journal.command({type:'focus.stop',payload:{sessionId:${JSON.stringify(timer.sessionId)}}})`);
   await run(main,`window.journal.command({type:'break.stop'})`);
@@ -181,10 +186,13 @@ module.exports=(dataDir,output,expectedVersion)=>{
   fs.writeFileSync(path.join(output,'inbox-view.png'),(await main.webContents.capturePage()).toPNG());
   await run(main,`window.journal.command({type:'inbox-review.settings',payload:{enabled:false,time:'09:00'}})`);
   await require('./qa-content-navigation.cjs')({main,run,until,check,wait,output,groupId,childId});
+  await require('./qa-shortcuts.cjs')({main,run,until,check,wait,output});
   await run(main,`window.journalAppearance.set({theme:'dark',motion:'reduce'})`);
   await run(main,`document.querySelector('.top-navigation [aria-label="今日"]').click()`);
   await until(()=>run(main,`!!document.querySelector('.today-page')`),'Today did not return after groups');
   const saved=await run(main,'window.journal.snapshot()');fs.writeFileSync(path.join(output,'persisted-evidence.json'),JSON.stringify({tasks:saved.state.tasks,sessions:saved.state.sessions,deletedSessions:saved.state.deletedSessions,activities:saved.state.activities}));
-  finished=true;
- }catch(e){failures.push(String(e));for(const w of BrowserWindow.getAllWindows()){diagnostics.push({title:w.getTitle(),visible:w.isVisible(),minimized:w.isMinimized(),url:w.webContents.getURL(),bounds:w.getBounds()});try{if(!w.webContents.getURL().includes('panel='))fs.writeFileSync(path.join(output,'failure.png'),(await w.webContents.capturePage()).toPNG());}catch{}}}finally{clearTimeout(timeout);app.quit();}});
+  check(await run(main,`!!document.querySelector('[aria-label="退出专注记"]')&&!document.querySelector('[aria-label="退出专注记"]').disabled`),'Sidebar offers direct exit');
+  finished=true;quitFromSidebar=true;
+  await run(main,`setTimeout(()=>document.querySelector('[aria-label="退出专注记"]').click(),100);true`);
+ }catch(e){failures.push(String(e));for(const w of BrowserWindow.getAllWindows()){diagnostics.push({title:w.getTitle(),visible:w.isVisible(),minimized:w.isMinimized(),url:w.webContents.getURL(),bounds:w.getBounds()});try{if(!w.webContents.getURL().includes('panel='))fs.writeFileSync(path.join(output,'failure.png'),(await w.webContents.capturePage()).toPNG());}catch{}}}finally{if(!quitFromSidebar||failures.length){clearTimeout(timeout);app.quit();}}});
 };

@@ -1,5 +1,4 @@
 import React,{useLayoutEffect,useState} from 'react';
-import {isMac,shortcutLabel} from './platform';
 import {applySettingsSection,requestSettingsSection,settingsSections,useSettingsSection,type SettingsSection} from './settings-navigation';
 import {AiSettings} from './AiSettings';
 import {AppearanceSettings} from './AppearanceSettings';
@@ -8,6 +7,7 @@ import {version as appVersion} from '../package.json';
 import {LocalApiSettings} from './LocalApiSettings';
 import {CaptureSettings} from './CaptureSettings';
 import {ReminderSettingsSection} from './ReminderSettings';
+import {ShortcutSettings} from './ShortcutSettings';
 import {SyncSettingsSection} from './SyncSettings';
 import {useWorkspaceJournal,Button,Field} from './ui';
 import {useSettingsAction} from './useSettingsAction';
@@ -34,7 +34,7 @@ function DataSettings(){
 
 function HabitSettings(){
  const {data,dialog}=useWorkspaceJournal();
- return <section className="settings-section" id="settings-habits"><h2>使用习惯</h2><p>{data.demo?'这是独立测试工作区，关闭窗口会保存并退出，不留托盘图标。':'关闭窗口后保留在系统托盘中，计时继续。选择托盘中的“退出专注记”会保存并暂停全部计时器。'}电脑休眠时自动暂停全部计时器，回来后由你决定何时恢复。</p><p>{shortcutLabel('Ctrl + K 搜索；Ctrl + N 新建事项；事项树中 ')}{isMac()?'⌘ + ⇧ + N 新增同级、⌘ + ⌥ + N 新增子项、':'Insert 新增同级、Ctrl + Insert 新增子项、'}{shortcutLabel('F2 改名、Ctrl + Z 撤销整理；今日快速添加事项：Enter 保存。')}</p><Button onClick={()=>dialog({type:'shortcuts'})}>查看事项快捷键</Button><p className="muted">专注记 {appVersion}</p>{isDesktop&&<Button onClick={()=>void api.windowAction('quit')}>保存并退出专注记</Button>}</section>;
+ return <section className="settings-section" id="settings-habits"><h2>使用习惯</h2><p>已提交的操作会自动保存。完全退出时保存计时进度并暂停全部计时器；退出不会提交尚未保存的表单。{data.demo?'独立测试工作区关闭窗口即退出，不留托盘图标。':'关闭窗口会收起到系统托盘，计时继续。'}电脑休眠时自动暂停全部计时器，回来后由你决定何时恢复。</p><Button onClick={()=>dialog({type:'shortcuts'})}>查看事项快捷键</Button><Button onClick={()=>requestSettingsSection('shortcuts')}>配置快捷键</Button><p className="muted">专注记 {appVersion}</p></section>;
 }
 
-const contents:Record<SettingsSection,React.ComponentType>={appearance:AppearanceSettings,focus:FocusSettings,reminders:ReminderSettingsSection,capture:CaptureSettings,ai:AiSettings,api:LocalApiSettings,sync:SyncSettingsSection,data:DataSettings,habits:HabitSettings};
+const contents:Record<SettingsSection,React.ComponentType>={appearance:AppearanceSettings,focus:FocusSettings,shortcuts:ShortcutSettings,reminders:ReminderSettingsSection,capture:CaptureSettings,ai:AiSettings,api:LocalApiSettings,sync:SyncSettingsSection,data:DataSettings,habits:HabitSettings};

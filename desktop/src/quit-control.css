@@ -1,0 +1,4 @@
+.sidebar-app-actions{display:flex;align-items:center;gap:4px}
+.application.workbench .sidebar-app-actions>.nav-item{width:auto;flex:1;min-width:0;gap:8px}
+.application.workbench .sidebar-app-actions>.quit-control{flex:0 0 auto}
+.sidebar-app-actions .quit-control:disabled{opacity:.45}

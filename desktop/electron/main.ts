@@ -1,4 +1,5 @@
 import {mainWindowChrome,applicationMenu} from './desktop-platform';
+import {shutdownJournal} from './shutdown';
 import {prepareWorkspace,finishWorkspaceStartup} from './workspace-startup';
 import type {DesktopEditAction} from '../core/desktop-platform';
 import {UsageStore} from './usage-store';
@@ -132,12 +133,17 @@ else if(workspace) {
     powerMonitor.on('resume',changed);
     const interval=setInterval(()=>{try{if(service.tick().length)changed();reminders.sync();floating.sync();tray?.setToolTip(floating.tooltip());}catch(e){report(e);}},1000);
     refreshTray();
+    const shutdown=()=>shutdownJournal(()=>service.shutdown(),()=>{closed=true;quitting=true;},[
+      ['interval',()=>clearInterval(interval)],['ai',()=>ai.dispose()],['usage',()=>usage.dispose()],
+      ['localApi',()=>localApi.dispose()],['sync',()=>sync.dispose()],['floating',()=>floating.dispose()],
+      ['reminders',()=>reminders.dispose()],['capture',()=>capture.dispose()],['appearance',()=>appearance.dispose()],
+      ['tray',()=>tray?.destroy()]
+    ],(name,error)=>log('shutdown-cleanup-error',{name,message:error instanceof Error?error.message:String(error)}));
     app.on('before-quit',event=>{
       if(closed)return;
-      try{ai.dispose();usage.dispose();localApi.dispose();sync.dispose();service.shutdown();closed=true;quitting=true;clearInterval(interval);floating.dispose();reminders.dispose();capture.dispose();appearance.dispose();tray?.destroy();log('shutdown');}
-      catch(e){event.preventDefault();report(e);}
+      try{shutdown();log('shutdown');}catch(e){event.preventDefault();report(e);}
     });
-    win.on('session-end',()=>{if(!closed){try{ai.dispose();usage.dispose();localApi.dispose();sync.dispose();service.shutdown();closed=true;clearInterval(interval);floating.dispose();reminders.dispose();capture.dispose();appearance.dispose();tray?.destroy();}catch{/* The last durable checkpoint remains recoverable. */}}});
+    win.on('session-end',()=>{if(!closed){try{shutdown();}catch{/* The last durable checkpoint remains recoverable. */}}});
   }).catch(error=>{dialog.showErrorBox('专注记启动失败',String(error));quitting=true;app.quit();});
 }
 let lastError='';
