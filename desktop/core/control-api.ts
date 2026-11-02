@@ -14,6 +14,7 @@ const obj=(properties:Record<string,Schema>,required:string[]=[]):Schema=>({type
 interface Definition {description:string;payload:Schema;map?:(p:Record<string,unknown>,s:Snapshot)=>Command}
 const define=(description:string,properties:Record<string,Schema>,required:string[]=[]):Definition=>({description,payload:obj(properties,required)});
 const itemFields={title:{...str(),minLength:1},description:str(10000),itemType:choice('task','note','event','group'),parentId:nullable(id),tagNames:{type:'array',items:str(80),maxItems:50} as Schema,plannedDate:date,dueAt:date,estimateMinutes:nullable(num(1)),remindAt:date,eventAt:date,eventEnd:date};
+const recurrenceRule:Schema={type:['object','null'],properties:{mode:choice('calendar','completion'),unit:choice('day','week','month','year'),interval:num(1,365),anchor:str(10),weekdays:{type:'array',items:num(0,6),maxItems:7},until:date,reminderOffsetMs:num(-366*86400000,366*86400000)},required:['mode','unit','interval','anchor','weekdays','until'],additionalProperties:false};
 export const controlCommands:Record<string,Definition>={
  'item.handoff':define('将本人责任交接给他人并以 handed-off 关闭；不计完成。仅处理明确选择的本项或子项，相关计时需 confirmTimers。',{id,ids:{type:'array',items:id,maxItems:1000},assignee:str(120),note:str(2000),followUp:bool,followUpAt:date,at:date,confirmTimers:bool},['id','assignee']),
  'item.reclaim':define('重新接手本项或明确选择的子项，不启动计时。',{id,ids:{type:'array',items:id,maxItems:1000}},['id']),
@@ -26,6 +27,13 @@ export const controlCommands:Record<string,Definition>={
  'item.change':define('暂停、恢复、移入回收站或从回收站恢复。整支删除需要 confirmBranch:true。',{id,action:choice('pause','resume','delete','restore'),confirmBranch:bool},['id','action']),
  'tag.attach':define('为事项添加自定义标签。',{id,name:str(80)},['id','name']),
  'tag.detach':define('从事项移除一个标签。',{id,tagId:id},['id','tagId']),
+ 'reminder.convert':define('将未结束的事项转为独立提醒，保留历史；rule 为 null 或固定日历规则。',{id,at:str(40),rule:{type:['object','null'],properties:{mode:choice('calendar'),unit:choice('day','week','month','year'),interval:num(1,365),anchor:str(10),weekdays:{type:'array',items:num(0,6),maxItems:7},until:date},required:['mode','unit','interval','anchor','weekdays','until'],additionalProperties:false}},['id','at','rule']),
+ 'inbox-review.settings':define('设置每日收件箱整理提醒。',{enabled:bool,time:str(5)},['enabled','time']),
+ 'inbox-review.dismiss':define('确认本次收件箱整理提醒。',{}),
+ 'inbox-review.snooze':define('五分钟后再次提醒整理收件箱。',{}),
+ 'recurrence.set':define('设置或移除事项、事件或提醒的重复规则；提醒仅支持固定日历。',{id,rule:recurrenceRule},['id','rule']),
+ 'item-reminder.snooze':define('将已到时的提醒推迟五分钟，不改变原安排。',{id},['id']),
+ 'item-reminder.dismiss':define('确认已到时的提醒；循环提醒会安排下一次。',{id},['id']),
  'item-reminder.set':define('设置或取消独立提醒；不修改截止或投入。',{id,at:date},['id','at']),
  'event.save':define('更新事件时间或日期；不生成实际投入。',{id,at:date,end:date},['id','at']),
  'focus.start':define('为事项开始计时；可用 startedAt 补入过去的开始时间，提醒从现在重新计算；允许并行。',{taskId:id,skipEstimate:bool,targetMinutes:num(1,240),startedAt:str(40)},['taskId']),

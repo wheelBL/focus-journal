@@ -10,7 +10,7 @@ import {projectReview} from '../core/project-review';
 import {calendarEntries} from '../src/calendar-layout';
 import {CaptureShortcut} from '../electron/capture-shortcut';
 const now='2026-10-20T14:00:00+08:00';
-class Store{path='capture tests';state=emptyState();load(){return structuredClone(this.state);}save(s:JournalState){this.state=structuredClone(s);}close(){}}
+class Store{path='capture tests';state:JournalState={...emptyState(),settings:{...emptyState().settings,inboxReview:{enabled:false,time:'09:00',pendingDate:null,lastHandledDate:null,snoozedUntil:null}}};load(){return structuredClone(this.state);}save(s:JournalState){this.state=structuredClone(s);}close(){}}
 const setup=()=>{const clock={time:Date.parse(now),mono:0,now(){return this.time;},monotonic(){return this.mono;}};return {s:new JournalService(new Store(),clock),clock};};
 const create=(s:JournalService,raw:string,parentId:string|null='inbox')=>s.execute({type:'capture.create',payload:{draft:parseCapture(raw,s.snapshot().now).draft,parentId}}).state.tasks.at(-1)!;
 

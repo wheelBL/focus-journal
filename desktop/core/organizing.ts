@@ -25,11 +25,13 @@ export function deleteTag(s:JournalState,id:unknown){
 // Restore only organizing fields; live timer segments, completions and work records are never rolled back.
 export function organizingUndo(before:JournalState,after:JournalState):(state:JournalState)=>void{
  const changes:{id:string;key:string;before:unknown;after:unknown}[]=[];
- for(const a of before.tasks){const b=after.tasks.find(t=>t.id===a.id);if(!b)continue;for(const key of ['itemType','groupHistory','estimateMinutes','reminder','reviewSchedule','title','description','isProject','tagIds','plannedDate','dueAt','eventAt','eventEnd','focusDate','recurrence'] as const)if(JSON.stringify(a[key])!==JSON.stringify(b[key]))changes.push({id:a.id,key,before:structuredClone(a[key]),after:structuredClone(b[key])});}
+ for(const a of before.tasks){const b=after.tasks.find(t=>t.id===a.id);if(!b)continue;for(const key of ['itemType','reminderHistory','groupHistory','estimateMinutes','reminder','reviewSchedule','title','description','isProject','tagIds','plannedDate','dueAt','eventAt','eventEnd','focusDate','recurrence'] as const)if(JSON.stringify(a[key])!==JSON.stringify(b[key]))changes.push({id:a.id,key,before:structuredClone(a[key]),after:structuredClone(b[key])});}
  const tagIds=new Set([...before.tags,...after.tags].map(t=>t.id));
  const tags=[...tagIds].filter(id=>JSON.stringify(before.tags.find(t=>t.id===id))!==JSON.stringify(after.tags.find(t=>t.id===id))).map(id=>({id,before:before.tags.find(t=>t.id===id),after:after.tags.find(t=>t.id===id)}));
  const views=before.views.map(v=>({id:v.id,before:v.filter,after:after.views.find(a=>a.id===v.id)?.filter})).filter(v=>JSON.stringify(v.before)!==JSON.stringify(v.after));
  return s=>{
+  // Type conversion is one reversible operation: never restore only part of it.
+  for(const conversion of changes.filter(c=>c.key==='itemType')){const item=s.tasks.find(t=>t.id===conversion.id);if(!item||changes.some(c=>c.id===conversion.id&&JSON.stringify((item as any)[c.key])!==JSON.stringify(c.after)))throw new Error('事项转换后已有变化，请手动调整类型。');}
   for(const c of changes){const item=s.tasks.find(t=>t.id===c.id);if(item&&JSON.stringify((item as any)[c.key])===JSON.stringify(c.after))(item as any)[c.key]=structuredClone(c.before);}
   for(const v of views){const item=s.views.find(a=>a.id===v.id);if(item&&JSON.stringify(item.filter)===JSON.stringify(v.after))item.filter=structuredClone(v.before);}
   for(const t of tags){const i=s.tags.findIndex(a=>a.id===t.id);if(JSON.stringify(s.tags[i])!==JSON.stringify(t.after))continue;if(t.before){if(i<0)s.tags.push(structuredClone(t.before));else s.tags[i]=structuredClone(t.before);}else if(!s.tasks.some(a=>a.tagIds?.includes(t.id))&&!s.views.some(v=>ruleTagIds(rulesFor(v.filter)).includes(t.id)))s.tags=s.tags.filter(a=>a.id!==t.id);}

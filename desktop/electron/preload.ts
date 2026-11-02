@@ -19,6 +19,7 @@ contextBridge.exposeInMainWorld('journal',{
   openDataFolder:()=>invoke('journal:folder'),
   windowAction:(action:string)=>invoke('journal:window',action),
   onOpenItem:(callback:(id:string)=>void)=>{const listener=(_event:unknown,id:string)=>callback(id);ipcRenderer.on('journal:open-item',listener);return()=>ipcRenderer.removeListener('journal:open-item',listener);},
+  onOpenInbox:(callback:()=>void)=>{const listener=()=>callback();ipcRenderer.on('journal:open-inbox',listener);return()=>ipcRenderer.removeListener('journal:open-inbox',listener);},
   onOpenSession:(callback:(id:string)=>void)=>{const listener=(_event:unknown,id:string)=>callback(id);ipcRenderer.on('journal:open-session',listener);return()=>ipcRenderer.removeListener('journal:open-session',listener);},
   onChanged:(callback:()=>void)=>{const listener=()=>callback();ipcRenderer.on('journal:changed',listener);return()=>ipcRenderer.removeListener('journal:changed',listener);}
 });

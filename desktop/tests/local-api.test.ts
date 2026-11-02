@@ -37,6 +37,7 @@ test('API handoff closes personal work, exposes an explicit closed query and rec
 
 test('content revision survives elapsed-only checkpoints while business changes still reject stale writes',async()=>{
  const h=await setup();try{
+  assert.equal((await h.command('inbox-review.settings',{enabled:false,time:'09:00'})).status,200);
   const id=(await h.command('item.create',{title:'稳定修订'})).body.data.createdItemIds[0];await h.command('focus.start',{taskId:id});const revision=(await h.get('/status')).body.revision;
   h.clock.time+=10000;h.s.tick();assert.equal((await h.get('/status')).body.revision,revision);assert.equal((await h.get(`/items/${id}`)).body.data.effort.ownMs,10000);
   assert.equal((await h.command('outline.patch',{id,field:'title',value:'无需因时钟重试'},revision)).status,200);
@@ -221,3 +222,18 @@ test('unavailable token encryption never starts or saves an open endpoint',async
 
 
 test('API groups reject execution and appear in all-items search',async()=>{const h=await setup();try{const created=await h.command('item.create',{title:'API 分组',itemType:'group',parentId:null});assert.equal(created.status,200);const id=created.body.data.createdItemIds[0];assert.equal((await h.get('/items?status=all&query=API')).body.data.items.find((t:any)=>t.id===id).itemType,'group');assert.equal((await h.get('/items')).body.data.items.some((t:any)=>t.id===id),false);assert.equal((await h.command('focus.start',{taskId:id})).status,422);assert.equal((await h.command('item.create',{title:'非法',itemType:'group',dueAt:'2026-10-23'})).status,422);assert.equal((await h.command('outline.patch',{id,field:'itemType',value:'task'})).status,200);}finally{h.close();}});
+test('API supports recurring reminder conversion and explicit handling without task completion',async()=>{
+ const h=await setup();try{
+  const id=(await h.command('item.create',{title:'API reminder'})).body.data.createdItemIds[0];
+  const at=new Date(h.clock.time).toISOString(),rule={mode:'calendar',unit:'month',interval:1,anchor:'2026-10-20',weekdays:[],until:null};
+  assert.equal((await h.command('reminder.convert',{id,at,rule})).status,200);h.s.tick();
+  assert.equal((await h.command('item-reminder.set',{id,at:null})).status,422);
+  assert.equal((await h.command('item-reminder.snooze',{id})).status,200);assert.equal(h.s.snapshot().state.tasks.find(t=>t.id===id)!.reminder!.at,at);
+  h.clock.time+=300000;h.s.tick();assert.equal((await h.command('item-reminder.dismiss',{id})).status,200);
+  let task=h.s.snapshot().state.tasks.find(t=>t.id===id)!;assert.equal(task.status,'open');assert.equal(task.reminder!.at,'2026-11-20T06:00:00.000Z');
+  assert.equal((await h.command('recurrence.set',{id,rule:{...rule,mode:'completion'}})).status,422);
+  assert.equal((await h.command('recurrence.set',{id,rule:{...rule,extra:true}})).status,400);
+  assert.equal((await h.command('recurrence.set',{id,rule:null})).status,200);task=h.s.snapshot().state.tasks.find(t=>t.id===id)!;assert.equal(task.recurrence,null);assert.equal(task.reminder!.at,'2026-11-20T06:00:00.000Z');
+  assert.equal((await h.command('task.status',{id,status:'done'})).status,422);assert.equal((await h.command('outline.patch',{id,field:'itemType',value:'task'})).status,200);
+ }finally{h.close();}
+});

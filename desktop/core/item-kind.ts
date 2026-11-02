@@ -1,12 +1,13 @@
 import type {Task} from './types';
 
-export type ItemType='task'|'note'|'event'|'group';
+export type ItemType='task'|'note'|'event'|'group'|'reminder';
+export const isReminder=(item:Partial<Task>|null|undefined)=>item?.itemType==='reminder';
 export const isGroup=(item:Partial<Task>|null|undefined)=>item?.itemType==='group';
 export const isNote=(item:Partial<Task>|null|undefined)=>item?.itemType==='note';
 export const isEvent=(item:Partial<Task>|null|undefined)=>item?.itemType==='event';
 export const isTask=(item:Partial<Task>|null|undefined)=>!item?.itemType||item.itemType==='task';
 export const isInformation=(item:Partial<Task>|null|undefined)=>!!item&&!isTask(item);
-export const itemTypeLabels={task:'事项',note:'笔记／信息',event:'事件',group:'分组'};
+export const itemTypeLabels={task:'事项',note:'笔记／信息',event:'事件',group:'分组',reminder:'提醒'};
 
 /** A leading hyphen and space is the Bullet Journal information marker. */
 export function captureItem(value:string,type:ItemType='task'):{title:string;itemType:ItemType}{

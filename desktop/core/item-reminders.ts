@@ -1,4 +1,4 @@
-import {isNote,isGroup} from './item-kind';
+import {isNote,isGroup,isReminder} from './item-kind';
 import {outlineNodes,type OutlineIndex} from './outline';
 import type {JournalState,Task,ItemReminder} from './types';
 
@@ -27,6 +27,7 @@ export function reminderTime(task:Task){const r=effectiveItemReminder(task);retu
 export function scheduledItems(state:JournalState){const candidates=state.tasks.filter(t=>effectiveItemReminder(t)&&effectiveItemReminder(t)!.state!=='dismissed');if(!candidates.length)return [];return candidates.filter(reminderEligibility(state));}
 export function setItemReminder(task:Task,value:unknown){if(isNote(task)||isGroup(task))throw new Error('笔记／信息不设置提醒。');
  const ownership=task.status==='handed-off'?task.ownership:null;
+ if((value===null||value==='')&&isReminder(task))throw new Error('提醒需要保留提醒时间。');
  if(value===null||value===''){if(ownership)ownership.reminder=null;else task.reminder=null;return;}
  if(typeof value!=='string'||!/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}/.test(value)||!Number.isFinite(Date.parse(value)))throw new Error('请选择有效的提醒日期和时间。');
  if(task.status!=='open'&&!ownership||task.deletedAt||task.archived)throw new Error('请先恢复事项，再设置提醒。');

@@ -17,7 +17,7 @@ export class ReminderWindow{
  private cueId=0;
  private state:ReminderWindowState={alerts:[],settings:{sound:true,volume:60,repeatSeconds:30},preview:false,cue:null};
  private awaiting=new Map<number,{resolve:()=>void;reject:(e:Error)=>void;timeout:ReturnType<typeof setTimeout>}>();
- constructor(private service:JournalService,private changed:()=>void,private icon:string,private log:(event:string,details?:unknown)=>void,private openItem:(id:string)=>void=()=>{},private openSession:(id:string)=>void=()=>{},private openJournal:(reveal?:boolean)=>void=()=>{},private presentationChanged:()=>void=()=>{}){
+ constructor(private service:JournalService,private changed:()=>void,private icon:string,private log:(event:string,details?:unknown)=>void,private openItem:(id:string)=>void=()=>{},private openSession:(id:string)=>void=()=>{},private openJournal:(reveal?:boolean)=>void=()=>{},private presentationChanged:()=>void=()=>{},private openInbox:()=>void=()=>{}){
   const trusted=(event:Electron.IpcMainInvokeEvent|Electron.IpcMainEvent)=>{if(!this.window||event.sender!==this.window.webContents||event.senderFrame!==this.window.webContents.mainFrame)throw new Error('无效的提醒窗口请求。');};
   ipcMain.handle('reminder:snapshot',event=>{trusted(event);return this.state;});
   ipcMain.handle('reminder:action',(event,action:ReminderAction,sessionId?:string)=>{
@@ -29,6 +29,10 @@ export class ReminderWindow{
     if(!['continue','restart-break','dismiss','choose'].includes(action))throw new Error('休息提醒操作无效。');
     this.service.execute({meta:{source:'user',entry:'reminder.card'},type:action==='continue'?'break.continue':action==='restart-break'?'break.start':'break.acknowledge'});this.changed();
     if(action!=='dismiss')this.openJournal(action==='choose');return;
+   }
+   if(alert.kind==='inbox'){
+    if(!['snooze','dismiss','open'].includes(action))throw new Error('收件箱整理提醒不支持计时操作。');
+    this.service.execute({meta:{source:'user',entry:'reminder.card'},type:action==='snooze'?'inbox-review.snooze':'inbox-review.dismiss'});this.changed();if(action==='open')this.openInbox();return;
    }
    if(alert.kind==='task'){
     if(!['snooze','dismiss','open'].includes(action))throw new Error('事项提醒不是运行中的计时器。');

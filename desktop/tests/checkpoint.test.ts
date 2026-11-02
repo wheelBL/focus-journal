@@ -57,15 +57,17 @@ test('timer targets still change revision and deliver exactly one alert after li
 });
 
 test('SQLite checkpoints change only existing running records and recover paused at their durable time',()=>{
- const folder=mkdtempSync(path.join(tmpdir(),'journal-checkpoint-'));try{
-  const file=path.join(folder,'journal.sqlite'),clock=new Clock(),store=new SqliteJournalStore(file),service=new JournalService(store,clock);
+ const folder=mkdtempSync(path.join(tmpdir(),'journal-checkpoint-'));let store:SqliteJournalStore|undefined,recovered:JournalService|undefined;
+ try{
+  const file=path.join(folder,'journal.sqlite'),clock=new Clock();store=new SqliteJournalStore(file);const service=new JournalService(store,clock);
+  service.execute({type:'inbox-review.settings',payload:{enabled:false,time:'09:00'}});
   const id=service.execute({type:'task.save',payload:{title:'保留事项',estimateMinutes:25}}).state.tasks.at(-1)!.id;
   service.execute({type:'session.manual',payload:{taskId:id,date:'2026-10-21',minutes:20,summary:'保留历史'}});start(service);const paused=start(service);service.execute({type:'focus.pause',payload:{sessionId:paused}});
   const before=store.load(),revision=service.snapshot().revision;clock.advance(12000);service.tick();const after=store.load();
   assert.deepEqual({...after,sessions:before.sessions},before);assert.deepEqual(after.sessions[0],before.sessions[0]);assert.deepEqual(after.sessions[2],before.sessions[2]);assert.equal(after.sessions[1].durationMs,12000);assert.equal(service.snapshot().revision,revision);
-  assert.throws(()=>store.saveSessionCheckpoint([{...after.sessions[1],id:'unknown'}]),/尚未保存/);assert.deepEqual(store.load(),after);store.close();
-  const recovered=new JournalService(new SqliteJournalStore(file),clock);assert.equal(recovered.snapshot().state.sessions[1].durationMs,12000);assert.ok(recovered.clockSnapshot().sessions.every(s=>s.status==='paused'));recovered.shutdown();
- }finally{rmSync(folder,{recursive:true,force:true});}
+  assert.throws(()=>store!.saveSessionCheckpoint([{...after.sessions[1],id:'unknown'}]),/尚未保存/);assert.deepEqual(store.load(),after);store.close();store=undefined;
+  recovered=new JournalService(new SqliteJournalStore(file),clock);assert.equal(recovered.snapshot().state.sessions[1].durationMs,12000);assert.ok(recovered.clockSnapshot().sessions.every(s=>s.status==='paused'));
+ }finally{recovered?.shutdown();store?.close();rmSync(folder,{recursive:true,force:true});}
 });
 
 test('SQLite multi-timer checkpoint rolls back all rows on failure and keeps its write cache retryable',()=>{

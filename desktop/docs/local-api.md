@@ -153,3 +153,6 @@ request.json 是 UTF-8 文件，例如 `{"title":"整理周报"}`。工具不会
 0.20.0 新增投入回收站：`session.delete {id}` 删除已结束的投入，`session.restore {id}` 恢复。仍需写权限、If-Match 和 Idempotency-Key。删除返回 `removedSessionIds`，并更新事项累计投入；`GET /v1/sessions?deleted=true` 分页查询可恢复记录。恢复同一事项的重叠区间会拒绝，运行中的记录不能删除。备份与同步包含回收站，CSV 只导出有效投入。
 
 0.21.1：`session.delete {id, summary?}` 可在放弃投入时原子保留最后填写的进展。`session.summary {id, summary, remainingMinutes?, rest:true}` 可原子保存小结并开始休息；如其他计时仍在运行或保存失败，小结、剩余估计与休息状态均不改变。补记新投入不能选择已删除、归档的事项或其后代；校正原有历史投入可保留原归属。
+
+
+0.32.0：新增 `reminder.convert {id,at,rule}` 将事项转为纯提醒，保留原安排和投入。`recurrence.set {id,rule}` 调整重复规则；提醒只支持固定日历。`item-reminder.dismiss {id}` 确认本次并进入下一次，`item-reminder.snooze {id}` 五分钟后提醒。通过 `outline.patch {id,field:"itemType",value:"task"}` 转回事项。`inbox-review.settings {enabled,time}` 配置每天整理提醒，`inbox-review.dismiss` 和 `inbox-review.snooze` 处理本次提醒。时间格式 HH:mm、默认09:00、本机时区；具体参数由 `/commands` 和 `/openapi.json` 返回。详情见 [纯提醒与收件箱](reminders-inbox.md)。

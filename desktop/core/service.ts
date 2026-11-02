@@ -1,3 +1,4 @@
+import {inboxItems,inboxReviewSettings,inboxReviewDue,validateInboxReviewSettings} from './inbox-review';
 import {appendActivity,validateActivityState} from './activity-log';
 import {validateOwnership,completionLabels} from './activity';
 import {changeOwnership,setCompletion} from './ownership';
@@ -13,11 +14,11 @@ import {deleteSession,restoreSession} from './session-trash';
 import {saveManualSession} from './manual-session';
 import {saveCalendarSelection} from './calendar-command';
 import {defaultCaptureParent} from './capture-destination';
-import {configureRecurrence,generateTaskSuccessors,validateRecurrence,localDay,advanceEventReminder} from './recurrence';
+import {configureRecurrence,generateTaskSuccessors,validateRecurrence,localDay,advanceEventReminder,advancePureReminder} from './recurrence';
 import {applyBatch,isBatchLifecycle,batchImpact} from './batch';
 import {text,required,number,day,deadline,instant,validateSchedule} from './validation';
 import {createCapture,validateInformation} from './capture-command';
-import {captureItem,isNote,isEvent,isTask,isGroup,requireAction} from './item-kind';
+import {captureItem,isNote,isEvent,isTask,isGroup,isReminder,requireAction} from './item-kind';
 import {effectiveItemReminder,scheduledItems,reminderTime,setItemReminder,validateItemReminder} from './item-reminders';
 import {isDateDeadline,deadlineTime} from './deadlines';
 import {blockedReason} from './item-state';
@@ -110,12 +111,14 @@ export class JournalService {
     const s=this.state,running=this.clockSnapshot().sessions.filter(x=>x.status==='running'),reminders:string[]=[];
     const due=new Set(running.filter(x=>(!x.reminded&&x.durationMs>=timerTargetMs(x))||(x.reminder?.state==='snoozed'&&Date.parse(x.reminder.snoozedUntil!)<=this.clock.now())).map(x=>x.id));
     const itemDue=new Set(scheduledItems(s).filter(t=>['scheduled','snoozed'].includes(effectiveItemReminder(t)!.state)&&Date.parse(reminderTime(t)!)<=this.clock.now()).map(t=>t.id));
+    const inboxDue=inboxReviewDue(s,this.iso());
     const restDue=!!s.settings.breakUntil&&Date.parse(s.settings.breakUntil)<=this.clock.now();
-    if(due.size||itemDue.size||restDue)this.commit(draft=>{
+    if(due.size||itemDue.size||restDue||inboxDue)this.commit(draft=>{
       for(const session of this.active(draft))if(due.has(session.id)){
         session.reminded=true;session.reminder={state:'pending',snoozedUntil:null};reminders.push(`「${sessionTitle(draft,session.taskId)}」本次目标时间已到，计时会继续，直到你主动结束。`);
       }
       for(const task of draft.tasks)if(itemDue.has(task.id)){const reminder=effectiveItemReminder(task)!;reminder.state='pending';reminder.snoozedUntil=null;}
+      if(inboxDue){const r=inboxReviewSettings(draft);r.pendingDate??=localDate(this.clock.now());r.snoozedUntil=null;draft.settings.inboxReview=r;}
       if(restDue){finishBreak(draft,true);reminders.push('休息结束了，欢迎回来。准备好后，再开始下一次专注。');}
     });
     else if(running.length&&this.clock.monotonic()-this.checkpointAt>=10000)this.checkpoint();
@@ -131,9 +134,14 @@ export class JournalService {
     if(command.type==='item-review.mark'&&p.batchId&&this.state.itemReviews.some(r=>r.batchId===p.batchId))return this.snapshot();
     const before=structuredClone(this.state);let moved:OutlinePosition|undefined,undo=false,organizing=false,stateUndone=false;
     const lifecycle=['item.change','task.status','item.handoff','item.reclaim','item.completion'].includes(command.type)||command.type==='focus.stop'&&p.complete===true||command.type==='items.batch'&&isBatchLifecycle(p.action);
-    const undoLabel=command.type==='recurrence.set'?'重复安排':lifecycle?'事项状态':command.type==='items.batch'?'批量整理':command.type==='item.focus'?'今日重点':command.type==='event.save'?'事件时间':command.type==='outline.move'?'移动事项':command.type.startsWith('tag.')?'修改标签':command.type==='outline.patch'&&p.field!=='estimateMinutes'?'编辑事项':command.type==='task.plan'?'修改计划':command.type==='task.save'&&p.id?'编辑事项':null;
+    const undoLabel=command.type==='reminder.convert'?'转换为提醒':command.type==='recurrence.set'?'重复安排':lifecycle?'事项状态':command.type==='items.batch'?'批量整理':command.type==='item.focus'?'今日重点':command.type==='event.save'?'事件时间':command.type==='outline.move'?'移动事项':command.type.startsWith('tag.')?'修改标签':command.type==='outline.patch'&&p.field!=='estimateMinutes'?'编辑事项':command.type==='task.plan'?'修改计划':command.type==='task.save'&&p.id?'编辑事项':null;
     this.commit((s,now)=>{
       switch(command.type) {
+        case 'inbox-review.settings': {const r=inboxReviewSettings(s);if(typeof p.enabled!=='boolean'||typeof p.time!=='string')throw new Error('收件箱提醒设置无效。');const changed=r.time!==p.time;r.enabled=p.enabled;r.time=p.time;if(!r.enabled||changed){r.pendingDate=null;r.snoozedUntil=null;}s.settings.inboxReview=validateInboxReviewSettings(r);break;}
+        case 'inbox-review.dismiss':
+        case 'inbox-review.snooze': {const r=inboxReviewSettings(s);if(!r.pendingDate||r.snoozedUntil||!inboxItems(s).length)throw new Error('收件箱提醒已经处理。');if(command.type==='inbox-review.dismiss'){r.lastHandledDate=localDate(now);r.pendingDate=null;r.snoozedUntil=null;}else r.snoozedUntil=new Date(this.clock.now()+300000).toISOString();s.settings.inboxReview=r;break;}
+        case 'reminder.convert': {const t=this.task(s,p.id);if(!isTask(t)||t.status!=='open'||t.deletedAt||t.archived||t.availability==='paused'||t.ownership||this.active(s).some(a=>a.taskId===t.id))throw new Error('请先结束计时并恢复未结束的事项，再转为提醒。');
+          if(!Object.hasOwn(p,'rule')||p.at===null||p.at===undefined)throw new Error('请选择提醒时间和重复方式。');t.reminderHistory={estimateMinutes:t.estimateMinutes,plannedDate:t.plannedDate,dueAt:t.dueAt??null,focusDate:t.focusDate??null,reviewSchedule:t.reviewSchedule??null,reminder:t.reminder??null,recurrence:t.recurrence??null,isProject:!!t.isProject};t.itemType='reminder';t.estimateMinutes=null;t.plannedDate=null;t.dueAt=null;t.focusDate=null;t.reviewSchedule=null;t.isProject=false;t.recurrence=null;t.reminder=null;setItemReminder(t,p.at);if(!t.reminder)throw new Error('请选择提醒时间。');configureRecurrence(t,p.rule??null,now);break;}
         case 'item.handoff': {changeOwnership(s,p,now);break;}
         case 'item.reclaim': {changeOwnership(s,p,now,true);break;}
         case 'item.completion': {setCompletion(this.task(s,p.id),p,now);break;}
@@ -143,11 +151,11 @@ export class JournalService {
         case 'item.focus': {const task=this.task(s,p.id);requireAction(task);if(task.status!=='open'||task.deletedAt)throw new Error('请选择未完成事项。');task.focusDate=p.date?day(p.date):null;break;}
         case 'recurrence.set': {configureRecurrence(this.task(s,p.id),p.rule,now);break;}
         case 'event.save': {const task=this.task(s,p.id);if(!isEvent(task))throw new Error('请选择事件。');task.eventAt=deadline(p.at);task.eventEnd=p.end?instant(p.end):null;if(task.recurrence){task.recurrence.anchor=localDay(task.eventAt);if(task.recurrence.until&&task.recurrence.until<task.recurrence.anchor)throw new Error('事件日期晚于重复结束日，请先调整重复范围。');if(task.reminder&&task.recurrence.reminderOffsetMs!==undefined)task.reminder={at:new Date(Date.parse(task.eventAt.length===10?`${task.eventAt}T00:00:00`:task.eventAt)+task.recurrence.reminderOffsetMs).toISOString(),state:'scheduled',snoozedUntil:null};}break;}
-        case 'item-reminder.set': {const task=this.task(s,p.id);setItemReminder(task,p.at);if(task.recurrence&&isEvent(task)){delete task.recurrence.reminderOffsetMs;if(task.reminder)configureRecurrence(task,task.recurrence,now);}break;}
+        case 'item-reminder.set': {const task=this.task(s,p.id);setItemReminder(task,p.at);if(task.recurrence&&isReminder(task)&&task.reminder){task.recurrence.anchor=localDay(task.reminder.at);validateRecurrence(task.recurrence);}if(task.recurrence&&isEvent(task)){delete task.recurrence.reminderOffsetMs;if(task.reminder)configureRecurrence(task,task.recurrence,now);}break;}
         case 'item-reminder.snooze':
         case 'item-reminder.dismiss': {
           const task=scheduledItems(s).find(t=>t.id===p.id&&effectiveItemReminder(t)?.state==='pending');if(!task)throw new Error('这个提醒已经处理。');
-          effectiveItemReminder(task)!.state=command.type==='item-reminder.snooze'?'snoozed':'dismissed';effectiveItemReminder(task)!.snoozedUntil=command.type==='item-reminder.snooze'?new Date(this.clock.now()+300000).toISOString():null;if(command.type==='item-reminder.dismiss'&&!task.ownership)advanceEventReminder(task,now);break;
+          effectiveItemReminder(task)!.state=command.type==='item-reminder.snooze'?'snoozed':'dismissed';effectiveItemReminder(task)!.snoozedUntil=command.type==='item-reminder.snooze'?new Date(this.clock.now()+300000).toISOString():null;if(command.type==='item-reminder.dismiss'&&!task.ownership){advanceEventReminder(task,now);advancePureReminder(task,now);}break;
         }
         case 'item-review.configure': {
           const task=this.task(s,p.id),enabled=p.enabled===true;if(isGroup(task))throw new Error('分组不设置审视安排。');if(enabled&&(task.status!=='open'||task.deletedAt))throw new Error('请先重新打开或恢复事项，再开启审视。');
@@ -189,7 +197,7 @@ export class JournalService {
         case 'outline.patch': {
           const task=this.task(s,p.id);
           if(!['title','description','itemType'].includes(String(p.field)))requireAction(task);
-          if(p.field==='itemType'){if(p.value==='group'&&isTask(task)){if(this.active(s).some(r=>r.taskId===task.id))throw new Error('请先结束此事项的计时，再转为分组。');if(task.status!=='open'||task.availability==='paused'||task.plannedDate||task.dueAt||task.focusDate||task.reminder&&task.reminder.state!=='dismissed'||task.recurrence||task.reviewSchedule?.enabled||task.ownership)throw new Error('请先移除执行安排和审视安排，并恢复未结束状态，再转为分组。');task.groupHistory={initialEstimateMinutes:task.estimateMinutes,reminder:task.reminder??null,reviewSchedule:task.reviewSchedule??null};task.estimateMinutes=null;task.reminder=null;task.reviewSchedule=null;task.itemType='group';task.isProject=false;}else if(p.value==='task'&&!isTask(task)){if(isGroup(task)&&task.groupHistory){task.estimateMinutes=task.groupHistory.initialEstimateMinutes;task.reminder=task.groupHistory.reminder;task.reviewSchedule=task.groupHistory.reviewSchedule;delete task.groupHistory;}task.itemType='task';task.eventAt=null;task.eventEnd=null;task.recurrence=null;}else throw new Error('不支持此类型转换。');}
+          if(p.field==='itemType'){if(p.value==='group'&&isTask(task)){if(this.active(s).some(r=>r.taskId===task.id))throw new Error('请先结束此事项的计时，再转为分组。');if(task.status!=='open'||task.availability==='paused'||task.plannedDate||task.dueAt||task.focusDate||task.reminder&&task.reminder.state!=='dismissed'||task.recurrence||task.reviewSchedule?.enabled||task.ownership)throw new Error('请先移除执行安排和审视安排，并恢复未结束状态，再转为分组。');task.groupHistory={initialEstimateMinutes:task.estimateMinutes,reminder:task.reminder??null,reviewSchedule:task.reviewSchedule??null};task.estimateMinutes=null;task.reminder=null;task.reviewSchedule=null;task.itemType='group';task.isProject=false;}else if(p.value==='task'&&!isTask(task)){const restoredRecurrence=isReminder(task)?task.reminderHistory?.recurrence??null:null;if(isReminder(task)&&task.reminderHistory){const h=task.reminderHistory;task.estimateMinutes=h.estimateMinutes;task.plannedDate=h.plannedDate;task.dueAt=h.dueAt;task.focusDate=h.focusDate;task.reviewSchedule=h.reviewSchedule;task.reminder=h.reminder;task.isProject=h.isProject;delete task.reminderHistory;}if(isGroup(task)&&task.groupHistory){task.estimateMinutes=task.groupHistory.initialEstimateMinutes;task.reminder=task.groupHistory.reminder;task.reviewSchedule=task.groupHistory.reviewSchedule;delete task.groupHistory;}task.itemType='task';task.eventAt=null;task.eventEnd=null;task.recurrence=restoredRecurrence;}else throw new Error('不支持此类型转换。');}
           else if(p.field==='title')task.title=required(p.value);
           else if(p.field==='description')task.description=text(p.value);
           else if(p.field==='isProject'){if(typeof p.value!=='boolean')throw new Error('项目标记无效。');task.isProject=p.value;}
@@ -301,7 +309,8 @@ export class JournalService {
         }
         case 'reminder.snooze-all': {
           if(s.settings.rest?.phase==='ready')s.settings.rest.notify=false;
-          for(const task of scheduledItems(s))if(effectiveItemReminder(task)!.state==='pending'){const r=effectiveItemReminder(task)!;r.state='snoozed';r.snoozedUntil=new Date(this.clock.now()+300000).toISOString();r.at=r.snoozedUntil;}
+          const inbox=inboxReviewSettings(s);if(inbox.pendingDate&&!inbox.snoozedUntil&&inboxItems(s).length){inbox.snoozedUntil=new Date(this.clock.now()+300000).toISOString();s.settings.inboxReview=inbox;}
+          for(const task of scheduledItems(s))if(effectiveItemReminder(task)!.state==='pending'){const r=effectiveItemReminder(task)!;r.state='snoozed';r.snoozedUntil=new Date(this.clock.now()+300000).toISOString();}
           for(const a of this.active(s))if(a.status==='running'&&a.reminder?.state==='pending'){a.reminder={state:'snoozed',snoozedUntil:new Date(this.clock.now()+5*60000).toISOString()};a.updatedAt=now;}break;
         }
         case 'reminder.settings': {s.settings.reminders=validateReminderSettings(p.settings);break;}
@@ -329,7 +338,8 @@ export class JournalService {
         }
         case 'break.start': {startBreak(s,now,p.sessionId);break;}
         case 'break.finish': {finishBreak(s,false);break;}
-        case 'break.acknowledge': {if(s.settings.rest?.phase==='ready')s.settings.rest.notify=false;break;}
+        case 'break.acknowledge': {if(s.settings.rest?.phase==='ready')s.settings.rest.notify=false;
+          const inbox=inboxReviewSettings(s);if(inbox.pendingDate&&!inbox.snoozedUntil&&inboxItems(s).length){inbox.snoozedUntil=new Date(this.clock.now()+300000).toISOString();s.settings.inboxReview=inbox;}break;}
         case 'break.continue': {
           if(s.settings.rest?.phase!=='ready')throw new Error('休息状态已变化，请查看当前计时。');
           const next=breakContinuation(s);
@@ -451,7 +461,7 @@ export class JournalService {
 export function parseJournalBackup(content:string):JournalState {
   let parsed:unknown;try{parsed=JSON.parse(content);}catch{throw new Error('文件不是有效 JSON。');}
   const data=parsed as {format?:string;version?:number;state?:JournalState};
-  if(!data||data.format!=='focus-journal'||![1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20].includes(data.version??0)||!data.state)throw new Error('这不是支持的专注记备份。');
+  if(!data||data.format!=='focus-journal'||![1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21].includes(data.version??0)||!data.state)throw new Error('这不是支持的专注记备份。');
   validateState(data.state);return migrateOutline(data.state);
 }
 function validateState(s:JournalState) {
@@ -459,7 +469,7 @@ function validateState(s:JournalState) {
   const bool=(v:unknown)=>{if(typeof v!=='boolean')invalid();};
   const stamp=(v:unknown)=>{if(instant(v)!==v)invalid();};
   const nullableStamp=(v:unknown)=>{if(v!==null)stamp(v);};
-  if(!s||typeof s!=='object'||![1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20].includes(s.schemaVersion))throw new Error('备份版本不受支持。');
+  if(!s||typeof s!=='object'||![1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21].includes(s.schemaVersion))throw new Error('备份版本不受支持。');
   for(const k of ['projects','tasks','sessions','notes','estimates','reviews','audit'] as const){
     if(!Array.isArray(s[k])||s[k].length>100000)invalid();
     const ids=new Set();
@@ -475,13 +485,16 @@ function validateState(s:JournalState) {
   for(const t of s.tasks){
     if(t.status==='handed-off'&&s.schemaVersion<19)invalid();validateOwnership(t);if(t.ownership)validateItemReminder(t.ownership.reminder);if(s.schemaVersion>=19&&t.status==='open'&&t.ownership)invalid();
     required(t.title);text(t.outcome);text(t.nextAction);
+    if(t.reminderHistory!==undefined){const h=t.reminderHistory;if(s.schemaVersion<21||!isReminder(t)||!h||typeof h!=='object'||Array.isArray(h)||Object.keys(h).sort().join(',')!=='dueAt,estimateMinutes,focusDate,isProject,plannedDate,recurrence,reminder,reviewSchedule')invalid();if(h.estimateMinutes!==null)number(h.estimateMinutes);if(h.plannedDate!==null)day(h.plannedDate);if(h.dueAt!==null)deadline(h.dueAt);if(h.focusDate!==null)day(h.focusDate);if(typeof h.isProject!=='boolean')invalid();validateItemReminder(h.reminder);if(h.reviewSchedule)validateReviewSchedule(h.reviewSchedule);if(h.recurrence)validateRecurrence(h.recurrence);}
     if(t.groupHistory!==undefined){const h=t.groupHistory;if(!isGroup(t)||!h||typeof h!=='object'||Array.isArray(h)||Object.keys(h).sort().join(',')!=='initialEstimateMinutes,reminder,reviewSchedule')invalid();if(h.initialEstimateMinutes!==null)number(h.initialEstimateMinutes);validateItemReminder(h.reminder);if(h.reminder&&h.reminder.state!=='dismissed')invalid();if(h.reviewSchedule){validateReviewSchedule(h.reviewSchedule);if(h.reviewSchedule.enabled)invalid();}}
-    if(t.itemType!==undefined&&!['task','note','event','group'].includes(t.itemType)||t.itemType==='group'&&s.schemaVersion<20)invalid();if(t.updatedAt!==undefined)stamp(t.updatedAt);
+    if(t.itemType!==undefined&&!['task','note','event','group','reminder'].includes(t.itemType)||t.itemType==='group'&&s.schemaVersion<20||t.itemType==='reminder'&&s.schemaVersion<21)invalid();if(t.updatedAt!==undefined)stamp(t.updatedAt);
 
     if(!(s.schemaVersion>=13&&t.projectId===null)&&!projectIds.has(t.projectId as string)||!['open','done','cancelled','handed-off'].includes(t.status))invalid();
     if(t.estimateMinutes!==null)number(t.estimateMinutes);
     if(t.plannedDate!==null)day(t.plannedDate);
     validateItemReminder(t.reminder);
+    if(isReminder(t)&&t.reminder&&Object.keys(t.reminder).sort().join(',')!=='at,snoozedUntil,state')invalid();
+    if(isReminder(t)&&t.recurrence&&Object.keys(t.recurrence).sort().join(',')!=='anchor,interval,mode,unit,until,weekdays')invalid();
     if(t.recurrence){validateRecurrence(t.recurrence);if(isNote(t)||isEvent(t)&&(t.recurrence.mode!=='calendar'||t.recurrence.anchor!==localDay(t.eventAt!)))invalid();}
     for(const id of [t.recurrenceNextId,t.recurrencePreviousId])if(id!=null&&(!taskIds.has(id)||id===t.id))invalid();
     if(t.dueAt!==undefined&&t.dueAt!==null){if(typeof t.dueAt==='string'&&isDateDeadline(t.dueAt))day(t.dueAt);else stamp(t.dueAt);}validateSchedule(t);
@@ -524,7 +537,7 @@ function validateState(s:JournalState) {
   for(const r of s.reviews){text(r.outcome);text(r.reason);text(r.adjustment);stamp(r.updatedAt);if(!taskIds.has(r.taskId)||reviewed.has(r.taskId))invalid();reviewed.add(r.taskId);}
   for(const a of s.audit){stamp(a.createdAt);text(a.reason);if(!sessionIds.has(a.entityId)||typeof a.before!=='string')invalid();let before:Session;try{before=JSON.parse(a.before);}catch{invalid();}checkSession(before!);if(before!.id!==a.entityId)invalid();}
   validateActivityState(s);
-  if(!s.settings)invalid();if(s.settings.reminders!==undefined)validateReminderSettings(s.settings.reminders);number(s.settings.targetMinutes,1,240);number(s.settings.breakMinutes,1,60);nullableStamp(s.settings.breakUntil);
+  if(!s.settings)invalid();if(s.settings.inboxReview!==undefined){if(s.schemaVersion<21)invalid();validateInboxReviewSettings(s.settings.inboxReview);}if(s.settings.reminders!==undefined)validateReminderSettings(s.settings.reminders);number(s.settings.targetMinutes,1,240);number(s.settings.breakMinutes,1,60);nullableStamp(s.settings.breakUntil);
   if(s.settings.rest!=null){const rest=s.settings.rest;required(rest.id,100);if(!['offered','running','ready'].includes(rest.phase))invalid();number(rest.minutes,1,60);bool(rest.notify);if(rest.sessionId!==null&&!s.sessions.some(r=>r.id===rest.sessionId&&r.status==='ended'))invalid();if((rest.phase==='running')!==(s.settings.breakUntil!==null)||rest.notify&&rest.phase!=='ready'||s.sessions.some(r=>r.status==='running'))invalid();}
   else if(s.schemaVersion>=15&&s.settings.breakUntil!==null)invalid();
   if(s.settings.selectedTaskId!==null&&!taskIds.has(s.settings.selectedTaskId))invalid();

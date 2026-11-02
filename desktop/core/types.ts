@@ -1,10 +1,11 @@
 export type Id = string;
-export const JOURNAL_SCHEMA_VERSION=20;
+export const JOURNAL_SCHEMA_VERSION=21;
 export interface Project { id: Id; name: string; description: string; archived: boolean; createdAt: string; parentId?: Id | null; order?: number }
 export interface Task {
+  reminderHistory?:{estimateMinutes:number|null;plannedDate:string|null;dueAt:string|null;focusDate:string|null;reviewSchedule:ReviewSchedule|null;reminder:ItemReminder|null;recurrence:Recurrence|null;isProject:boolean};
   groupHistory?:{initialEstimateMinutes:number|null;reminder:ItemReminder|null;reviewSchedule:ReviewSchedule|null};
   ownership?:import('./activity').Ownership|null;completionBy?:import('./activity').CompletionBy;
-  id: Id; projectId: Id|null; title: string; itemType?:'task'|'note'|'event'|'group'; eventAt?:string|null; eventEnd?:string|null; focusDate?:string|null; updatedAt?:string; isProject?: boolean; description?: string; archived?: boolean; availability?:'active'|'paused'; deletedAt?:string|null; reviewSchedule?:ReviewSchedule|null; reminder?:ItemReminder|null; tagIds?: Id[]; outcome: string; nextAction: string; parentId?: Id | null; order?: number;
+  id: Id; projectId: Id|null; title: string; itemType?:'task'|'note'|'event'|'group'|'reminder'; eventAt?:string|null; eventEnd?:string|null; focusDate?:string|null; updatedAt?:string; isProject?: boolean; description?: string; archived?: boolean; availability?:'active'|'paused'; deletedAt?:string|null; reviewSchedule?:ReviewSchedule|null; reminder?:ItemReminder|null; tagIds?: Id[]; outcome: string; nextAction: string; parentId?: Id | null; order?: number;
   recurrence?:Recurrence|null; recurrenceNextId?:Id|null; recurrencePreviousId?:Id|null;
   estimateMinutes: number | null; plannedDate: string | null; /** YYYY-MM-DD means before local midnight; ISO means an exact time. */ dueAt?: string | null; status: 'open' | 'done' | 'cancelled' | 'handed-off';
   createdAt: string; startedAt: string | null; completedAt: string | null;
@@ -28,12 +29,13 @@ export interface Recurrence {mode:'calendar'|'completion';unit:'day'|'week'|'mon
 export interface Audit { id: Id; entityId: Id; before: string; reason: string; createdAt: string }
 export interface ItemReminder {at:string;state:'scheduled'|'pending'|'snoozed'|'dismissed';snoozedUntil:string|null}
 export interface ReminderSettings {sound:boolean;volume:number;repeatSeconds:number}
-export interface ReminderView {kind?:'task'|'break';breakMinutes?:number;canRest?:boolean;continuationTitle?:string;remindAt?:string;sessionId:Id;taskId:Id|null;title:string;durationMs:number;targetMinutes:number;targetOffsetMs?:number}
+export interface ReminderView {kind?:'task'|'break'|'inbox';breakMinutes?:number;canRest?:boolean;continuationTitle?:string;remindAt?:string;sessionId:Id;taskId:Id|null;title:string;durationMs:number;targetMinutes:number;targetOffsetMs?:number;count?:number;recurring?:boolean}
 export interface ReminderWindowState {alerts:ReminderView[];settings:ReminderSettings;preview:boolean;cue:{id:number;volume:number}|null}
 export type ReminderAction='stop-rest'|'continue'|'restart-break'|'choose'|'stop'|'snooze'|'dismiss'|'open'|'close-preview';
 export interface ReminderApi {snapshot():Promise<ReminderWindowState>;action(action:ReminderAction,sessionId?:string):Promise<void>;onChanged(callback:(state:ReminderWindowState)=>void):()=>void;audioResult(id:number,error?:string):void}
 export interface RestCycle {id:string;phase:'offered'|'running'|'ready';sessionId:Id|null;minutes:number;notify:boolean}
-export interface Settings { rest?:RestCycle|null; reminders?:ReminderSettings; targetMinutes: number; breakMinutes: number; selectedTaskId: Id | null; breakUntil: string | null }
+export interface InboxReviewSettings {enabled:boolean;time:string;pendingDate:string|null;lastHandledDate:string|null;snoozedUntil:string|null}
+export interface Settings { inboxReview?:InboxReviewSettings; rest?:RestCycle|null; reminders?:ReminderSettings; targetMinutes: number; breakMinutes: number; selectedTaskId: Id | null; breakUntil: string | null }
 export interface Tag { id: Id; name: string }
 export type FilterField = 'responsibility'|'assignee'|'completionBy'|'handedOffAt'|'focusDate'|'itemType'|'status'|'availability'|'plannedDate'|'dueAt'|'completedAt'|'tags'|'title'|'description'|'isProject'|'estimateMinutes'|'actualMinutes'|'scope'|'actionable';
 export type FilterOperator = 'is'|'is-not'|'before'|'after'|'period'|'between'|'set'|'unset'|'all'|'any'|'none'|'contains'|'not-contains'|'greater'|'less';
@@ -47,7 +49,7 @@ export type FilterRule = FilterCondition|FilterGroup;
 export interface ItemFilter { trash?:boolean; view: 'all'|'actions'|'unplanned'|'done'; query: string; showDone: boolean; scopeId: Id|null; tagIds: Id[]; tagMode: 'all'|'any'; planned: 'any'|'today'|'through-today'|'unplanned'; completed: 'any'|'today'|'this-week'; due: 'any'|'today'|'this-week'|'overdue'; projectsOnly: boolean; rules?:FilterGroup; sort?:'smart'|'manual'|'due'|'planned'|'title'|'created' }
 export interface SavedView { id: Id; name: string; filter: ItemFilter }
 export interface JournalState {
-  schemaVersion: 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10 | 11 | 12 | 13 | 14 | 15 | 16 | 17 | 18 | 19 | 20; activities?:import('./activity').BusinessActivity[];itemReviews:ItemReviewLog[]; moves:MoveRecord[]; tags: Tag[]; views: SavedView[]; projects: Project[]; tasks: Task[]; sessions: Session[]; deletedSessions:DeletedSession[]; notes: Note[];
+  schemaVersion: 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10 | 11 | 12 | 13 | 14 | 15 | 16 | 17 | 18 | 19 | 20 | 21; activities?:import('./activity').BusinessActivity[];itemReviews:ItemReviewLog[]; moves:MoveRecord[]; tags: Tag[]; views: SavedView[]; projects: Project[]; tasks: Task[]; sessions: Session[]; deletedSessions:DeletedSession[]; notes: Note[];
   estimates: Estimate[]; reviews: Review[]; audit: Audit[]; settings: Settings;
 }
 export interface TimerView { sessionId: Id; taskId: Id | null; durationMs: number; targetMinutes: number; targetOffsetMs?:number; paused: boolean; recovered: boolean }
@@ -75,6 +77,7 @@ export interface JournalApi {
   importData(): Promise<Snapshot | null>;
   openDataFolder(): Promise<void>; windowAction(action: 'minimize' | 'maximize' | 'close' | 'quit'): Promise<void>;
   onOpenSession?(callback:(id:string)=>void):()=>void;
+  onOpenInbox?(callback:()=>void):()=>void;
   onOpenItem?(callback:(id:string)=>void):()=>void;
   onChanged?(callback: () => void): () => void;
 }

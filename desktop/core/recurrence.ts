@@ -1,6 +1,6 @@
 import {localDate,shiftDate,type Recurrence,type Task,type JournalState} from './types';
 import {day} from './validation';
-import {isEvent,isNote,isGroup} from './item-kind';
+import {isEvent,isNote,isGroup,isReminder} from './item-kind';
 
 const ordinal=(date:string)=>Date.parse(`${date}T00:00:00Z`)/86400000;
 export const dateDistance=(from:string,to:string)=>ordinal(to)-ordinal(from);
@@ -51,11 +51,11 @@ export function configureRecurrence(task:Task,value:unknown,now:string){
  if(value===null){task.recurrence=null;return;}
  if(isNote(task)||isGroup(task)||task.status!=='open'||task.deletedAt||task.archived)throw new Error('请为未完成事项或事件设置重复。');
  const rule=validateRecurrence(value);
- if(isEvent(task)&&rule.mode!=='calendar')throw new Error('事件按固定日历重复。');
+ if((isEvent(task)||isReminder(task))&&rule.mode!=='calendar')throw new Error('事件按固定日历重复。');
  if(isEvent(task)){
   if(rule.anchor!==localDay(task.eventAt!))throw new Error('事件的首次日期请在事件时间中修改。');
   if(task.reminder&&rule.reminderOffsetMs===undefined)rule.reminderOffsetMs=Date.parse(task.reminder.at)-Date.parse(task.eventAt!.length===10?`${task.eventAt}T00:00:00`:task.eventAt!);
- }else if(!task.plannedDate&&!task.dueAt)task.plannedDate=rule.anchor;
+ }else if(isReminder(task)){if(!task.reminder||rule.anchor>localDay(task.reminder.at))throw new Error('重复首次日期不能晚于提醒日期。');}else if(!task.plannedDate&&!task.dueAt)task.plannedDate=rule.anchor;
  task.recurrence=rule;
  if(isEvent(task)&&task.reminder&&rule.reminderOffsetMs!==undefined){
   validateRecurrence(rule);
@@ -119,4 +119,12 @@ export function recurrenceLabel(rule:Recurrence){
  const units={day:'天',week:'周',month:'个月',year:'年'};
  const days=['日','一','二','三','四','五','六'];
  return `${rule.mode==='completion'?'完成后每隔':'每'} ${rule.interval} ${units[rule.unit]}${rule.mode==='calendar'&&rule.unit==='week'?` · 周${rule.weekdays.map(d=>days[d]).join('、')}`:''}${rule.until?` · 至 ${rule.until}`:''}`;
+}
+
+/** Advance from the original calendar anchor, independent of snoozes. */
+export function advancePureReminder(task:Task,now:string){
+ const rule=task.recurrence,r=task.reminder;if(!isReminder(task)||!rule||!r)return;
+ const currentDay=localDay(r.at),today=localDay(now);let date=nextOccurrence(rule,shiftDate(today,-1));
+ while(date){const at=shiftOccurrence(r.at,dateDistance(currentDay,date))!;if(Date.parse(at)>Date.parse(now)){task.reminder={at,state:'scheduled',snoozedUntil:null};return;}date=nextOccurrence(rule,date);}
+ r.state='dismissed';r.snoozedUntil=null;
 }

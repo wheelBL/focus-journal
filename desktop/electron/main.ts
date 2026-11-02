@@ -74,7 +74,7 @@ else if(workspace) {
       ...timerMenu(service.snapshot(),performTimer),...breakMenu(service.snapshot(),performTimer),
       {type:'separator'},{label:'退出专注记',click:()=>app.quit()}
     ]));
-    const reminders=new ReminderWindow(service,()=>changed(),icon,log,id=>{show();win?.webContents.send('journal:open-item',id);},openSession,reveal=>{if(reveal||win?.isVisible()&&!win.isMinimized())show();},()=>floating?.sync());
+    const reminders=new ReminderWindow(service,()=>changed(),icon,log,id=>{show();win?.webContents.send('journal:open-item',id);},openSession,reveal=>{if(reveal||win?.isVisible()&&!win.isMinimized())show();},()=>floating?.sync(),()=>{show();win?.webContents.send('journal:open-inbox');});
     const floating=new FloatingTimerWindow(service,win,()=>changed(),()=>reminders.isPresenting(),icon,path.join(dataDir,'floating-timer-position.json'),show,openSession,log);
     const capture=new CaptureWindow(service,()=>changed(),icon,path.join(dataDir,'capture-settings.json'),demo);
     const changed=()=>{win?.webContents.send('journal:changed');refreshTray();reminders.sync();floating.sync();tray?.setToolTip(floating.tooltip());};

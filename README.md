@@ -10,7 +10,7 @@ Windows 11 与 macOS 上的本地工作日志，把 **估计 → 实践 → 复�
 
 ## 下载与运行
 
-当前源码版本为 **0.31.1**，下载包由 GitHub Actions 构建。选择对应平台的成功运行，在 Artifacts 中下载；[0.31.1 更新说明](docs/releases/0.31.1.md)。
+当前源码版本为 **0.32.0**，下载包由 GitHub Actions 构建。选择对应平台的成功运行，在 Artifacts 中下载；[0.32.0 更新说明](docs/releases/0.32.0.md)。
 
 | 设备 | 下载 |
 | --- | --- |
@@ -130,7 +130,7 @@ node scripts/package-windows.mjs --versioned
 - [事项规则](desktop/docs/scenario-rules.md) · [事项审视](desktop/docs/item-review-rules.md)
 - [0.21.0 发布说明](docs/releases/0.21.0.md)
 - [0.31.0 发布说明](docs/releases/0.31.0.md)
-- [0.31.1 发布说明](docs/releases/0.31.1.md)
+- [0.32.0 发布说明](docs/releases/0.32.0.md)
 
 ## 数据与发布范围
 

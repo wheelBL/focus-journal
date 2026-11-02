@@ -9,7 +9,7 @@ import {emptyState} from '../core/types.ts';
 const folder=path.resolve('qa-evidence/release-0.8.0/dom');mkdirSync(folder,{recursive:true});const output=path.join(folder,'reminder-window.cjs');
 await build({stdin:{contents:"export {ReminderWindow} from './electron/reminder-window';export {harness} from './tests/fixtures/reminder-electron.mjs';",resolveDir:process.cwd(),loader:'ts'},outfile:output,bundle:true,platform:'node',format:'cjs',alias:{electron:path.resolve('tests/fixtures/reminder-electron.mjs')},logLevel:'silent'});
 const {ReminderWindow,harness}=createRequire(import.meta.url)(output);
-class Store{path='reminder desktop tests';state=emptyState();load(){return structuredClone(this.state);}save(s){this.state=structuredClone(s);}close(){}}
+class Store{path='reminder desktop tests';state={...emptyState(),settings:{...emptyState().settings,inboxReview:{enabled:false,time:'09:00',pendingDate:null,lastHandledDate:null,snoozedUntil:null}}};load(){return structuredClone(this.state);}save(s){this.state=structuredClone(s);}close(){}}
 class Clock{time=Date.now();mono=0;now(){return this.time;}monotonic(){return this.mono;}advance(ms){this.time+=ms;this.mono+=ms;}}
 const flush=()=>new Promise(r=>setImmediate(r));
 const setup=()=>{const clock=new Clock(),service=new JournalService(new Store(),clock),logs=[];const manager=new ReminderWindow(service,()=>manager.sync(),'test.png',(event,detail)=>logs.push({event,detail}));return {clock,service,manager,logs};};
@@ -85,4 +85,21 @@ test('native rest card can extend or dismiss while retaining the main welcome st
   await invoke('reminder:action',win,'restart-break',state.alerts[0].sessionId);await flush();assert.equal(win.visible,false);assert.equal(service.snapshot().state.settings.rest.phase,'running');
   clock.advance(300000);service.tick();manager.sync();await flush();state=invoke('reminder:snapshot',win);await invoke('reminder:action',win,'dismiss',state.alerts[0].sessionId);await flush();assert.equal(win.visible,false);assert.equal(service.snapshot().state.settings.rest.phase,'ready');assert.equal(service.snapshot().timers.length,0);
  }finally{manager.dispose();}
+});
+
+
+test('inbox card opens its dedicated view, snoozes, and acknowledges without completing contents',async()=>{
+ const clock=new Clock();clock.time=new Date('2026-11-02T09:01:00').getTime();const service=new JournalService(new Store(),clock),opened=[];let manager;
+ manager=new ReminderWindow(service,()=>manager.sync(),'test.png',()=>{},()=>opened.push('item'),()=>{},()=>{},()=>{},()=>opened.push('inbox'));
+ try{
+  service.execute({type:'inbox-review.settings',payload:{enabled:true,time:'09:00'}});
+  const id=service.execute({type:'task.save',payload:{title:'暂存内容',parentId:'inbox'}}).state.tasks.at(-1).id;
+  service.tick();manager.sync();await flush();const win=harness.windows.at(-1);let alert=invoke('reminder:snapshot',win).alerts.find(a=>a.kind==='inbox');
+  assert.equal(alert.count,1);assert.equal(win.focused,false);assert.equal(win.top,true);
+  assert.throws(()=>invoke('reminder:action',win,'stop',alert.sessionId),/不支持计时/);
+  await invoke('reminder:action',win,'snooze',alert.sessionId);await flush();assert.equal(win.visible,false);
+  clock.advance(300000);service.tick();manager.sync();await flush();assert.equal(win.visible,true);
+  await invoke('reminder:action',win,'open',alert.sessionId);await flush();assert.deepEqual(opened,['inbox']);assert.equal(win.visible,false);
+  service.tick();assert.equal(service.reminderSnapshot().alerts.length,0);assert.equal(service.snapshot().state.tasks.find(t=>t.id===id).status,'open');assert.equal(service.snapshot().state.sessions.length,0);
+ }finally{manager.dispose();assert.equal(harness.windows.at(-1).isDestroyed(),true);}
 });

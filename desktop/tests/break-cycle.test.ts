@@ -9,7 +9,7 @@ import {emptyState,type JournalState} from '../core/types';
 import {breakContinuation} from '../core/break-state';
 import {fingerprint,parseSyncDocument,syncDocument} from '../core/sync-data';
 import {ReminderCadence} from '../core/reminders';
-class Store{path='break cycle tests';state=emptyState();fail=false;load(){return structuredClone(this.state);}save(s:JournalState){if(this.fail)throw Error('disk full');this.state=structuredClone(s);}close(){}}
+class Store{path='break cycle tests';state:JournalState={...emptyState(),settings:{...emptyState().settings,inboxReview:{enabled:false,time:'09:00',pendingDate:null,lastHandledDate:null,snoozedUntil:null}}};fail=false;load(){return structuredClone(this.state);}save(s:JournalState){if(this.fail)throw Error('disk full');this.state=structuredClone(s);}close(){}}
 class Clock{time=Date.parse('2026-10-20T10:00:00+08:00');mono=0;now(){return this.time;}monotonic(){return this.mono;}advance(ms:number){this.time+=ms;this.mono+=ms;}}
 function setup(){const store=new Store(),clock=new Clock(),s=new JournalService(store,clock);return {s,store,clock};}
 const add=(s:JournalService)=>s.execute({type:'task.save',payload:{title:'整理设计'}}).state.tasks.at(-1)!.id;
@@ -74,9 +74,9 @@ test('schema 14 migration backs up the original break deadline and preserves una
  const dir=path.resolve('qa-evidence/release-0.16.0');mkdirSync(dir,{recursive:true});const folder=mkdtempSync(path.join(dir,'migration-')),file=path.join(folder,'journal.sqlite');
  const old=emptyState();old.schemaVersion=14;delete old.settings.rest;old.settings.breakUntil='2026-10-20T02:05:00.000Z';
  const disk=new SqliteJournalStore(file);disk.save(old);disk.close();
- const clock=new Clock(),s=new JournalService(new SqliteJournalStore(file),clock);assert.equal(s.snapshot().state.schemaVersion,20);assert.equal(s.snapshot().state.settings.breakUntil,old.settings.breakUntil);assert.equal(s.snapshot().state.settings.rest!.phase,'running');
+ const clock=new Clock(),s=new JournalService(new SqliteJournalStore(file),clock);assert.equal(s.snapshot().state.schemaVersion,21);assert.equal(s.snapshot().state.settings.breakUntil,old.settings.breakUntil);assert.equal(s.snapshot().state.settings.rest!.phase,'running');
  clock.advance(300000);s.tick();assert.equal(s.reminderSnapshot().alerts[0].kind,'break');s.shutdown();
- const name=readdirSync(path.join(folder,'backups')).find(n=>n.startsWith('before-schema-14-to-20-'))!;assert.ok(name);const backup=new DatabaseSync(path.join(folder,'backups',name),{readOnly:true});
+ const name=readdirSync(path.join(folder,'backups')).find(n=>n.startsWith('before-schema-14-to-21-'))!;assert.ok(name);const backup=new DatabaseSync(path.join(folder,'backups',name),{readOnly:true});
  assert.equal((backup.prepare('PRAGMA user_version').get() as any).user_version,14);assert.deepEqual(JSON.parse((backup.prepare("SELECT data FROM records WHERE kind='settings'").get() as any).data),old.settings);backup.close();
 });
 

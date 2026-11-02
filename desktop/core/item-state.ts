@@ -1,10 +1,11 @@
-import {isInformation,isGroup} from './item-kind';
+import {isInformation,isGroup,isReminder} from './item-kind';
 import {outlineIndex,outlinePath,type OutlineIndex} from './outline';
 import {deadlineTime} from './deadlines';
 import {taskMs,type JournalState,type Task,type Estimate} from './types';
 
 export function blockedReason(index:OutlineIndex,id:string):string|null {
  if(isGroup(index.nodes.get(id)?.record as Task))return '分组无需计时，可先转为事项。';
+ if(isReminder(index.nodes.get(id)?.record as Task))return '提醒无需计时，可先转为事项。';
  if(isInformation(index.nodes.get(id)?.record as Task))return '笔记／信息与事件无需计时，可先转为事项。';
  for(const node of outlinePath(index,id).reverse()){
   const task=node.record as Task,who=node.id===id?'此事项':`父级「${task.title}」`;

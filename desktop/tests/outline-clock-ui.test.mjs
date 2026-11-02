@@ -33,6 +33,8 @@ test('actual effort filters become eligible as time grows, without inheriting ch
 
 test('aggregate ticks preserve active inline drafts, focus, selection and chosen order',async()=>{
  const h=await appDom();try{
+  // This case isolates aggregate timer ticks from the independent Inbox reminder mutation.
+  h.service.execute({type:'inbox-review.settings',payload:{enabled:false,time:'09:00'}});
   const first=h.add('第一项'),second=h.add('第二项');h.service.execute({type:'focus.start',payload:{taskId:second}});const loads=clockOnly(h);
   await h.mount();await h.click(h.label('事项'));await h.input(h.label('视图排序'),'manual');await h.key(row(h,first),'F2');const input=h.label('名称 第一项');await h.input(input,'仍在编辑的名称');await h.action(()=>input.setSelectionRange(2,5));
   const order=[...document.querySelectorAll('[data-outline-id]')].map(el=>el.dataset.outlineId),initial=loads();await tick(h,20000);

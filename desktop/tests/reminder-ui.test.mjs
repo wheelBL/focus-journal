@@ -13,7 +13,7 @@ const dom=new JSDOM('<!doctype html><div id="root"></div>',{url:'http://localhos
 for(const key of ['window','document','HTMLElement','HTMLInputElement','HTMLSelectElement','HTMLTextAreaElement','Event','MouseEvent','KeyboardEvent','CustomEvent'])globalThis[key]=dom.window[key];
 globalThis.IS_REACT_ACT_ENVIRONMENT=true;globalThis.requestAnimationFrame=cb=>setTimeout(cb,0);globalThis.cancelAnimationFrame=clearTimeout;
 dom.window.HTMLElement.prototype.scrollIntoView=function(){};dom.window.HTMLElement.prototype.scrollBy=function(){};
-class Store{path='reminder UI tests';state=emptyState();load(){return structuredClone(this.state);}save(s){this.state=structuredClone(s);}close(){}}
+class Store{path='reminder UI tests';state={...emptyState(),settings:{...emptyState().settings,inboxReview:{enabled:false,time:'09:00',pendingDate:null,lastHandledDate:null,snoozedUntil:null}}};load(){return structuredClone(this.state);}save(s){this.state=structuredClone(s);}close(){}}
 const service=new JournalService(new Store()),previews=[];
 window.journal={snapshot:async()=>service.snapshot(),command:async c=>service.execute(c),onChanged:()=>()=>{},exportData:async()=>null,importData:async()=>null,openDataFolder:async()=>{},windowAction:async()=>{},previewReminder:async(settings,mode)=>previews.push({settings:structuredClone(settings),mode})};
 const contexts=[];
@@ -97,5 +97,15 @@ test('welcome card presents explicit continue, extend and later choices without 
  try{assert.match(query('.reminder-heading').textContent,/休息结束/);assert.match(query('.reminder-intro').textContent,/欢迎回来/);assert.deepEqual(actions,[]);
   for(const label of ['继续专注','再休息 5 分钟','回到工作台选择事项','暂不开始'])await click(button(label));
   assert.deepEqual(actions,[['continue','break:one'],['restart-break','break:one'],['choose','break:one'],['dismiss','break:one']]);
+ }finally{await action(()=>root.unmount());}
+});
+
+
+test('inbox and repeating reminder cards use non-completion labels and distinct actions',async()=>{
+ const root=createRoot(query('#root')),actions=[];
+ window.reminder={snapshot:async()=>({alerts:[{kind:'inbox',sessionId:'inbox-review',taskId:'inbox',title:'收件箱待整理',count:3,durationMs:0,targetMinutes:0},{kind:'task',sessionId:'item:repeat',taskId:'repeat',title:'每周提醒',remindAt:'2026-11-02T01:00:00.000Z',recurring:true,durationMs:0,targetMinutes:0}],settings:{sound:false,volume:50,repeatSeconds:30},preview:false,cue:null}),onChanged:()=>()=>{},action:async(...args)=>actions.push(args),audioResult:()=>{}};
+ try{await action(()=>root.render(React.createElement(ReminderPanel)));assert.match(query('.reminder-intro').textContent,/未整理内容/);assert.match(document.body.textContent,/3 条内容待整理/);
+  await click(button('整理收件箱'));await click(button('今天稍后自己整理'));await click(button('确认本次，等待下次'));
+  assert.deepEqual(actions,[['open','inbox-review'],['dismiss','inbox-review'],['dismiss','item:repeat']]);assert.equal(document.querySelector('.reminder-time'),null);
  }finally{await action(()=>root.unmount());}
 });

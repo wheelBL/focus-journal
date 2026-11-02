@@ -9,6 +9,8 @@ const readout=()=>document.querySelector('.big-timer, .dock-timer-row > strong')
 
 test('durable timer checkpoints update the clock without reloading history or losing the current page',async()=>{
  const h=await appDom();try{
+  // Isolate timer-only checkpoints from the independent daily Inbox review mutation.
+  h.service.execute({type:'inbox-review.settings',payload:{enabled:false,time:'09:00'}});
   const id=h.add('连续专注');h.service.execute({type:'focus.start',payload:{taskId:id}});let loads=0;
   window.journal.clock=async()=>h.service.clockSnapshot();window.journal.snapshot=async()=>{loads++;return h.service.snapshot();};
   await h.mount();const initial=loads;h.clock.advance(10000);h.service.tick();await wait(h);assert.equal(loads,initial);assert.equal(readout(),'00:10');

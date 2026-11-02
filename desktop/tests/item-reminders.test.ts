@@ -9,7 +9,7 @@ import {scheduledItems,reminderEligible,reminderEligibility} from '../core/item-
 import {outlineIndex,outlinePath} from '../core/outline';
 import {pendingReminders} from '../core/reminders';
 import {calendarEntries,calendarReminderInput} from '../src/calendar-layout';
-class Store{path='scheduled reminder tests';state=emptyState();fail=false;load(){return structuredClone(this.state);}save(s:JournalState){if(this.fail)throw new Error('disk full');this.state=structuredClone(s);}close(){}}
+class Store{path='scheduled reminder tests';state:JournalState={...emptyState(),settings:{...emptyState().settings,inboxReview:{enabled:false,time:'09:00',pendingDate:null,lastHandledDate:null,snoozedUntil:null}}};fail=false;load(){return structuredClone(this.state);}save(s:JournalState){if(this.fail)throw new Error('disk full');this.state=structuredClone(s);}close(){}}
 class Clock{time=Date.parse('2026-10-19T09:00:00');mono=0;now(){return this.time;}monotonic(){return this.mono;}advance(ms:number){this.time+=ms;this.mono+=ms;}}
 const setup=()=>{const clock=new Clock(),store=new Store(),service=new JournalService(store,clock);return {service,store,clock};};
 const add=(s:JournalService,title='提醒事项',extra={})=>s.execute({type:'task.save',payload:{title,...extra}}).state.tasks.at(-1)!.id;
@@ -51,7 +51,7 @@ test('calendar slots respect scrolled coordinates and reminder lanes never becom
 test('schema nine upgrades keep records and create a pre-migration backup',()=>{
  const {service:s}=setup();add(s,'保留已有任务');const legacy=s.snapshot().state;legacy.schemaVersion=9;for(const t of legacy.tasks)delete t.reminder;
  const dir=mkdtempSync(path.resolve('qa-evidence/reminder-migration-')),file=path.join(dir,'journal.sqlite');const disk=new SqliteJournalStore(file);disk.save(legacy);disk.close();
- const current=new JournalService(new SqliteJournalStore(file));assert.equal(current.snapshot().state.schemaVersion,20);assert.equal(current.snapshot().state.tasks.filter((t:{id:string})=>t.id!=='inbox')[0].id,legacy.tasks.filter((t:{id:string})=>t.id!=='inbox')[0].id);assert.equal(current.snapshot().state.tasks.filter((t:{id:string})=>t.id!=='inbox')[0].reminder,null);current.shutdown();assert.ok(readdirSync(path.join(dir,'backups')).some(f=>f.startsWith('before-schema-9-to-20-')));
+ const current=new JournalService(new SqliteJournalStore(file));assert.equal(current.snapshot().state.schemaVersion,21);assert.equal(current.snapshot().state.tasks.filter((t:{id:string})=>t.id!=='inbox')[0].id,legacy.tasks.filter((t:{id:string})=>t.id!=='inbox')[0].id);assert.equal(current.snapshot().state.tasks.filter((t:{id:string})=>t.id!=='inbox')[0].reminder,null);current.shutdown();assert.ok(readdirSync(path.join(dir,'backups')).some(f=>f.startsWith('before-schema-9-to-21-')));
 });
 
 function oldScheduled(state:JournalState){const index=outlineIndex(state);return state.tasks.filter(task=>task.reminder&&task.reminder.state!=='dismissed'&&task.status==='open'&&!outlinePath(index,task.id).some(n=>{const item=n.record as Task;return item.archived||item.deletedAt||item.status&&item.status!=='open';}));}

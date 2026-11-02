@@ -1,10 +1,10 @@
 import {ownershipLabel,completionLabels} from './activity';
 import type {OutlineIndex} from './outline';
 import type {Task,TimerView} from './types';
-import {isInformation,isEvent,isGroup} from './item-kind';
+import {isInformation,isEvent,isGroup,isReminder} from './item-kind';
 import {isDeadlineOverdue} from './deadlines';
 
-export type ProgressKind='waiting'|'progress'|'running'|'timer-paused'|'paused'|'blocked'|'done'|'cancelled'|'handed-off'|'note'|'event'|'deleted'|'group';
+export type ProgressKind='waiting'|'progress'|'running'|'timer-paused'|'paused'|'blocked'|'done'|'cancelled'|'handed-off'|'note'|'event'|'deleted'|'group'|'reminder';
 export interface ItemPresentation {kind:ProgressKind;label:string;reason:string;branch:boolean;childCount:number;descendantDone:number;descendantTasks:number;ownOverdue:boolean;descendantOverdue:number;progressed:boolean}
 /** One tree pass for inherited availability, one for branch progress; no per-row subtree scans. */
 export function itemPresentations(index:OutlineIndex,timers:TimerView[],now:string){
@@ -23,7 +23,8 @@ export function itemPresentations(index:OutlineIndex,timers:TimerView[],now:stri
   const progressed=ownProgressed||childProgressed,ancestor=node.parentId?blocked.get(node.parentId):undefined;
   let kind:ProgressKind='waiting',label='待启动',reason='尚无实际开始或投入记录';
   if(task.deletedAt){kind='deleted';label='回收站';reason='内容和历史记录保留';}
-  else if(isGroup(task)){kind='group';label=(descendantOpen?`${descendantOpen} 个待办`:children.length?'暂无待办':'暂无事项')+(descendantRunning?` · ${descendantRunning} 计时中`:'');reason=[descendantOverdue?`${descendantOverdue} 个子事项逾期`:'',descendantRunning?`${descendantRunning} 个子事项计时中`:''].filter(Boolean).join(' · ')||'分组汇总子事项';}
+  else if(isGroup(task)){kind='group';label=(descendantOpen?`${descendantOpen} 个待办`:children.length?'暂无待办':'暂无事项')+(descendantRunning?` · ${descendantRunning} 计时中`:'');reason=[descendantOverdue?`${descendantOverdue} 个子事项逾期`:'',descendantRunning?`${descendantRunning} 个子事项计时中`:''].filter(Boolean).join(' · ')||'仅统计未结束的普通事项；笔记、事件和分组不计入待办。普通父事项也计入，纯分类请转为分组。';}
+  else if(isReminder(task)){kind='reminder';label=task.recurrence?'循环提醒':'提醒';reason=task.recurrence?'按日历重复提醒，确认后安排下一次；不计为待办或完成':'到时提醒，不计为待办或完成';}
   else if(info){kind=isEvent(task)?'event':'note';label=isEvent(task)?'事件':'笔记';reason=isEvent(task)?'日历安排，不计为实际投入':'信息记录，没有执行状态';}
   else if(task.status==='done'){kind='done';label=task.completionBy==='other'?'他人完成':task.completionBy==='shared'?'共同完成':'已完成';reason='整体进度完成，个人成果按完成归属分别统计';}
   else if(task.status==='handed-off'){kind='handed-off';label=ownershipLabel(task);reason='本人责任已交接关闭，历史投入保留，不计为完成';}

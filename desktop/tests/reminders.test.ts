@@ -9,7 +9,7 @@ import {SqliteJournalStore} from '../core/store';
 import {emptyState,type JournalState,type JournalStore,type WorkClock} from '../core/types';
 import {pendingReminders,reminderSettings,ReminderCadence,reminderBounds,validateReminderSettings} from '../core/reminders';
 class Clock implements WorkClock{time=Date.parse('2026-10-19T09:00:00+08:00');mono=0;now(){return this.time;}monotonic(){return this.mono;}advance(ms:number){this.time+=ms;this.mono+=ms;}}
-class Store implements JournalStore{path='reminder tests';state=emptyState();fail=false;load(){return structuredClone(this.state);}save(s:JournalState){if(this.fail)throw new Error('disk full');this.state=structuredClone(s);}close(){}}
+class Store implements JournalStore{path='reminder tests';state:JournalState={...emptyState(),settings:{...emptyState().settings,inboxReview:{enabled:false,time:'09:00',pendingDate:null,lastHandledDate:null,snoozedUntil:null}}};fail=false;load(){return structuredClone(this.state);}save(s:JournalState){if(this.fail)throw new Error('disk full');this.state=structuredClone(s);}close(){}}
 function setup(){const store=new Store(),clock=new Clock(),service=new JournalService(store,clock);const ids=['写作','阅读'].map(title=>service.execute({type:'task.save',payload:{title,estimateMinutes:50}}).state.tasks.at(-1)!.id);for(const taskId of ids)service.execute({type:'focus.start',payload:{taskId,targetMinutes:1}});const alerts=()=>pendingReminders(service.snapshot().state);return {store,clock,service,ids,alerts};}
 test('targets persist independent pending cards while work continues; acknowledgement never ends a timer',()=>{
  const {service,clock,alerts}=setup();clock.advance(60000);assert.equal(service.tick().length,2);const [a,b]=alerts();assert.equal(alerts().length,2);
@@ -68,8 +68,8 @@ test('invalid reminder state in a backup cannot replace the current journal',()=
 test('schema 5 migration creates a backup without changing existing tasks, views, sessions or settings',()=>{
  const dir=mkdtempSync(path.join(tmpdir(),'journal-reminder-upgrade-'));try{
   const {service,clock}=setup();for(const t of service.snapshot().timers)service.execute({type:'focus.stop',payload:{sessionId:t.sessionId}});const legacy=structuredClone(service.snapshot().state);legacy.schemaVersion=5;
-  const file=path.join(dir,'journal.sqlite'),old=new SqliteJournalStore(file);old.save(legacy);old.close();const upgraded=new JournalService(new SqliteJournalStore(file),clock);assert.deepEqual(upgraded.snapshot().state,{...legacy,schemaVersion:20});upgraded.shutdown();
-  const backup=readdirSync(path.join(dir,'backups')).find(f=>f.startsWith('before-schema-5-to-20-'));assert.ok(backup);const db=new DatabaseSync(path.join(dir,'backups',backup),{readOnly:true});assert.equal((db.prepare('PRAGMA user_version').get() as {user_version:number}).user_version,5);db.close();
+  const file=path.join(dir,'journal.sqlite'),old=new SqliteJournalStore(file);old.save(legacy);old.close();const upgraded=new JournalService(new SqliteJournalStore(file),clock);assert.deepEqual(upgraded.snapshot().state,{...legacy,schemaVersion:21});upgraded.shutdown();
+  const backup=readdirSync(path.join(dir,'backups')).find(f=>f.startsWith('before-schema-5-to-21-'));assert.ok(backup);const db=new DatabaseSync(path.join(dir,'backups',backup),{readOnly:true});assert.equal((db.prepare('PRAGMA user_version').get() as {user_version:number}).user_version,5);db.close();
  }finally{rmSync(dir,{recursive:true,force:true});}
 });
 test('reminder bounds stay in the chosen monitor work area, including negative coordinates and small displays',()=>{

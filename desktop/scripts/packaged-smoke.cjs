@@ -32,6 +32,7 @@ module.exports=(dataDir,output,expectedVersion)=>{
   }
   for(const timer of before.timers)await run(main,`window.journal.command({type:'focus.stop',payload:{sessionId:${JSON.stringify(timer.sessionId)}}})`);
   await run(main,`window.journal.command({type:'break.stop'})`);
+  await run(main,`window.journal.command({type:'inbox-review.settings',payload:{enabled:false,time:'09:00'}})`);
   const stable=await run(main,'window.journal.snapshot()');
   await run(main,`window.journalAppearance.set({theme:'dark',motion:'reduce'})`);
   await until(()=>run(main,`document.documentElement.dataset.theme==='dark'`),'Dark appearance missing');
@@ -91,7 +92,7 @@ module.exports=(dataDir,output,expectedVersion)=>{
   const groupCreated=await run(main,`window.journal.command({type:'outline.create',payload:{title:'发布验证：工作分类',kind:'group',parentId:null}})`),groupId=groupCreated.state.tasks.at(-1).id;
   const subgroupCreated=await run(main,`window.journal.command({type:'outline.create',payload:{title:'发布验证：嵌套分类',kind:'group',parentId:${JSON.stringify(groupId)}}})`),subgroupId=subgroupCreated.state.tasks.at(-1).id;
   const groupChild=await run(main,`window.journal.command({type:'outline.create',payload:{title:'发布验证：分类中的实际工作',parentId:${JSON.stringify(subgroupId)}}})`),childId=groupChild.state.tasks.at(-1).id;
-  check(groupChild.state.schemaVersion===20&&groupChild.state.tasks.find(t=>t.id===subgroupId).parentId===groupId,'Packaged groups persist explicit type and arbitrary nested identities');
+  check(groupChild.state.schemaVersion===21&&groupChild.state.tasks.find(t=>t.id===subgroupId).parentId===groupId,'Packaged groups persist explicit type and arbitrary nested identities');
   check(await run(main,`window.journal.command({type:'focus.start',payload:{taskId:${JSON.stringify(groupId)}}}).then(()=>false,()=>true)`),'Packaged backend refuses execution on a group');
   const childStarted=await run(main,`window.journal.command({type:'focus.start',payload:{taskId:${JSON.stringify(childId)}}})`);
   check(childStarted.timers.some(t=>t.taskId===childId),'A task under nested groups remains executable');
@@ -143,6 +144,38 @@ module.exports=(dataDir,output,expectedVersion)=>{
   await until(()=>run(main,`!document.querySelector('[data-outline-id="${subgroupId}"]')`),'Collapse all did not collapse branches');
   check(true,'Toolbar expands and collapses all nested branches directly');
   await run(main,`document.querySelector('[aria-label="全部展开"]').click()`);
+  // Real window geometry, reminder card actions and direct Inbox navigation.
+  const reminderId=await run(main,`window.journal.command({type:'task.save',payload:{title:'发布验证：循环提醒',parentId:null}}).then(s=>s.state.tasks.at(-1).id)`);
+  const remindAt=new Date(Date.now()-1000).toISOString(),anchor=new Date().getFullYear()+'-'+String(new Date().getMonth()+1).padStart(2,'0')+'-'+String(new Date().getDate()).padStart(2,'0');
+  await run(main,`window.journal.command({type:'reminder.convert',payload:{id:${JSON.stringify(reminderId)},at:${JSON.stringify(remindAt)},rule:{mode:'calendar',unit:'day',interval:1,anchor:${JSON.stringify(anchor)},weekdays:[],until:null}}})`);
+  await until(()=>BrowserWindow.getAllWindows().some(w=>w.isVisible()&&w.webContents.getURL().includes('panel=reminder')),'Recurring reminder card missing');
+  const reminderCard=BrowserWindow.getAllWindows().find(w=>w.webContents.getURL().includes('panel=reminder'));
+  await until(()=>run(reminderCard,`document.body.textContent.includes('确认本次，等待下次')`),'Recurring acknowledgement label missing');
+  await run(reminderCard,`window.reminder.action('dismiss','item:'+${JSON.stringify(reminderId)})`);
+  const reminderItem=await run(main,`window.journal.snapshot().then(s=>s.state.tasks.find(t=>t.id===${JSON.stringify(reminderId)}))`);
+  check(reminderItem.status==='open'&&reminderItem.reminder.at>new Date().toISOString(),'Recurring reminder advances without marking task complete');
+  await until(()=>run(main,`!!document.querySelector('[data-outline-id="${reminderId}"]')`),'Reminder row missing');
+  check(await run(main,`(()=>{const row=document.querySelector('[data-outline-id="${reminderId}"]');return !row.querySelector('input[type=checkbox],.row-start')&&row.textContent.includes('循环提醒');})()`),'Reminder row has its own label and no execution controls');
+  const originalBounds=main.getBounds();main.setMinimumSize(900,500);main.setSize(1100,600);
+  const menuId=await run(main,`window.journal.command({type:'task.save',payload:{title:'发布验证：长菜单',parentId:null}}).then(s=>s.state.tasks.at(-1).id)`);
+  await until(()=>run(main,`!!document.querySelector('[data-outline-id="${menuId}"]')`),'Menu test row missing');
+  await run(main,`document.querySelector('[data-outline-id="${menuId}"]').dispatchEvent(new MouseEvent('contextmenu',{bubbles:true,cancelable:true,clientX:innerWidth-12,clientY:innerHeight-12}))`);
+  await until(()=>run(main,`!!document.querySelector('[role="menu"]')`),'Context menu missing');
+  check(await run(main,`(()=>{const el=document.querySelector('[role="menu"]'),r=el.getBoundingClientRect();return r.left>=7&&r.top>=7&&r.right<=innerWidth-7&&r.bottom<=innerHeight-7&&el.parentElement.parentElement===document.body;})()`),'Context menu fits real viewport outside clipped panes');
+  await run(main,`document.querySelector('[role="menu"]').dispatchEvent(new KeyboardEvent('keydown',{key:'End',bubbles:true,cancelable:true}))`);
+  check(await run(main,`(()=>{const menu=document.querySelector('[role="menu"]'),items=[...menu.querySelectorAll('button:not(:disabled)')],last=items.at(-1),r=last.getBoundingClientRect(),m=menu.getBoundingClientRect();return document.activeElement===last&&r.top>=m.top&&r.bottom<=m.bottom;})()`),'Menu End key scrolls last action into view');
+  check(await run(main,`(()=>{const menu=document.querySelector('[role="menu"]');return menu.scrollHeight>menu.clientHeight&&menu.scrollTop>0;})()`),'Long menu scrolls within a short native window');
+  fs.writeFileSync(path.join(output,'menu-viewport.png'),(await main.webContents.capturePage()).toPNG());
+  await run(main,`document.querySelector('[role="menu"]').dispatchEvent(new KeyboardEvent('keydown',{key:'Escape',bubbles:true,cancelable:true}))`);
+  main.setBounds(originalBounds);
+  await run(main,`window.journal.command({type:'task.save',payload:{title:'发布验证：待整理笔记',itemType:'note',parentId:'inbox'}})`);
+  await run(main,`window.journal.command({type:'inbox-review.settings',payload:{enabled:true,time:'00:00'}})`);
+  await until(()=>run(reminderCard,`!!document.querySelector('button')&&document.body.textContent.includes('整理收件箱')`),'Inbox review card missing');
+  await run(reminderCard,`window.reminder.action('open','inbox-review')`);
+  await until(()=>run(main,`!!document.querySelector('[aria-label="收件箱整理提醒设置"]')&&document.querySelector('.tree-page-header h1').textContent.startsWith('收件箱')`),'Inbox card did not open its dedicated view');
+  check(await run(main,`!document.querySelector('[data-outline-id="inbox"]')&&document.body.textContent.includes('待整理笔记')`),'Dedicated Inbox shows contents without the container row');
+  fs.writeFileSync(path.join(output,'inbox-view.png'),(await main.webContents.capturePage()).toPNG());
+  await run(main,`window.journal.command({type:'inbox-review.settings',payload:{enabled:false,time:'09:00'}})`);
   await run(main,`window.journalAppearance.set({theme:'dark',motion:'reduce'})`);
   await run(main,`document.querySelector('.top-navigation [aria-label="今日"]').click()`);
   await until(()=>run(main,`!!document.querySelector('.today-page')`),'Today did not return after groups');
