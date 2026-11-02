@@ -1,0 +1,38 @@
+// Synthetic native coverage only. Lightweight records must not contain input values.
+const fs=require('node:fs'),path=require('node:path');
+module.exports=async({main,run,until,check,wait,output,groupId})=>{
+ const press=async(key,modifiers=[])=>{main.focus();main.webContents.sendInputEvent({type:'keyDown',keyCode:key,modifiers});main.webContents.sendInputEvent({type:'keyUp',keyCode:key,modifiers});await wait(80);};
+ const input=async(selector,value)=>run(main,`(()=>{const e=document.querySelector(${JSON.stringify(selector)});if(!e)throw Error('Missing input');Object.getOwnPropertyDescriptor(HTMLInputElement.prototype,'value').set.call(e,${JSON.stringify(value)});e.dispatchEvent(new Event('input',{bubbles:true}));})()`);
+ const usage=()=>run(main,'window.journal.usage.snapshot()');
+ const id=await run(main,`window.journal.command({type:'task.save',payload:{title:'发布验证：采集私密探针',parentId:${JSON.stringify(groupId)}}}).then(s=>s.state.tasks.at(-1).id)`);
+ const start=(await usage()).operations.length;
+ await input('[aria-label="在事项树中搜索"]','采集私密探针');
+ await until(()=>run(main,`!!document.querySelector('[data-outline-id="${id}"]')`),'Telemetry task row missing');
+ await press('G',['control']);
+ await run(main,`document.querySelector('[data-outline-id="${id}"]').click()`);await press('F2');
+ await until(()=>run(main,`!!document.querySelector('[data-outline-id="${id}"] .inline-editor input')`),'Native telemetry rename did not open');
+ await input(`[data-outline-id="${id}"] .inline-editor input`,'发布验证：采集私密探针已改名');await press('Enter');
+ await until(()=>run(main,`window.journal.snapshot().then(s=>s.state.tasks.find(t=>t.id===${JSON.stringify(id)})?.title==='发布验证：采集私密探针已改名')`),'Rename did not persist');
+ const afterRename=(await usage()).operations.slice(start),rename=afterRename.filter(o=>o.operation==='item.rename'&&o.result==='success');
+ check(rename.length===1&&rename[0].entry==='items.keyboard.rename','Native rename records one success with its original shortcut entry');
+ check(afterRename.some(o=>o.operation==='search.open'&&o.entry==='search.current.shortcut'),'Search shortcut records intent without query contents');
+ await run(main,`document.querySelector('[data-outline-id="${id}"]').click()`);await press('F2');
+ await until(()=>run(main,`!!document.querySelector('[data-outline-id="${id}"] .inline-editor input')`),'Second rename did not open');
+ await input(`[data-outline-id="${id}"] .inline-editor input`,'绝不能进入轻量操作的草稿内容');await press('Escape');
+ const afterCancel=(await usage()).operations.slice(start);
+ check(afterCancel.filter(o=>o.operation==='item.rename'&&o.result==='cancelled'&&o.entry==='items.keyboard.rename').length===1,'Explicit edit cancellation is recorded separately from success');
+ check(afterCancel.every(o=>Object.keys(o).sort().join(',')==='at,entry,id,operation,result,version')&&!JSON.stringify(afterCancel).includes('私密探针')&&!JSON.stringify(afterCancel).includes('草稿内容'),'Lightweight payload retains only four fields plus metadata and excludes input values');
+ const rejected=await run(main,`window.journal.command({type:'outline.patch',payload:{id:${JSON.stringify(id)},field:'dueAt',value:'not-a-date'},meta:{entry:'items.inspector'}}).then(()=>false,()=>true)`);
+ check(rejected&&(await usage()).operations.some(o=>o.operation==='item.deadline.set'&&o.result==='failed.validation'&&o.entry==='items.inspector'),'Validation rejection keeps a bounded failure reason without storing error text');
+ const converted=await run(main,`window.journal.command({type:'outline.patch',payload:{id:${JSON.stringify(id)},field:'itemType',value:'group'},meta:{entry:'qa.telemetry'}})`);
+ check(converted.state.activities.some(a=>a.changes.some(c=>c.entityId===id&&c.field==='itemType'&&c.before==='task'&&c.after==='group')),'Converting to group records the actual type change in business history');
+ await input('[aria-label="在事项树中搜索"]','');
+ await run(main,`document.querySelector('.top-navigation [aria-label="回顾"]').click()`);await wait(100);
+ await run(main,`[...document.querySelectorAll('[aria-label="回顾方式侧栏"] button')].find(b=>b.textContent.trim()==='活动记录').click()`);
+ await until(()=>run(main,`!!document.querySelector('[aria-label="记录类型"]')`),'Activity review missing');
+ await run(main,`(()=>{const e=document.querySelector('[aria-label="记录类型"]');Object.getOwnPropertyDescriptor(HTMLSelectElement.prototype,'value').set.call(e,'operations');e.dispatchEvent(new Event('change',{bubbles:true}));})()`);
+ await until(()=>run(main,`!!document.querySelector('.operation-table')`),'Lightweight operation review missing');
+ await run(main,`document.querySelector('.activity-page details').open=true`);await wait(80);
+ check(await run(main,`document.querySelector('.activity-page').textContent.includes('设计')`),'Operation summary distinguishes designed route costs from observed actions');
+ fs.writeFileSync(path.join(output,'telemetry-summary.png'),(await main.webContents.capturePage()).toPNG());
+};

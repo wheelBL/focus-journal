@@ -6,7 +6,7 @@ import {AiAssistantService} from '../core/ai-assistant-service';
 import {AiError,type AiSettingsInput} from '../core/ai-types';
 import type {JournalService} from '../core/service';
 import type {AiScope} from '../core/ai-assistant-types';
-import {aiOperationResult} from '../core/usage-types';
+import {aiOperationResult,operationFailure,type OperationResult} from '../core/usage-types';
 
 /** Main-window-only capability. No credentials or arbitrary commands enter renderer space. */
 export class AiController {
@@ -16,10 +16,11 @@ export class AiController {
   const fetch=(input:Parameters<typeof net.fetch>[0],init?:Parameters<typeof net.fetch>[1])=>net.fetch(input,init);
   this.assistant=new AiAssistantService(journal,()=>this.settings.connection(),(connection,request)=>chatCompletion(connection,request,fetch),changed,record=>usage?.saveAi(record));
   this.assistant.subscribe(state=>{if(state.phase!=='running')usage?.updateSuggestions(state.id,state.suggestions);if(!window.isDestroyed())window.webContents.send('ai:changed',state);});
+  const record=(channel:string,result:OperationResult)=>{try{usage?.record({operation:channel.replace(':','.'),entry:'ai.assistant',result,version:'current'});}catch{/* Usage must not affect AI operations. */}};
   const handle=(channel:string,fn:(...args:any[])=>unknown)=>{
    this.channels.push(channel);ipcMain.handle(channel,(event,...args)=>{
     if(this.stopped||event.sender!==window.webContents||event.senderFrame!==event.sender.mainFrame||event.sender.getURL().split('?')[0]!==pathToFileURL(entry).href)throw Error('无效的 AI 请求。');
-    try{const result=fn(...args);return Promise.resolve(result).then(value=>{if(!['ai:status','ai:context','ai:get'].includes(channel))usage?.record({operation:channel.replace(':','.'),entry:'ai.assistant',result:aiOperationResult(channel.replace(':','.'),value,args[0]?.suggestionId),version:'current'});return value;},error=>{usage?.record({operation:channel.replace(':','.'),entry:'ai.assistant',result:'failed',version:'current'});throw error;});}catch(error){usage?.record({operation:channel.replace(':','.'),entry:'ai.assistant',result:'failed',version:'current'});throw error;}
+    try{const result=fn(...args);return Promise.resolve(result).then(value=>{if(!['ai:status','ai:context','ai:get'].includes(channel))record(channel,aiOperationResult(channel.replace(':','.'),value,args[0]?.suggestionId));return value;},error=>{record(channel,operationFailure(error));throw error;});}catch(error){record(channel,operationFailure(error));throw error;}
    });
   };
   const idle=()=>{if(this.testAbort||this.assistant.get().phase==='running')throw new AiError('busy','请先停止当前 AI 请求，再修改连接。');};

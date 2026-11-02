@@ -18,3 +18,7 @@ test('AI records whitelist fields, update application results without duplicates
  s.record({operation:'focus.start',entry:'today',result:'success',version:'v'});s.flush();assert.equal(statSync(file+'.ai.json').mtimeMs,aiTime);
  s.clear('ai-text');s.flush();assert.equal(s.snapshot().ai[0].prompt,'');assert.equal(s.snapshot().ai[0].context.items.length,0);assert.equal(s.snapshot().ai[0].suggestions[0].state,'applied');assert.equal(s.snapshot().ai[0].suggestions[0].target,'已清理');s.updateSuggestions('run-1',[{...record().suggestions[0],state:'applied'}]);assert.equal(s.snapshot().ai[0].suggestions[0].before,'');s.saveAi(record());assert.equal(s.snapshot().ai[0].prompt,'');assert.equal(s.snapshot().ai[0].suggestions[0].after,'');assert.equal(s.snapshot().operations.length,1);s.dispose();
 });
+
+test('bounded failure variants survive operation store validation and reload',()=>{
+ const file=path.join(mkdtempSync(path.resolve('qa-data/usage-result-')),'usage.json'),store=new UsageStore(file,'0.35.0');for(const result of ['failed.validation','failed.conflict','failed.storage','failed.network','failed'] as const)store.record({operation:'item.rename',entry:'items.row',result,version:'ignored'});assert.throws(()=>store.record({operation:'item.rename',entry:'items.row',result:'failed.private-message',version:'ignored'} as any));store.dispose();const restored=new UsageStore(file,'0.35.0');assert.deepEqual(restored.snapshot().operations.map(r=>r.result),['failed.validation','failed.conflict','failed.storage','failed.network','failed']);restored.dispose();
+});

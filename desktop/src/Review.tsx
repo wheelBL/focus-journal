@@ -13,7 +13,7 @@ type ReviewTab='items'|'effort'|'activity';
 function savedTab():ReviewTab{try{const t=window.sessionStorage.getItem('review-tab');return t==='activity'?'activity':t==='effort'?'effort':'items';}catch{return 'items';}}
 export function Review(){
  const {data}=useWorkspaceJournal(),[tab,setTab]=useState<ReviewTab>(savedTab),id=useId(),due=reviewQueue(data.state,localDate(data.now)).length;
- const select=(value:ReviewTab)=>{recordOperation('navigation.review','review.'+value);setTab(value);try{window.sessionStorage.setItem('review-tab',value);}catch{/* This optional device preference must never prevent reviewing work. */}};
+ const select=(value:ReviewTab)=>{if(value!==tab)recordOperation('navigation.review','review.'+value);setTab(value);try{window.sessionStorage.setItem('review-tab',value);}catch{/* This optional device preference must never prevent reviewing work. */}};
  const tabs=[['items',`事项审视${due?` · ${due}`:''}`],['effort','投入复盘'],['activity','活动记录']] as const;
  const keys=(event:React.KeyboardEvent<HTMLDivElement>)=>{
   if(event.nativeEvent.isComposing||event.ctrlKey||event.altKey||event.metaKey||!(event.target instanceof HTMLElement)||event.target.getAttribute('role')!=='tab')return;

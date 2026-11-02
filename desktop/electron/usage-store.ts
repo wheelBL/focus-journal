@@ -1,6 +1,7 @@
 import {existsSync,readFileSync} from 'node:fs';
 import {randomUUID} from 'node:crypto';
 import {atomicWrite} from './sync-storage';
+import {operationResults} from '../core/usage-types';
 import type {OperationSummary,StoredOperation,AiUsageRecord,UsageSnapshot} from '../core/usage-types';
 /** Device-only bounded records, persisted once per batch. No command payloads or credentials. */
 export class UsageStore {
@@ -9,7 +10,7 @@ export class UsageStore {
  snapshot(){return structuredClone(this.value);}
  record(value:OperationSummary){
   if(!this.value.enabled)return;
-  if(!value||Object.keys(value).some(k=>!['operation','entry','result','version'].includes(k))||!/^[-a-zA-Z0-9_.:]{1,100}$/.test(value.operation)||!/^[-a-zA-Z0-9_.:]{1,150}$/.test(value.entry)||!['success','failed','cancelled'].includes(value.result))throw Error('操作记录格式无效。');
+  if(!value||Object.keys(value).some(k=>!['operation','entry','result','version'].includes(k))||!/^[-a-zA-Z0-9_.:]{1,100}$/.test(value.operation)||!/^[-a-zA-Z0-9_.:]{1,150}$/.test(value.entry)||!operationResults.includes(value.result))throw Error('操作记录格式无效。');
   this.value.operations.push({id:randomUUID(),at:new Date().toISOString(),operation:value.operation,entry:value.entry,result:value.result,version:this.version});this.value.operations=this.value.operations.slice(-5000);this.schedule();
  }
  saveAi(record:AiUsageRecord){

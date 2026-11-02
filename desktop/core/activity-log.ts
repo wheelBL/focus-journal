@@ -1,11 +1,11 @@
 import {randomUUID} from 'node:crypto';
 import type {Command,JournalState} from './types';
 import type {BusinessActivity} from './activity';
-const taskFields=['title','description','parentId','order','isProject','status','completedAt','completionBy','ownership','plannedDate','dueAt','focusDate','availability','deletedAt','tagIds','reminder','reviewSchedule','recurrence','eventAt','eventEnd','estimateMinutes'] as const;
+const taskFields=['title','description','itemType','relatedTaskIds','reminderRecurrence','parentId','order','isProject','status','completedAt','completionBy','ownership','plannedDate','dueAt','focusDate','availability','deletedAt','tagIds','reminder','reviewSchedule','recurrence','eventAt','eventEnd','estimateMinutes'] as const;
 export function appendActivity(before:JournalState,after:JournalState,command:Command,at:string){
  if(['task.select','activity.import'].includes(command.type)||command.type.startsWith('usage.'))return;
  const changes:BusinessActivity['changes']=[];
- const add=(entityId:string,title:string,field:string,a:unknown,b:unknown)=>{if(JSON.stringify(a)!==JSON.stringify(b))changes.push({entityId,title,field,...JSON.parse(JSON.stringify({before:a??null,after:b??null}))});};
+ const add=(entityId:string,title:string,field:string,a:unknown,b:unknown)=>{if(JSON.stringify(a??null)!==JSON.stringify(b??null))changes.push({entityId,title,field,...JSON.parse(JSON.stringify({before:a??null,after:b??null}))});};
  const oldTasks=new Map(before.tasks.map(t=>[t.id,t]));
  for(const task of after.tasks){const old=oldTasks.get(task.id);if(!old){add(task.id,task.title,'created',null,{title:task.title,parentId:task.parentId??null});continue;}for(const field of taskFields)add(task.id,task.title,field,old[field],task[field]);}
  const taskIds=new Set(after.tasks.map(t=>t.id));for(const old of before.tasks)if(!taskIds.has(old.id))add(old.id,old.title,'removed',true,false);

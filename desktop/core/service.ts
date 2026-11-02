@@ -1,3 +1,4 @@
+import {semanticOperation,operationFailure,type OperationResult} from './usage-types';
 import {contentGroupId,visible as contentVisible} from './content-workspace';
 import {inboxItems,inboxReviewSettings,inboxReviewDue,validateInboxReviewSettings} from './inbox-review';
 import {appendActivity,validateActivityState} from './activity-log';
@@ -127,9 +128,9 @@ export class JournalService {
   }
   suspend() { if(this.active().some(s=>s.status==='running'))this.commit(s=>{for(const a of this.active(s)){a.status='paused';a.recovered=true;}}); }
   shutdown() { if(this.active().length)this.commit(s=>{for(const a of this.active(s)){a.status='paused';a.recovered=true;}});this.store.close(); }
-  private operationRecorder:((operation:string,entry:string,result:'success'|'failed')=>void)|null=null;
-  setOperationRecorder(record:(operation:string,entry:string,result:'success'|'failed')=>void){this.operationRecorder=record;}
-  execute(command:Command):Snapshot{try{const result=this.executeCommand(command);if(command.meta?.source!=='ai')try{this.operationRecorder?.(command.type,command.meta?.entry??'system.command','success');}catch{}return result;}catch(error){if(command.meta?.source!=='ai')try{this.operationRecorder?.(command.type,command.meta?.entry??'system.command','failed');}catch{}throw error;}}
+  private operationRecorder:((operation:string,entry:string,result:OperationResult)=>void)|null=null;
+  setOperationRecorder(record:(operation:string,entry:string,result:OperationResult)=>void){this.operationRecorder=record;}
+  execute(command:Command):Snapshot{try{const result=this.executeCommand(command);if(command.meta?.source!=='ai')try{this.operationRecorder?.(semanticOperation(command),command.meta?.entry??'system.command','success');}catch{}return result;}catch(error){if(command.meta?.source!=='ai')try{this.operationRecorder?.(semanticOperation(command),command.meta?.entry??'system.command',operationFailure(error));}catch{}throw error;}}
   private executeCommand(command:Command): Snapshot {
     const p=command.payload??{};
     if(command.type==='item-review.mark'&&p.batchId&&this.state.itemReviews.some(r=>r.batchId===p.batchId))return this.snapshot();
