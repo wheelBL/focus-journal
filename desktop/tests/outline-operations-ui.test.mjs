@@ -68,7 +68,7 @@ test('context action returns row focus for keyboard continuation and never steal
 test('view options expose named display and view actions directly; failed removal stays local and retry preserves items',async()=>{
  const h=await appDom();try{
   h.add('删除视图不删除事项');await h.mount();await h.command({type:'view.save',payload:{name:'我的视图',filter:emptyFilter()}});await h.click(h.label('事项'));await h.click(h.button('我的视图',h.query('[aria-label="事项视图"]')));await h.click(h.label('视图选项'));
-  const panel=h.query('.filter-controls .action-popover-panel');assert.equal(panel.hidden,false);for(const name of ['展开全部','折叠全部','重命名视图','复制视图','删除视图'])assert.ok(h.button(name,panel));assert.ok(!panel.textContent.includes('管理当前视图'));
+  const panel=h.query('.filter-controls .action-popover-panel');assert.equal(panel.hidden,false);for(const name of ['重命名视图','复制视图','删除视图'])assert.ok(h.button(name,panel));assert.ok(!panel.textContent.includes('管理当前视图'));
   await h.click(h.button('复制视图',panel));assert.equal(h.label('常用视图名称').value,'我的视图 副本');await h.click(h.button('取消',h.query('dialog')));
   await viewAction(h,'删除视图');const before=h.service.snapshot().state.tasks;const gate=gateCommand('view.delete');await h.click(h.button('移除视图'));assert.equal(h.query('dialog').getAttribute('aria-busy'),'true');await h.click(h.label('关闭',h.query('dialog')));assert.equal(gate.calls,1);await h.action(()=>gate.reject('删除暂不可用'));assert.match(h.query('dialog [role=alert]').textContent,/删除暂不可用/);assert.equal(h.service.snapshot().state.views.length,1);gate.restore();await h.click(h.button('移除视图'));assert.equal(document.querySelector('dialog'),null);assert.equal(h.service.snapshot().state.views.length,0);assert.deepEqual(h.service.snapshot().state.tasks,before);
  }finally{await h.close();}

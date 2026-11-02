@@ -6,27 +6,27 @@ Windows 11 与 macOS 上的本地工作日志，把 **估计 → 实践 → 复�
 
 界面采用 Things 风格的紧凑列表与右侧详情，支持跟随系统、浅色和深色。侧栏底部可以快速切换外观，在“设置 → 外观与动效”调整过渡效果；计时、提醒和快速记录窗口保持一致。外观偏好仅保存在本机，不改变工作记录。
 
-事项页的“视图选项”集中提供保存视图、显示已完成、展开与折叠；右侧详情中的“更多安排”提供尚未设置的提醒、重复和定期审视，设置后直接显示。设置按分类打开，分类之间切换保留当前未保存的输入。
+事项页切换树形和平铺时保留展开状态、选中事项及各自的阅读位置。“全部展开 / 全部折叠”直接位于显示方式旁，只在树形下显示；“视图选项”提供保存视图和显示已完成。右侧详情中的“更多安排”提供尚未设置的提醒、重复和定期审视，设置后直接显示。设置按分类打开，分类之间切换保留当前未保存的输入。
 
 ## 下载与运行
 
-最近公开发布版本为 **0.31.0**，源码和下载包见 [Releases](https://github.com/wheelBL/focus-journal/releases/tag/v0.31.0)。
+当前源码版本为 **0.31.1**，下载包由 GitHub Actions 构建。选择对应平台的成功运行，在 Artifacts 中下载；[0.31.1 更新说明](docs/releases/0.31.1.md)。
 
 | 设备 | 下载 |
 | --- | --- |
-| Windows 11 x64 | [ZIP](https://github.com/wheelBL/focus-journal/releases/download/v0.31.0/FocusJournal-0.31.0-Windows-x64.zip) |
-| Mac，M 系列芯片 | [DMG](https://github.com/wheelBL/focus-journal/releases/download/v0.31.0/FocusJournal-0.31.0-macOS-arm64.dmg) · [ZIP](https://github.com/wheelBL/focus-journal/releases/download/v0.31.0/FocusJournal-0.31.0-macOS-arm64.zip) |
-| Mac，Intel 芯片 | [Actions 产物](https://github.com/wheelBL/focus-journal/actions/runs/41316432197#artifacts)：选择 `FocusJournal-macOS-x64-dmg` 或 `FocusJournal-macOS-x64-zip` |
+| Windows 11 x64 | [Windows Actions](https://github.com/wheelBL/focus-journal/actions/workflows/windows.yml)：`FocusJournal-Windows-x64-zip` |
+| Mac，M 系列芯片 | [macOS Actions](https://github.com/wheelBL/focus-journal/actions/workflows/macos.yml)：`FocusJournal-macOS-arm64-dmg` 或 `FocusJournal-macOS-arm64-zip` |
+| Mac，Intel 芯片 | [macOS Actions](https://github.com/wheelBL/focus-journal/actions/workflows/macos.yml)：`FocusJournal-macOS-x64-dmg` 或 `FocusJournal-macOS-x64-zip` |
 
 Windows 解压整个文件夹，双击 **专注记.exe**；Mac 安装说明见下文。无需安装 Node.js。
 
-后续 Windows 与 macOS 下载包统一由 GitHub Actions 构建：[Windows](https://github.com/wheelBL/focus-journal/actions/workflows/windows.yml) · [macOS](https://github.com/wheelBL/focus-journal/actions/workflows/macos.yml)。打开成功的运行，在 Artifacts 中选择 `FocusJournal-Windows-x64-zip` 或对应 Mac 芯片的包。下载 Actions 产物需登录 GitHub，产物有保留期限；上表已发布的版本继续保留，不重复上传。
+下载 Actions 产物需登录 GitHub，产物有保留期限。此前 [0.31.0 Release](https://github.com/wheelBL/focus-journal/releases/tag/v0.31.0) 的下载包继续保留；后续包无需从本机重复上传。
 
 - 系统：Windows 11 x64；macOS 14 或更新系统，提供 Apple Silicon 与 Intel 两种包。macOS 原生启动测试使用 macOS 15。
 - 更新：先在旧版托盘中选择“退出专注记”，再运行新版。数据保存在用户数据目录中，升级数据结构前自动备份。
 - Windows 0.30.1 起使用固定的 `%USERPROFILE%\.focus-journal`，不随启动入口改变。首次升级保留原目录并校验迁移；发现不同的旧工作区时明确选择。详见[统一工作区规则](desktop/docs/workspace-location.md)。
 - 关闭主窗口后继续在托盘运行；完全退出请使用托盘菜单或设置中的“保存并退出”。
-- 发布包目前未做 Windows 代码签名。校验值随 Releases 中的 `SHA256SUMS.txt` 提供。
+- 发布包目前未做 Windows 代码签名。校验值随下载包的 `SHA256SUMS-*.txt` 提供；历史 Release 使用 `SHA256SUMS.txt`。
 - 不要只移动 EXE，必须保留同目录的运行库、`resources` 和许可证文件。
 
 ## 主要能力
@@ -130,6 +130,7 @@ node scripts/package-windows.mjs --versioned
 - [事项规则](desktop/docs/scenario-rules.md) · [事项审视](desktop/docs/item-review-rules.md)
 - [0.21.0 发布说明](docs/releases/0.21.0.md)
 - [0.31.0 发布说明](docs/releases/0.31.0.md)
+- [0.31.1 发布说明](docs/releases/0.31.1.md)
 
 ## 数据与发布范围
 

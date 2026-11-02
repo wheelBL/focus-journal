@@ -74,7 +74,7 @@ test('real tree interactions: context creation, keyboard, inline edit, tags, fil
   await click(button('筛选'));await input(label('筛选计划开始'),'today');await viewAction('保存视图');await input(label('常用视图名称'),'今日计划');await submit(label('常用视图名称').form);assert.deepEqual(service.snapshot().state.views[0].filter.rules.children,[{kind:'condition',field:'status',op:'is-not',value:'done'},{kind:'condition',field:'status',op:'is-not',value:'cancelled'},{kind:'condition',field:'status',op:'is-not',value:'handed-off'},{kind:'condition',field:'plannedDate',op:'period',value:'today'}]);
   await click(button('清除筛选'));await savedView(service.snapshot().state.views[0].name);assert.equal(label('筛选计划开始').value,'today');await click(button('清除筛选'));
   await input(label('在事项树中搜索'),'原有');await click(row('原有子项'));await key(row('原有子项'),'F2');await input(label('名称 原有子项'),'改了名称');await key(label('名称 原有子项'),'Enter');assert.ok(row('改了名称'));assert.ok(document.querySelector('.retained-notice'));
-  await click(button('清除筛选'));await viewOptions();await click(label('折叠全部'));assert.ok(!document.querySelector('[role=treeitem][aria-label="改了名称"]'));await viewOptions();await click(label('展开全部'));assert.ok(row('改了名称'));
+  await click(button('清除筛选'));await click(label('全部折叠'));assert.ok(!document.querySelector('[role=treeitem][aria-label="改了名称"]'));await click(label('全部展开'));assert.ok(row('改了名称'));
  });
  await t.test('project markers can time directly; a parent with open descendants cannot be completed',async()=>{
   await context(row('另一事项'));await click(button('标记为项目'));assert.equal(service.snapshot().state.tasks.find(t=>t.id===other).isProject,true);
