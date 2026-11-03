@@ -12,7 +12,7 @@ test('default outline is quiet, secondary controls remain keyboard-accessible, a
   const trigger=h.label('视图选项'),panel=h.query('.action-popover-panel');assert.equal(panel.hidden,true);
   await h.click(trigger);assert.equal(panel.hidden,false);await h.key(h.label('显示已完成'),'Escape');assert.equal(panel.hidden,true);assert.equal(document.activeElement,trigger);
   await h.click(h.label('完成验证视图选项'));assert.equal(document.querySelector(`[data-outline-id="${id}"]`),null);
-  await h.click(h.button('撤销状态调整'));assert.ok(document.querySelector(`[data-outline-id="${id}"]`));
+  await h.click(h.label('撤销上一步'));assert.ok(document.querySelector(`[data-outline-id="${id}"]`));
   await h.click(trigger);await h.click(h.label('显示已完成'));assert.equal(panel.hidden,false);assert.equal(h.label('显示已完成').checked,true);
  }finally{await h.close();}
 });

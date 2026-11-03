@@ -27,4 +27,17 @@ module.exports=async({main,run,until,check,wait,output})=>{
  await nav('任务');await until(()=>run(main,`!!document.querySelector('[aria-label="在事项树中搜索"]')`),'Task search did not return');
  await press('K');await press('F');check(await focused('搜索任务和笔记'),'Old current-search binding stops after rebinding');
  await press('G');check(await focused('在事项树中搜索'),'New current-search binding works immediately');
+ const id=await run(main,`window.journal.command({type:'task.save',payload:{title:'QA撤销原名',parentId:null}}).then(s=>s.commandResult.createdItemIds[0])`);
+ await run(main,`window.journal.command({type:'outline.patch',payload:{id:${JSON.stringify(id)},field:'title',value:'QA撤销改名'}})`);
+ await nav('今日');await run(main,`document.activeElement?.blur()`);await press('Z');
+ check(await run(main,`window.journal.snapshot().then(s=>s.state.tasks.find(t=>t.id===${JSON.stringify(id)}).title==='QA撤销原名')`),'Native Ctrl+Z undoes an item edit from Today');
+ await press('Z',['control','shift']);
+ check(await run(main,`window.journal.snapshot().then(s=>s.state.tasks.find(t=>t.id===${JSON.stringify(id)}).title==='QA撤销改名')`),'Native Ctrl+Shift+Z redoes the same edit');
+ await run(main,`window.journal.command({type:'task.status',payload:{id:${JSON.stringify(id)},status:'done'}})`);await press('Z');
+ check(await run(main,`window.journal.snapshot().then(s=>s.state.tasks.find(t=>t.id===${JSON.stringify(id)}).status==='open')`),'Native Ctrl+Z includes completion changes in the same history');
+ await press('Y');
+ check(await run(main,`window.journal.snapshot().then(s=>s.state.tasks.find(t=>t.id===${JSON.stringify(id)}).status==='done')`),'Native Windows Ctrl+Y redoes completion');
+ await press('Z');await nav('任务');await press('G');await main.webContents.insertText('QA文字撤销');await wait(100);await press('Z');
+ check(await run(main,`document.querySelector('[aria-label="在事项树中搜索"]').value===''`),'Native text undo edits the search field instead of business history');
+ check(await run(main,`window.journal.snapshot().then(s=>s.state.tasks.find(t=>t.id===${JSON.stringify(id)}).title==='QA撤销改名'&&s.state.tasks.find(t=>t.id===${JSON.stringify(id)}).status==='open')`),'Native text undo leaves saved item edits and state unchanged');
 };

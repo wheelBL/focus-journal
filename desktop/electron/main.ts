@@ -51,7 +51,7 @@ else if(workspace) {
     const icon=path.join(__dirname,'../assets/icon.png');
     win=new BrowserWindow({width:demo&&!treePrototype?1060:1440,height:demo&&!treePrototype?640:920,minWidth:900,minHeight:640,show:false,title:treePrototype?'专注记 · 任务树交互稿':'专注记',icon,backgroundColor:'#FFFFFF',...mainWindowChrome(process.platform),webPreferences:{preload:path.join(__dirname,'preload.cjs'),contextIsolation:true,nodeIntegration:false,sandbox:true}});
     appearance.setMain(win);
-    if(process.platform==='darwin')win.webContents.on('before-input-event',(event,input)=>{if(input.type!=='keyDown'||!input.meta||input.alt||input.control)return;const key=input.key.toLowerCase();if(key==='z'||key==='a'&&!input.shift){event.preventDefault();nativeEdit(key==='a'?'selectAll':input.shift?'redo':'undo');}});
+    if(process.platform==='darwin')win.webContents.on('before-input-event',(event,input)=>{if(input.type==='keyDown'&&input.meta&&!input.alt&&!input.control&&!input.shift&&input.key.toLowerCase()==='a'){event.preventDefault();nativeEdit('selectAll');}});
     win.webContents.setWindowOpenHandler(()=>({action:'deny'}));
     win.webContents.on('render-process-gone',(_event,details)=>log('renderer-exit',details));
     win.webContents.on('did-fail-load',(_event,code,description)=>log('load-error',{code,description}));

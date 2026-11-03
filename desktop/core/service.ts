@@ -28,10 +28,11 @@ import {nextReviewDate,validateReviewSchedule} from './item-reviews';
 import {validateReminderSettings,pendingReminders,reminderSettings} from './reminders';
 import { randomUUID } from 'node:crypto';
 import { performance } from 'node:perf_hooks';
-import {attachTag,renameTag,deleteTag,organizingUndo,tagName} from './organizing';
+import {attachTag,renameTag,deleteTag,tagName} from './organizing';
+import {historyLabel,makeHistoryEntry,type HistoryEntry} from './history';
 import {validateFilter,tagKey} from './filters';
 import { emptyState, localDate, taskMs, type Command, type JournalState, type JournalStore, type Session, type Snapshot, type WorkClock } from './types';
-import {assertOutline,assertParentAvailable,branchIds,currentPosition,ensureOutlineFields,inheritedProjects,migrateOutline,moveBranch,moveRelative,openDescendants,outlineIndex,syncProjectOwnership,type OutlinePosition} from './outline';
+import {assertOutline,assertParentAvailable,branchIds,ensureOutlineFields,inheritedProjects,migrateOutline,moveBranch,moveRelative,openDescendants,outlineIndex,syncProjectOwnership} from './outline';
 
 const realClock: WorkClock={now:()=>Date.now(),monotonic:()=>performance.now()};
 export class JournalService {
@@ -39,9 +40,8 @@ export class JournalService {
   private revision=0;
   private anchor: number;
   private checkpointAt: number;
-  private lastMove:OutlinePosition|null=null;
-  private stateHistory:{label:string;apply:(s:JournalState)=>void}[]=[];
-  private history:{label:string;apply:(s:JournalState)=>void}[]=[];
+  private history:HistoryEntry[]=[];
+  private redoHistory:HistoryEntry[]=[];
   constructor(private store: JournalStore,private clock: WorkClock=realClock,public demo=false,private appVersion='development') {
     const loaded=store.load();this.state=migrateOutline(loaded);
     if(JSON.stringify(loaded)!==JSON.stringify(this.state))store.save(this.state);
@@ -76,7 +76,7 @@ export class JournalService {
     for(const task of draft.tasks)if(task.status!=='open'&&task.reviewSchedule?.enabled){task.reviewSchedule.enabled=false;task.reviewSchedule.nextDate=null;}
     const oldTasks=new Map(this.state.tasks.map(t=>[t.id,t]));
     for(const task of draft.tasks){const old=oldTasks.get(task.id);if(old&&JSON.stringify(old)!==JSON.stringify(task))task.updatedAt=now;if(old&&(old.parentId!==task.parentId||old.order!==task.order))draft.moves.push({id:randomUUID(),itemId:task.id,fromParent:old.parentId??null,toParent:task.parentId??null,fromProject:old.projectId,toProject:task.projectId,fromOrder:old.order??0,toOrder:task.order??0,createdAt:now});}
-    for(const t of draft.tasks){const old=oldTasks.get(t.id);if(t.status==='done'&&old?.status!=='done')t.completionBy=(t.id===command?.payload?.id?command?.payload?.completionBy as import('./activity').CompletionBy:undefined)??(t.ownership?'other':'self');if(t.status!=='done')delete t.completionBy;validateOwnership(t);}
+    for(const t of draft.tasks){const old=oldTasks.get(t.id);if(t.status==='done'&&old?.status!=='done')t.completionBy=(command?.type.startsWith('history.')||['item.undo','organize.undo','outline.undo'].includes(command?.type??''))?t.completionBy??(t.ownership?'other':'self'):(t.id===command?.payload?.id?command?.payload?.completionBy as import('./activity').CompletionBy:undefined)??(t.ownership?'other':'self');if(t.status!=='done')delete t.completionBy;validateOwnership(t);}
     if(command)appendActivity(this.state,draft,{...command,meta:{...command.meta,version:this.appVersion}},now);
     validateInformation(draft);
     const active=this.active(draft),owned=active.filter(s=>s.taskId!==null);
@@ -100,7 +100,7 @@ export class JournalService {
   }
   snapshot(): Snapshot {
     const state=this.live(),timers=this.active(state).map(active=>({sessionId:active.id,taskId:active.taskId,durationMs:active.durationMs,targetMinutes:active.targetMinutes,...active.targetOffsetMs!==undefined?{targetOffsetMs:active.targetOffsetMs}:{},paused:active.status==='paused',recovered:active.recovered}));
-    return {revision:this.revision,stateUndoLabel:this.stateHistory.at(-1)?.label??null,undoLabel:this.history.at(-1)?.label??null,state,timers,timer:timers[0]??null,now:this.iso(),dataPath:this.store.path,demo:this.demo};
+    return {revision:this.revision,stateUndoLabel:this.history.at(-1)?.category==='state'?this.history.at(-1)!.label:null,undoLabel:this.history.at(-1)?.label??null,redoLabel:this.redoHistory.at(-1)?.label??null,state,timers,timer:timers[0]??null,now:this.iso(),dataPath:this.store.path,demo:this.demo};
   }
   clockSnapshot():import('./types').ClockSnapshot {
     const sessions=structuredClone(this.active()),delta=Math.max(0,this.clock.monotonic()-this.anchor),now=this.iso();
@@ -134,9 +134,12 @@ export class JournalService {
   private executeCommand(command:Command): Snapshot {
     const p=command.payload??{};
     if(command.type==='item-review.mark'&&p.batchId&&this.state.itemReviews.some(r=>r.batchId===p.batchId))return this.snapshot();
-    const before=structuredClone(this.state);let moved:OutlinePosition|undefined,undo=false,organizing=false,stateUndone=false;
-    const lifecycle=['item.change','task.status','item.handoff','item.reclaim','item.completion'].includes(command.type)||command.type==='focus.stop'&&p.complete===true||command.type==='items.batch'&&isBatchLifecycle(p.action);
-    const undoLabel=command.type==='reminder.convert'?'转换为提醒':command.type==='recurrence.set'?'重复安排':lifecycle?'事项状态':command.type==='items.batch'?'批量整理':command.type==='item.focus'?'今日重点':command.type==='event.save'?'事件时间':command.type==='outline.move'?'移动事项':command.type.startsWith('tag.')?'修改标签':command.type==='outline.patch'&&p.field!=='estimateMinutes'?'编辑事项':command.type==='task.plan'?'修改计划':command.type==='task.save'&&p.id?'编辑事项':null;
+    const before=structuredClone(this.state);
+    const direction=command.type==='history.redo'?'redo':['history.undo','item.undo','organize.undo','outline.undo'].includes(command.type)?'undo':null;
+    const entry=direction?(direction==='undo'?this.history:this.redoHistory).at(-1):undefined;
+    if(direction&&!entry)throw new Error(direction==='undo'?'没有可撤销的操作。':'没有可重做的操作。');
+    if(entry&&command.type==='item.undo'&&entry.category!=='state'||entry&&command.type==='organize.undo'&&entry.category==='state'||entry&&command.type==='outline.undo'&&entry.category!=='move')throw new Error('请先撤销最近的操作。');
+    const meta=historyLabel(command);
     this.commit((s,now)=>{
       switch(command.type) {
         case 'note.update': {const t=this.task(s,p.id);if(!isNote(t)||!contentVisible(outlineIndex(s),t.id))throw new Error('请选择可用笔记。');t.title=required(p.title);t.description=text(p.description);break;}
@@ -236,16 +239,10 @@ export class JournalService {
           if(existing)Object.assign(existing,{name,filter});else s.views.push({id,name,filter});break;
         }
         case 'view.delete': {if(!s.views.some(v=>v.id===p.id))throw new Error('视图不存在。');s.views=s.views.filter(v=>v.id!==p.id);break;}
-        case 'item.undo': {const previous=this.stateHistory.at(-1);if(!previous)throw new Error('没有可撤销的事项状态调整。');previous.apply(s);stateUndone=true;break;}
-        case 'organize.undo': {const previous=this.history.at(-1);if(!previous)throw new Error('没有可以撤销的整理操作。');previous.apply(s);organizing=true;break;}
+        case 'history.undo': case 'history.redo': case 'item.undo': case 'organize.undo': case 'outline.undo': {entry!.apply(s,direction!);break;}
         case 'outline.move': {
           const position=String(p.position);if(!['inside','before','after','root'].includes(position))throw new Error('移动位置无效。');
-          moved=currentPosition(s,required(p.id,100));moveRelative(s,moved.id,p.targetId==null?null:required(p.targetId,100),position as 'inside'|'before'|'after'|'root');break;
-        }
-        case 'outline.undo': {
-          if(!this.lastMove)throw new Error('没有可以撤销的移动。');const previous=this.lastMove;
-          const index=outlineIndex(s);const before=previous.beforeId&&index.nodes.get(previous.beforeId)?.parentId===previous.parentId?previous.beforeId:null;
-          moveBranch(s,previous.id,previous.parentId,before);undo=true;break;
+          moveRelative(s,required(p.id,100),p.targetId==null?null:required(p.targetId,100),position as 'inside'|'before'|'after'|'root');break;
         }
         case 'project.save': {
           const title=required(p.name),description=text(p.description??'');
@@ -264,7 +261,7 @@ export class JournalService {
           if(!isTask(captured)&&(p.start||p.estimateMinutes!=null||p.plannedDate||p.dueAt||isNote(captured)&&p.remindAt))throw new Error('笔记／信息无需计划或计时，请先转为事项。');
           const outcome=p.outcome===undefined?(existing?.outcome??''):text(p.outcome),nextAction=p.nextAction===undefined?(existing?.nextAction??''):text(p.nextAction);
           if(p.id) {
-            const task=this.task(s,p.id);const oldPosition=currentPosition(s,task.id);if(p.parentId!==undefined&&p.parentId!==task.parentId)moveBranch(s,task.id,p.parentId===null?null:required(p.parentId,100));else if(p.parentId===undefined&&p.projectId!==undefined&&task.projectId!==projectId)moveBranch(s,task.id,projectId);if(task.parentId!==oldPosition.parentId)moved=oldPosition;Object.assign(task,{title,outcome,nextAction});
+            const task=this.task(s,p.id);if(p.parentId!==undefined&&p.parentId!==task.parentId)moveBranch(s,task.id,p.parentId===null?null:required(p.parentId,100));else if(p.parentId===undefined&&p.projectId!==undefined&&task.projectId!==projectId)moveBranch(s,task.id,projectId);Object.assign(task,{title,outcome,nextAction});
             if(p.plannedDate!==undefined)task.plannedDate=p.plannedDate?day(p.plannedDate):null;
             if(p.dueAt!==undefined)task.dueAt=p.dueAt?deadline(p.dueAt):null;if(p.remindAt!==undefined)setItemReminder(task,p.remindAt);validateSchedule(task);
             if(task&&task.estimateMinutes===null&&p.estimateMinutes!=null){if(taskMs(s,task.id)>0)throw new Error('已有投入，请记录剩余估计，不补写历史初始估计。');task.estimateMinutes=number(p.estimateMinutes);}
@@ -374,19 +371,11 @@ export class JournalService {
         const ended=s.sessions.findLast(r=>r.status==='ended'&&previouslyActive.has(r.id));if(ended)offerBreak(s,ended.id);
       }
     },command);
-    if(moved)this.lastMove=moved;if(undo)this.lastMove=null;
-    if(stateUndone)this.stateHistory.pop();
-    if(organizing)this.history.pop();
-    else if(undoLabel&&JSON.stringify({tasks:before.tasks,tags:before.tags,views:before.views})!==JSON.stringify({tasks:this.state.tasks,tags:this.state.tags,views:this.state.views})){
-      const afterState=this.state,positions=command.type==='items.batch'&&p.action==='move'?batchImpact(before,p.ids as string[],'move').roots.map(id=>({old:currentPosition(before,id),expected:currentPosition(afterState,id)})):[];
-      const position=moved,restoreFields=organizingUndo(before,this.state),after=structuredClone(this.state.tasks),apply=(s:JournalState)=>{if(position){const index=outlineIndex(s);moveBranch(s,position.id,position.parentId,position.beforeId&&index.nodes.get(position.beforeId)?.parentId===position.parentId?position.beforeId:null);}restoreFields(s);
-        for(const {old,expected} of positions)if(JSON.stringify(currentPosition(s,old.id))===JSON.stringify(expected)){const index=outlineIndex(s);moveBranch(s,old.id,old.parentId,old.beforeId&&index.nodes.get(old.beforeId)?.parentId===old.parentId?old.beforeId:null);}
-        if(lifecycle)for(const generated of after.filter(t=>t.recurrencePreviousId&&!before.tasks.some(b=>b.id===t.id))){const current=s.tasks.find(t=>t.id===generated.id);if(!current)continue;if(JSON.stringify(current)!==JSON.stringify(generated)||s.sessions.some(r=>r.taskId===generated.id)||s.tasks.some(t=>t.parentId===generated.id))throw new Error('下一次事项已有变化，未撤销；请保留其进展并手动重新打开本次事项。');s.tasks=s.tasks.filter(t=>t.id!==generated.id);s.projects=s.projects.filter(p=>p.id!==generated.id);const source=s.tasks.find(t=>t.id===generated.recurrencePreviousId);if(source)source.recurrenceNextId=null;}
-        if(lifecycle)for(const old of before.tasks){const expected=after.find(t=>t.id===old.id),task=s.tasks.find(t=>t.id===old.id);if(!expected||!task)continue;const fields=['status','completedAt','availability','deletedAt','reviewSchedule','ownership','completionBy'] as const;for(const field of fields)if(JSON.stringify(old[field])!==JSON.stringify(expected[field])&&JSON.stringify(task[field])===JSON.stringify(expected[field]))(task as any)[field]=structuredClone(old[field]);}
-        for(const task of s.tasks)if(task.status!=='open'&&!task.deletedAt&&openDescendants(s,task.id).length)throw new Error('子项已发生新的变化，请先处理子项再撤销。');};
-      const history=lifecycle?this.stateHistory:this.history;history.push({label:undoLabel,apply});if(history.length>50)history.shift();
-    }
+    if(direction){const source=direction==='undo'?this.history:this.redoHistory,target=direction==='undo'?this.redoHistory:this.history;source.pop();target.push(entry!);}
+    else {const next=meta&&makeHistoryEntry(before,this.state,meta);if(next){this.history.push(next);if(this.history.length>50)this.history.shift();this.redoHistory=[];}else if(!['task.select','focus.start','focus.start-unassigned','focus.resume','focus.pause','focus.stop'].includes(command.type)&&JSON.stringify({tasks:before.tasks,tags:before.tags,views:before.views,notes:before.notes,estimates:before.estimates,reviews:before.reviews,itemReviews:before.itemReviews,sessions:before.sessions,deletedSessions:before.deletedSessions})!==JSON.stringify({tasks:this.state.tasks,tags:this.state.tags,views:this.state.views,notes:this.state.notes,estimates:this.state.estimates,reviews:this.state.reviews,itemReviews:this.state.itemReviews,sessions:this.state.sessions,deletedSessions:this.state.deletedSessions})){this.redoHistory=[];}}
     const result=this.snapshot();
+    const previousIds=new Set(before.tasks.map(t=>t.id)),createdItemIds=this.state.tasks.filter(t=>!previousIds.has(t.id)).map(t=>t.id);
+    if(createdItemIds.length)result.commandResult={createdItemIds};
     if(['focus.start','focus.start-unassigned','focus.resume'].includes(command.type)&&result.timers.filter(t=>!t.paused).length>1)result.focusReminder='每次只做一件事情，更容易专注。当前有多个事项同时计时，各项投入会分别累计。';
     if(command.type==='task.status'&&p.status!=='open'||command.type==='focus.stop'&&p.complete===true){const taskId=p.id??result.state.sessions.find(r=>r.id===p.sessionId)?.taskId,parent=result.state.tasks.find(t=>t.id===result.state.tasks.find(t=>t.id===taskId)?.parentId);if(parent&&parent.status==='open'&&!openDescendants(result.state,parent.id).length)result.itemNotice=`子项已结束，可以检查父项「${parent.title}」是否完成；父项保持未完成。`;}
     return result;
@@ -421,7 +410,7 @@ export class JournalService {
   }
   private restoreState(next:JournalState) {
     for(const session of next.sessions)if(session.status!=='ended'){session.status='paused';session.recovered=true;}
-    this.store.save(next);this.state=next;this.revision++;this.lastMove=null;this.history=[];this.stateHistory=[];this.anchor=this.clock.monotonic();this.checkpointAt=this.anchor;return this.snapshot();
+    this.store.save(next);this.state=next;this.revision++;this.history=[];this.redoHistory=[];this.anchor=this.clock.monotonic();this.checkpointAt=this.anchor;return this.snapshot();
   }
   seedDemo() {
     if(this.state.tasks.some(t=>t.id!=='inbox'))return;

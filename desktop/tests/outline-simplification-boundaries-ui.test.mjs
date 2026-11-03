@@ -28,8 +28,8 @@ test('review subtree retains display, details and undo controls without inheriti
   await h.click(h.label('显示已完成'));assert.ok(h.query(`[data-outline-id="${child}"]`));
   await h.click(h.label('收起详情'));assert.equal(document.querySelector('.task-inspector'),null);await h.click(h.button('详情'));assert.ok(h.query('.task-inspector'));
   await h.click(h.label('全部折叠'));assert.equal(document.querySelector(`[data-outline-id="${active}"]`),null);await h.click(h.label('全部展开'));assert.ok(h.query(`[data-outline-id="${active}"]`));
-  await h.click(h.label('完成可推进子项'));assert.equal(h.get(active).status,'done');await h.click(h.button('撤销状态调整'));assert.equal(h.get(active).status,'open');
-  await h.command({type:'outline.patch',payload:{id:active,field:'title',value:'改名后子项'}});await h.click(h.label('撤销整理操作'));assert.equal(h.get(active).title,'可推进子项');
+  await h.click(h.label('完成可推进子项'));assert.equal(h.get(active).status,'done');await h.click(h.label('撤销上一步'));assert.equal(h.get(active).status,'open');
+  await h.command({type:'outline.patch',payload:{id:active,field:'title',value:'改名后子项'}});await h.click(h.label('撤销上一步'));assert.equal(h.get(active).title,'可推进子项');
   await h.click(h.label('任务'));assert.match(h.query('.tree-page-header h1').textContent,/工作视图只看范围外/);assert.ok(h.query(`[data-outline-id="${outside}"]`));assert.equal(document.querySelector(`[data-outline-id="${parent}"]`),null);
  }finally{await h.close();}
 });

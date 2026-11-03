@@ -22,6 +22,10 @@ module.exports=(dataDir,output,expectedVersion)=>{
   check(app.isPackaged,'Real packaged executable');check(app.getVersion()===expectedVersion,'Correct app version');
   const before=await run(main,'window.journal.snapshot()');check(before.demo&&before.dataPath.startsWith(dataDir),'Isolated data only');
   if(restart){
+   const conversationEvidence=JSON.parse(fs.readFileSync(path.join(output,'ai-conversation-evidence.json'),'utf8'));
+   const conversation=await run(main,'window.journalAI.get()');
+   check(conversation.conversationId===conversationEvidence.conversationId&&conversation.turns.length===conversationEvidence.turns&&conversation.turns.at(-1).suggestions.some(s=>s.state==='applied'),'Restart restores the current AI conversation and confirmed application results');
+   check(!conversation.suggestions.some(s=>s.state==='pending')&&!before.undoLabel&&!before.redoLabel,'Restart invalidates executable AI plans and clears transient business undo history');
    const saved=JSON.parse(fs.readFileSync(path.join(output,'persisted-evidence.json'),'utf8'));
    check(JSON.stringify(before.state.tasks)===JSON.stringify(saved.tasks)&&JSON.stringify(before.state.sessions)===JSON.stringify(saved.sessions)&&JSON.stringify(before.state.deletedSessions)===JSON.stringify(saved.deletedSessions),'Restart preserves item identities, records, segments and deleted effort');
    check(JSON.stringify(before.state.activities)===JSON.stringify(saved.activities),'Restart preserves business activities and completion attribution');
@@ -189,6 +193,7 @@ module.exports=(dataDir,output,expectedVersion)=>{
   await require('./qa-shortcuts.cjs')({main,run,until,check,wait,output});
   await require('./qa-telemetry.cjs')({main,run,until,check,wait,output,groupId});
   await require('./qa-capture-destination.cjs')({main,run,until,check,wait,output});
+  await require('./qa-ai-conversation.cjs')({main,run,until,check,wait,output});
   await run(main,`window.journalAppearance.set({theme:'dark',motion:'reduce'})`);
   await run(main,`document.querySelector('.top-navigation [aria-label="今日"]').click()`);
   await until(()=>run(main,`!!document.querySelector('.today-page')`),'Today did not return after groups');

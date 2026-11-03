@@ -53,7 +53,7 @@ export interface JournalState {
   estimates: Estimate[]; reviews: Review[]; audit: Audit[]; settings: Settings;
 }
 export interface TimerView { sessionId: Id; taskId: Id | null; durationMs: number; targetMinutes: number; targetOffsetMs?:number; paused: boolean; recovered: boolean }
-export interface Snapshot { revision?:number; stateUndoLabel?:string|null; undoLabel?: string|null; state: JournalState; timers: TimerView[]; focusReminder?: string;itemNotice?:string; /** Legacy single-session projection. Commands must identify a session when several exist. */ timer: TimerView | null; now: string; dataPath: string; demo: boolean }
+export interface Snapshot { commandResult?:{createdItemIds:string[]}; revision?:number; stateUndoLabel?:string|null; undoLabel?: string|null; redoLabel?: string|null; state: JournalState; timers: TimerView[]; focusReminder?: string;itemNotice?:string; /** Legacy single-session projection. Commands must identify a session when several exist. */ timer: TimerView | null; now: string; dataPath: string; demo: boolean }
 export interface ClockSnapshot {revision:number;now:string;timers:TimerView[];sessions:Session[]}
 export interface CapturePreferences {shortcut:string;registered:boolean;error?:string}
 export interface WorkClock { now(): number; monotonic(): number }

@@ -68,7 +68,7 @@ test('tag rename merges all references and saved filters; undo restores mapping 
  service.execute({type:'tag.rename',payload:{id:alpha,name:'BETA'}});
  assert.equal(service.snapshot().state.tags.length,1);assert.deepEqual(service.snapshot().state.views[0].filter.tagIds,[beta]);
  service.execute({type:'focus.start',payload:{taskId:a,skipEstimate:true}});clock.advance(7000);service.execute({type:'focus.stop'});service.execute({type:'task.status',payload:{id:a,status:'done'}});
- const s=undo(service).state;assert.equal(s.tags.length,2);assert.deepEqual(s.tasks.find(t=>t.id===a)!.tagIds,[alpha]);assert.deepEqual(s.views[0].filter.tagIds,[alpha,beta]);assert.equal(s.sessions[0].durationMs,7000);assert.equal(s.tasks.find(t=>t.id===a)!.status,'done');
+ assert.throws(()=>undo(service),/最近/);service.execute({type:'history.undo'});const s=undo(service).state;assert.equal(s.tags.length,2);assert.deepEqual(s.tasks.find(t=>t.id===a)!.tagIds,[alpha]);assert.deepEqual(s.views[0].filter.tagIds,[alpha,beta]);assert.equal(s.sessions[0].durationMs,7000);assert.equal(s.tasks.find(t=>t.id===a)!.status,'open');
  const id=s.sessions[0].id;service.execute({type:'tag.delete',payload:{id:alpha}});assert.deepEqual(service.snapshot().state.views[0].filter.tagIds,[beta]);undo(service);assert.equal(service.snapshot().state.sessions[0].id,id);assert.deepEqual(service.snapshot().state.views[0].filter.tagIds,[alpha,beta]);
 });
 
@@ -76,8 +76,8 @@ test('detaching is local; deleting is global and undo does not delete a newly sa
  const {service}=setup(),a=item(service,'A'),b=item(service,'B'),id=tag(service,a,'自定义');tag(service,b,'自定义');
  service.execute({type:'tag.detach',payload:{id:a,tagId:id}});assert.deepEqual(service.snapshot().state.tasks.find(t=>t.id===b)!.tagIds,[id]);assert.equal(service.snapshot().state.tags.length,1);undo(service);
  service.execute({type:'tag.delete',payload:{id}});assert.equal(service.snapshot().state.tags.length,0);assert.ok(service.snapshot().state.tasks.every(t=>!t.tagIds!.length));undo(service);
- const c=item(service,'C'),newId=tag(service,c,'被视图使用');service.execute({type:'view.save',payload:{name:'新视图',filter:{...emptyFilter(),tagIds:[newId]}}});undo(service);
- assert.ok(service.snapshot().state.tags.some(t=>t.id===newId));assert.deepEqual(service.snapshot().state.tasks.find(t=>t.id===c)!.tagIds,[]);service.importJson(service.exportJson());
+ const c=item(service,'C'),newId=tag(service,c,'被视图使用');service.execute({type:'view.save',payload:{name:'新视图',filter:{...emptyFilter(),tagIds:[newId]}}});assert.throws(()=>undo(service),/已有变化/);
+ assert.ok(service.snapshot().state.tags.some(t=>t.id===newId));assert.deepEqual(service.snapshot().state.tasks.find(t=>t.id===c)!.tagIds,[newId]);service.importJson(service.exportJson());
 });
 
 test('all/any filtering retains ancestor context but never treats ancestor tags as matching child tags',()=>{
@@ -103,11 +103,12 @@ test('completion and deadline filters use actual dates with closed/archived cont
  assert.throws(()=>service.execute({type:'focus.start',payload:{taskId:p,skipEstimate:true}}),/归档/);clock.advance(86400000);s=service.snapshot();assert.equal(filterOutline(s.state,{...emptyFilter(),completed:'today'},s.now).matches.size,0);assert.deepEqual([...filterOutline(s.state,{...emptyFilter(),completed:'this-week'},s.now).matches],[a]);
 });
 
-test('undo moves and form edits preserve newer children and a running timer; failed save keeps undo available',()=>{
+test('newer child with effort blocks undo; failed saves preserve the latest edit',()=>{
  const {service,clock,store}=setup(),p=item(service,'原父级'),q=item(service,'新父级'),a=item(service,'原名称',p);
- service.execute({type:'task.save',payload:{id:a,title:'新名称',parentId:q}});const newChild=item(service,'后来添加',a);
- service.execute({type:'focus.start',payload:{taskId:newChild,skipEstimate:true}});clock.advance(9000);store.fail=true;assert.throws(()=>undo(service),/disk full/);store.fail=false;
- const s=undo(service);assert.equal(s.state.tasks.find(t=>t.id===a)!.parentId,p);assert.equal(s.state.tasks.find(t=>t.id===a)!.title,'原名称');assert.equal(s.state.tasks.find(t=>t.id===newChild)!.parentId,a);assert.equal(s.timer!.durationMs,9000);
+ service.execute({type:'task.save',payload:{id:a,title:'新名称',parentId:q}});const child=item(service,'后来添加',a);
+ service.execute({type:'focus.start',payload:{taskId:child,skipEstimate:true}});clock.advance(9000);assert.throws(()=>undo(service),/已有变化/);
+ patch(service,a,'description','修改');store.fail=true;assert.throws(()=>undo(service),/disk full/);store.fail=false;
+ const s=undo(service);assert.equal(s.state.tasks.find(t=>t.id===a)!.description,'');assert.equal(s.state.tasks.find(t=>t.id===a)!.parentId,q);assert.equal(s.state.tasks.find(t=>t.id===child)!.parentId,a);assert.equal(s.timer!.durationMs,9000);
 });
 
 test('malformed tag/view/projection backups cannot replace existing data and valid new data survives SQLite restart',()=>{

@@ -94,14 +94,14 @@ test('real tree interactions: context creation, keyboard, inline edit, tags, fil
   const pointer=(type,x,y)=>action(()=>{const event=new MouseEvent(type,{bubbles:true,cancelable:true,button:0,clientX:x,clientY:y});Object.defineProperty(event,'pointerId',{value:1});grip.dispatchEvent(event);});
   await pointer('pointerdown',20,20);await pointer('pointermove',200,122);await pointer('pointerup',200,122);
   let moved=service.snapshot().state.tasks.find(t=>t.title==='筛选中新建');assert.equal(moved.parentId,other);assert.deepEqual(moved.tagIds,[]);
-  await click(label('撤销整理操作'));moved=service.snapshot().state.tasks.find(t=>t.title==='筛选中新建');assert.equal(moved.parentId,null);assert.equal(service.snapshot().state.sessions[0].durationMs,11000);
+  await click(label('撤销上一步'));moved=service.snapshot().state.tasks.find(t=>t.title==='筛选中新建');assert.equal(moved.parentId,null);assert.equal(service.snapshot().state.sessions[0].durationMs,11000);
  });
  await t.test('tag manager merges names, confirms global deletion, and undo restores item and view references',async()=>{
   await click(row('另一事项'));await input(label('自定义标签'),'合并目标');await key(label('自定义标签'),'Enter');
   await click(button('管理标签'));await click(label('标签名称 自定义：自定义'));await input(label('标签名称 自定义'),'合并目标');await key(label('标签名称 自定义'),'Enter');
   assert.equal(service.snapshot().state.tags.length,1);assert.equal(service.snapshot().state.tasks.find(t=>t.id===other).tagIds.length,1);
   await click(button('删除'));assert.match(query('.tag-delete-confirm').textContent,/解除全部关联/);assert.equal(service.snapshot().state.tags.length,1);await click(button('确认删除标签'));assert.equal(service.snapshot().state.tags.length,0);
-  await click(label('关闭'));await click(label('撤销整理操作'));assert.equal(service.snapshot().state.tags.length,1);assert.equal(service.snapshot().state.tasks.find(t=>t.id===other).tagIds.length,1);
+  await click(label('关闭'));await click(label('撤销上一步'));assert.equal(service.snapshot().state.tags.length,1);assert.equal(service.snapshot().state.tasks.find(t=>t.id===other).tagIds.length,1);
  });
  await t.test('quick weekly view includes overdue; common/advanced switch is lossless; save, update, copy and rename work',async()=>{
   assert.equal([...document.querySelectorAll('.filter-controls button')].some(b=>b.textContent.trim()==='清除筛选'),false);await input(label('筛选状态'),'open');await input(label('筛选截止时间'),'through-week');

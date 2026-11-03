@@ -5,8 +5,9 @@ import {contentGroupId} from '../core/content-workspace';
 import {setContentScope} from './content-navigation';
 import './content-navigation.css';
 import {desktopPlatform} from './platform';
-import {shortcutFromEvent,formatShortcut} from '../core/shortcuts';
+import {shortcutAction,formatShortcut} from '../core/shortcuts';
 import {useShortcuts} from './shortcuts';
+import {useEditActions} from './useEditActions';
 import {recordOperation,operationEntry,withOperationEntry} from './operation-entry';
 import {BreakBar} from './BreakBar';
 import {AppearanceQuickSwitch} from './AppearanceSettings';
@@ -59,7 +60,7 @@ export default function App(){
  useEffect(()=>api.onOpenSession?.(id=>{void refresh().then(()=>setDialog({type:'summary',id}));}),[refresh]);
  useEffect(()=>api.onOpenItem?.(id=>{void refresh().then(()=>preview(id));}),[preview,refresh]);
  const run=useCallback(async(command:Command)=>{if(busyRef.current)throw new Error('正在保存，请稍候。');busyRef.current=true;setBusy(true);++seq.current;try{const result=await api.command({...command,meta:{...command.meta,entry:command.meta?.entry??dialogRef.current?.entry??operationEntry()}});dataRef.current=result;setData(result);if(result.focusReminder)notify(result.focusReminder);if(result.itemNotice)notify(result.itemNotice);return result;}catch(e){notify(e instanceof Error?e.message:String(e));throw e;}finally{busyRef.current=false;setBusy(false);}},[notify]);
- useEffect(()=>api.onEditAction?.(action=>{const editing=document.activeElement?.closest('input,textarea,select,[contenteditable=true]');if(action!=='redo'&&view==='projects'&&!query&&!dialog&&!editing){if(action==='undo')void run({type:'organize.undo',meta:{entry:'menu.edit'}}).then(()=>notify('已撤销整理操作，计时与投入记录保留')).catch(()=>{});else window.dispatchEvent(new Event('journal:select-all'));}else void api.editText?.(action).catch(()=>{});}),[view,query,dialog,run,notify]);
+ useEditActions({view,query,dialogOpen:!!dialog,data,busy,run,notify});
  const navigate=useCallback((id:string)=>{if(id!==view||query)recordOperation('navigation.'+id,operationEntry());if(id==='projects'&&window.sessionStorage.getItem('journal-locate'))setLocationRevision(value=>value+1);if(id!=='settings')clearSettingsSection();returnFromSearch.current=false;setQuery('');setPreviewId(null);setView(id);setSidebarOpen(false);},[view,query]);
  const shortcuts=useShortcuts(),shortcutFocus=useRef(false);
  useEffect(()=>{
@@ -73,13 +74,12 @@ export default function App(){
  },[]);
  useEffect(()=>{const key=(e:KeyboardEvent)=>{
   if(e.isComposing||e.defaultPrevented||dialog||document.querySelector('dialog[open],[role="dialog"]')||(e.target instanceof HTMLElement&&e.target.closest('[data-shortcut-recorder]')))return;
-  const chord=shortcutFromEvent(e,desktopPlatform());
-  const action=Object.entries(shortcuts).find(([,binding])=>binding&&binding===chord)?.[0];
-  if(!action||['create-sibling','create-child','rename','toggle-timer','stop-timer','complete','delete'].includes(action))return;
+  const action=shortcutAction(e,shortcuts,desktopPlatform());
+  if(!action||['undo','redo','create-sibling','create-child','rename','toggle-timer','stop-timer','complete','delete'].includes(action))return;
   e.preventDefault();
   if(e.repeat)return;
   if(action==='search-current'||action==='search-global'){
-   const labels:Record<string,string>={projects:'在事项树中搜索',notes:'搜索笔记',reminders:'搜索提醒'};
+   const labels:Record<string,string>={projects:'在事项树中搜索',inbox:'在事项树中搜索',notes:'搜索笔记',reminders:'搜索提醒'};
    const local=!query&&action==='search-current'&&labels[view]?mainRef.current?.querySelector<HTMLInputElement>(`input[aria-label="${labels[view]}"]`):null;
    const target=local??searchRef.current;if(target){recordOperation('search.open',local?'search.current.shortcut':'search.global.shortcut');shortcutFocus.current=true;try{target.focus();target.select();}finally{shortcutFocus.current=false;}}
   }else if(action==='create'){recordOperation('shortcut.invoke','shortcut.create');withOperationEntry('shortcut.create',()=>{if(['projects','notes','reminders','inbox'].includes(view)&&!query)window.dispatchEvent(new Event('journal:new-item'));else setDialog({type:'task',entry:'shortcut.create'});});}

@@ -26,9 +26,9 @@ test('workspace location, view meaning, inspector modes and completion remain co
    await click(button('分组 A',query('[aria-label="共享分组"]')));await input(label('常用视图'),view.id);assert.ok(row(c));assert.match(query('.view-scope-title').textContent,/全部分组/);
   });
   await t.test('leaf completion is identical from checkbox, keyboard and details and all paths offer undo',async()=>{
-   await click(label('完成事项 A'));assert.equal(get(a).status,'done');assert.equal(document.querySelector('dialog'),null);await click(button('撤销状态调整',query('.outline-toolbar')));assert.equal(get(a).status,'open');
-   await click(row(a));await key(row(a),' ');assert.equal(get(a).status,'done');assert.equal(document.querySelector('dialog'),null);await click(button('撤销状态调整',query('.outline-toolbar')));
-   await click(row(a));await click(button('完成事项',query('.task-inspector')));assert.equal(get(a).status,'done');await click(button('撤销状态调整',query('.outline-toolbar')));
+   await click(label('完成事项 A'));assert.equal(get(a).status,'done');assert.equal(document.querySelector('dialog'),null);await click(label('撤销上一步',query('.outline-toolbar')));assert.equal(get(a).status,'open');
+   await click(row(a));await key(row(a),' ');assert.equal(get(a).status,'done');assert.equal(document.querySelector('dialog'),null);await click(label('撤销上一步',query('.outline-toolbar')));
+   await click(row(a));await click(button('完成事项',query('.task-inspector')));assert.equal(get(a).status,'done');await click(label('撤销上一步',query('.outline-toolbar')));
    await key(row(a),'Enter',{ctrlKey:true});await click(label('完成事项 A'));assert.ok(query('dialog[aria-label="完成事项"]'));assert.equal(get(a).status,'open');await click(button('返回',query('dialog')));await command({type:'focus.stop',payload:{taskId:a}});
    await click(label('完成项目 A'));assert.ok(label('处理未结束子项'));await click(button('返回',query('dialog')));
   });

@@ -1,4 +1,4 @@
-import {desktopPlatform,shortcutLabel} from './platform';
+import {desktopPlatform} from './platform';
 import {formatShortcut,type ShortcutAction} from '../core/shortcuts';
 import {useShortcuts} from './shortcuts';
 import {withOperationEntry} from './operation-entry';
@@ -41,6 +41,6 @@ export function OutlineMenu({menu,index,close,create,rename,patch,stateAction,un
     {task.status==='open'&&!task.deletedAt&&<><button role="menuitem" disabled={!!blockedReason(index,task.id)} onClick={()=>finish(()=>run({type:'focus.switch',payload:{taskId:task.id,skipEstimate:true}}))}>切换计时到此项</button><button role="menuitem" onClick={()=>finish(()=>toggleFocus(task))}>{task.focusDate===localDate(data.now)?'移出今日重点':'加入今日重点'}</button><button role="menuitem" onClick={()=>finish(()=>stateAction(node.id,task.availability==='paused'?'resume':'pause'))}>{task.availability==='paused'?'恢复事项':'暂停事项'}</button><button role="menuitem" onClick={()=>finish(()=>stateAction(node.id,'cancel'))}>取消事项</button></>}
    </>}<button role="menuitem" onClick={()=>finish(()=>stateAction(node.id,task.deletedAt?'restore':'delete'))}>{task.deletedAt?'恢复整支':'移入回收站'}</button></>}
   </>:<><button role="menuitem" onClick={()=>createFromMenu(scopeId??null)}>{scopeId?'新增范围内事项':'新增最外层事项'}</button><button role="menuitem" onClick={()=>createFromMenu(scopeId??null,null,'note')}>{scopeId?'新增范围内笔记':'新增最外层笔记'}</button><button role="menuitem" onClick={()=>createFromMenu(scopeId??null,null,'group')}>{scopeId?'新增范围内分组':'新增最外层分组'}</button></>}
-  <hr/><button role="menuitem" disabled={!data.undoLabel||busy} onClick={()=>finish(undo)}>撤销{data.undoLabel?`：${data.undoLabel}`:''} <kbd>{shortcutLabel('Ctrl Z')}</kbd></button>
+  <hr/><button role="menuitem" disabled={!data.undoLabel||busy} onClick={()=>finish(undo)}>撤销{data.undoLabel?`：${data.undoLabel}`:''} {hint('undo')}</button><button role="menuitem" disabled={!data.redoLabel||busy} onClick={()=>finish(()=>run({type:'history.redo'}))}>重做{data.redoLabel?`：${data.redoLabel}`:''} {hint('redo')}</button>
  </div></div>,document.body);
 }

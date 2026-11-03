@@ -259,3 +259,11 @@ test('API event destination defaults unfiled and explicit inbox remains reviewab
   const moved=await h.command('inbox.organize',{id:queuedId,parentId:null});assert.equal(moved.status,200);const item=h.s.snapshot().state.tasks.find(t=>t.id===queuedId)!;assert.equal(item.parentId,null);assert.equal(item.itemType,'event');assert.equal(item.eventAt,'2026-10-20');
  }finally{h.close();}
 });
+
+test('API configures and defers review on an existing item without creating work or pausing it',async()=>{
+ const h=await setup();try{const id=(await h.command('item.create',{title:'审视测试事项'})).body.data.createdItemIds[0],before=h.s.snapshot().state.tasks.length;
+  assert.equal((await h.command('item-review.configure',{id,enabled:true,nextDate:'2026-10-22'})).status,200);let item=h.s.snapshot().state.tasks.find(t=>t.id===id)!;assert.deepEqual(item.reviewSchedule?.interval,{unit:'once',count:1});assert.equal(item.availability??'active','active');
+  assert.equal((await h.command('item-review.defer',{id,nextDate:'2026-10-24'})).status,200);item=h.s.snapshot().state.tasks.find(t=>t.id===id)!;assert.equal(item.reviewSchedule?.nextDate,'2026-10-24');assert.equal(h.s.snapshot().state.tasks.length,before);assert.equal(h.s.snapshot().state.itemReviews.length,0);
+  assert.equal((await h.command('item-review.defer',{id,nextDate:'2026-10-25',unexpected:true})).status,400);
+ }finally{h.close();}
+});

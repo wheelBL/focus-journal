@@ -120,3 +120,13 @@ test('rapid navigation snapshots the actual note caret before a delayed selectio
 test('continue writing after task generation restores the note caret, focus and enclosing reading position',async()=>{
  const h=await harness(),id=h.add('接着写的笔记',null,'note','原始笔记正文');try{await h.mount('Notes');await h.input(h.label('笔记正文'),'正在编辑的笔记正文');const body=h.label('笔记正文'),pane=h.query('.content-detail-pane');await h.action(()=>{body.focus();body.setSelectionRange(3,5);body.scrollTop=55;pane.scrollTop=90;});await h.click([...pane.querySelectorAll('.content-note-actions button')].find(button=>button.textContent.endsWith('生成任务')));await h.input(h.label('生成任务名称'),'从资料产生的下一步');await h.action(()=>{pane.scrollTop=420;});await h.click(h.button('生成任务',h.label('从笔记生成任务')));await h.click(h.button('继续写笔记'));assert.equal(document.activeElement,body);assert.equal(body.selectionStart,3);assert.equal(body.selectionEnd,5);assert.equal(pane.scrollTop,90);assert.equal(body.scrollTop,55);assert.equal(body.value,'正在编辑的笔记正文');assert.equal(h.get(id).description,'原始笔记正文');assert.equal(h.service.snapshot().state.tasks.filter(t=>t.title==='从资料产生的下一步').length,1);}finally{await h.close();}
 });
+test('new note and reminder select the records from their own command receipt',async()=>{
+ const h=await harness();try{
+  await h.mount('Notes');await h.click(h.button('新增笔记'));await h.input(h.label('笔记名称'),'我的笔记');
+  h.intercept(c=>{if(c.type==='capture.create'){h.intercept(null);h.add('并发笔记',null,'note','外部内容');}});
+  await h.click(h.button('保存笔记'));assert.equal(h.label('笔记名称').value,'我的笔记');
+  await h.show('Reminders');await h.click(h.button('新增提醒'));await h.input(h.label('提醒名称'),'我的提醒');await h.input(h.label('提醒时间'),'2026-11-03T09:00');
+  h.intercept(c=>{if(c.type==='reminder.create'){h.intercept(null);h.execute({type:'reminder.create',payload:{title:'并发提醒',parentId:null,at:'2026-11-03T08:00:00.000Z',rule:null}});}});
+  await h.click(h.button('保存提醒'));assert.equal(h.label('提醒名称').value,'我的提醒');
+ }finally{await h.close();}
+});

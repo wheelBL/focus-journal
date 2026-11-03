@@ -19,7 +19,7 @@ test('branch completion protects child decisions until a single write finishes a
   assert.equal(choice.value,'done');assert.equal(gate.calls,1);assert.equal(h.query('dialog'),d);
   await h.action(gate.fail);assert.equal(choice.disabled,false);assert.equal(choice.value,'done');assert.match(h.query('dialog [role=alert]').textContent,/保存失败/);assert.equal(h.get(parent).status,'open');
   gate.restore();await h.click(h.button('确认完成事项',d));assert.equal(h.get(parent).status,'done');assert.equal(h.get(child).status,'done');assert.equal(document.querySelector('dialog'),null);
-  await h.click(h.button('撤销状态调整',h.query('.outline-tools')));assert.equal(h.get(parent).status,'open');assert.equal(h.get(child).status,'open');
+  await h.click(h.label('撤销上一步'));assert.equal(h.get(parent).status,'open');assert.equal(h.get(child).status,'open');
  }finally{await h.close();}
 });
 

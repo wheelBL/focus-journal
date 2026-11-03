@@ -39,7 +39,7 @@ test('before/after drops reorder siblings and undo preserves edits and newly acc
  const {service,clock}=setup(),p=create(service,'project','项目',null),a=create(service,'task','A',p),b=create(service,'task','B',p),c=create(service,'task','C',p);
  move(service,c,a,'before');assert.deepEqual(outlineIndex(service.snapshot().state).children.get(p)!.map(n=>n.id),[c,a,b]);
  move(service,c,b,'after');patch(service,c,'title','C 已改名');service.execute({type:'focus.start',payload:{taskId:c,estimateMinutes:25}});clock.advance(12000);
- const state=service.execute({type:'outline.undo'}).state;assert.deepEqual(outlineIndex(state).children.get(p)!.map(n=>n.id),[c,a,b]);assert.equal(state.tasks.find(t=>t.id===c)!.title,'C 已改名');assert.equal(state.sessions[0].durationMs,12000);
+ assert.throws(()=>service.execute({type:'outline.undo'}),/最近/);service.execute({type:'history.undo'});const state=service.execute({type:'outline.undo'}).state;assert.deepEqual(outlineIndex(state).children.get(p)!.map(n=>n.id),[c,a,b]);assert.equal(state.tasks.find(t=>t.id===c)!.title,'C');assert.equal(state.sessions[0].durationMs,12000);
 });
 test('inline edits preserve immutable original estimates and unrelated fields',()=>{
  const {service}=setup(),id=create(service,'task','任务','inbox');patch(service,id,'estimateMinutes',50);patch(service,id,'nextAction','先读一页');patch(service,id,'outcome','一页小结');const state=patch(service,id,'title','新的标题').state;
@@ -68,7 +68,7 @@ test('SQLite roundtrip persists hierarchy and order with stable record identitie
  const reloaded=new JournalService(store,new Clock()),index=outlineIndex(reloaded.snapshot().state);assert.deepEqual(index.children.get(p)!.map(n=>n.id),[b,a]);assert.equal(reloaded.snapshot().state.schemaVersion,22);store.close();
 });
 test('a failed drag save leaves structure, derived ownership and undo unchanged',()=>{
- const {store,service}=setup(),p=create(service,'project','目标',null),t=create(service,'task','任务','inbox'),before=service.exportJson();store.fail=true;assert.throws(()=>move(service,t,p),/disk full/);assert.equal(service.exportJson(),before);store.fail=false;assert.throws(()=>service.execute({type:'outline.undo'}),/没有可以撤销/);
+ const {store,service}=setup(),p=create(service,'project','目标',null),t=create(service,'task','任务','inbox'),before=service.exportJson();store.fail=true;assert.throws(()=>move(service,t,p),/disk full/);assert.equal(service.exportJson(),before);store.fail=false;assert.throws(()=>service.execute({type:'outline.undo'}),/最近/);
 });
 test('parent estimates remain distinct and child estimate rollup avoids counting nested budgets twice',()=>{
  const {service}=setup(),p=create(service,'task','父项','inbox'),c=create(service,'task','子项',p),g=create(service,'task','更小的步骤',c);patch(service,p,'estimateMinutes',100);patch(service,c,'estimateMinutes',50);patch(service,g,'estimateMinutes',25);const index=outlineIndex(service.snapshot().state);assert.equal(index.stats.get(p)!.ownEstimate,100);assert.equal(index.stats.get(p)!.childEstimate,50);assert.equal(index.stats.get(c)!.childEstimate,25);

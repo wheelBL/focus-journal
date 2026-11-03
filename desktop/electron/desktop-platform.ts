@@ -10,7 +10,9 @@ export function applicationMenu(platform:NodeJS.Platform,name:string,edit:(actio
  if(platform!=='darwin')return null;
  return [{label:name,submenu:[{role:'about'},{type:'separator'},{role:'hide'},{role:'hideOthers'},{role:'unhide'},{type:'separator'},{role:'quit'}]},
   {label:'文件',submenu:[{role:'close'}]},
-  {label:'编辑',submenu:[{label:'撤销',accelerator:'CommandOrControl+Z',click:()=>edit('undo')},{label:'重做文字编辑',accelerator:'CommandOrControl+Shift+Z',click:()=>edit('redo')},{type:'separator'},{role:'cut'},{role:'copy'},{role:'paste'},{role:'pasteAndMatchStyle'},{id:'journal-select-all',label:'全选',accelerator:'CommandOrControl+A',click:()=>edit('selectAll')}]},
+  // Undo/redo bindings are device-configurable in the renderer. Menu clicks use
+  // the same dispatcher; fixed native accelerators would bypass those settings.
+  {label:'编辑',submenu:[{label:'撤销',click:()=>edit('undo')},{label:'重做',click:()=>edit('redo')},{type:'separator'},{role:'cut'},{role:'copy'},{role:'paste'},{role:'pasteAndMatchStyle'},{id:'journal-select-all',label:'全选',accelerator:'CommandOrControl+A',click:()=>edit('selectAll')}]},
   {label:'显示',submenu:[{role:'resetZoom'},{role:'zoomIn'},{role:'zoomOut'},{type:'separator'},{role:'togglefullscreen'}]},
   {role:'windowMenu',label:'窗口'}];
 }

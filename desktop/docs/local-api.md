@@ -160,3 +160,7 @@ request.json 是 UTF-8 文件，例如 `{"title":"整理周报"}`。工具不会
 
 
 0.32.0：新增 `reminder.convert {id,at,rule}` 将事项转为纯提醒，保留原安排和投入。`recurrence.set {id,rule}` 调整重复规则；提醒只支持固定日历。`item-reminder.dismiss {id}` 确认本次并进入下一次，`item-reminder.snooze {id}` 五分钟后提醒。通过 `outline.patch {id,field:"itemType",value:"task"}` 转回事项。`inbox-review.settings {enabled,time}` 配置每天整理提醒，`inbox-review.dismiss` 和 `inbox-review.snooze` 处理本次提醒。时间格式 HH:mm、默认09:00、本机时区；具体参数由 `/commands` 和 `/openapi.json` 返回。详情见 [纯提醒与收件箱](reminders-inbox.md)。
+
+### 事项审视安排（0.37.0）
+
+`item-review.configure` 为已有任务配置审视：`id`、`enabled`、`nextDate`，以及可选 `interval:{unit:"once"|"days"|"weeks"|"months",count:1..120}`。`item-review.defer` 只调整已开启审视的 `nextDate`。遵循原有修订号、幂等键和写权限规则。审视安排不新增任务，不修改截止时间，也不表示已审视；间隔从实际标记已审视的日期起算，不是固定星期提醒。

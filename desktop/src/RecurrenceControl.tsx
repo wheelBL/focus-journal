@@ -1,4 +1,4 @@
-import {ReminderConvertDialog} from './ReminderContent';
+import {ReminderConvertDialog} from './ReminderConvertDialog';
 import React,{useEffect,useRef,useState} from 'react';
 import {ArrowRepeatAll20Regular} from '@fluentui/react-icons';
 import type {Task,Recurrence} from '../core/types';

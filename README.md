@@ -12,7 +12,7 @@ Windows 11 与 macOS 上的本地工作日志，把 **估计 → 实践 → 复�
 
 ## 下载与运行
 
-当前源码版本为 **0.36.0**，下载包由 GitHub Actions 构建。选择对应平台的成功运行，在 Artifacts 中下载；[0.36.0 更新说明](docs/releases/0.36.0.md)。
+当前源码版本为 **0.37.0**，下载包由 GitHub Actions 构建。选择对应平台的成功运行，在 Artifacts 中下载；[0.37.0 更新说明](docs/releases/0.37.0.md)。
 
 | 设备 | 下载 |
 | --- | --- |

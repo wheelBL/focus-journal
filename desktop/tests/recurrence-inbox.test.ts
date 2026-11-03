@@ -74,7 +74,7 @@ test('late calendar completion skips missed slots; completion-relative recurrenc
 test('completion undo removes untouched successor, preserves effort, protects an edited successor and rolls back on disk failure',()=>{
  const {s,store}=setup(),id=create(s,'重复任务');repeat(s,id);s.execute({type:'focus.start',payload:{taskId:id}});s.execute({type:'focus.stop',payload:{taskId:id,complete:true}});
  const next=get(s,id).recurrenceNextId!;s.execute({type:'item.undo'});assert.equal(get(s,id).status,'open');assert.equal(get(s,next),undefined);assert.equal(s.snapshot().state.sessions.length,1);
- complete(s,id);patch(s,get(s,id).recurrenceNextId!,'title','开始准备');assert.throws(()=>s.execute({type:'item.undo'}),/已有变化/);assert.equal(get(s,id).status,'done');
+ complete(s,id);patch(s,get(s,id).recurrenceNextId!,'title','开始准备');assert.throws(()=>s.execute({type:'item.undo'}),/最近/);assert.equal(get(s,id).status,'done');s.execute({type:'history.undo'});s.execute({type:'item.undo'});assert.equal(get(s,id).status,'open');
  const other=create(s,'失败保护');repeat(s,other);const before=s.exportJson();store.fail=true;assert.throws(()=>complete(s,other),/disk full/);assert.equal(s.exportJson(),before);
 });
 test('event occurrences project into future calendar without duplicating stored tasks or effort, reminders advance and snooze remains local',()=>{

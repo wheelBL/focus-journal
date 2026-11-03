@@ -1,5 +1,7 @@
 import {BrowserWindow,ipcMain,safeStorage,net} from 'electron';
 import {pathToFileURL} from 'node:url';
+import path from 'node:path';
+import {AiConversationStore} from './ai-conversation-store';
 import {AiSettings,createElectronAiVault} from './ai-settings';
 import {chatCompletion} from './ai-transport';
 import {AiAssistantService} from '../core/ai-assistant-service';
@@ -14,8 +16,8 @@ export class AiController {
  constructor(file:string,private window:BrowserWindow,entry:string,journal:JournalService,changed:()=>void,usage?:import('./usage-store').UsageStore){
   this.settings=new AiSettings(file,createElectronAiVault(safeStorage));
   const fetch=(input:Parameters<typeof net.fetch>[0],init?:Parameters<typeof net.fetch>[1])=>net.fetch(input,init);
-  this.assistant=new AiAssistantService(journal,()=>this.settings.connection(),(connection,request)=>chatCompletion(connection,request,fetch),changed,record=>usage?.saveAi(record));
-  this.assistant.subscribe(state=>{if(state.phase!=='running')usage?.updateSuggestions(state.id,state.suggestions);if(!window.isDestroyed())window.webContents.send('ai:changed',state);});
+  this.assistant=new AiAssistantService(journal,()=>this.settings.connection(),(connection,request)=>chatCompletion(connection,request,fetch),changed,record=>usage?.saveAi(record),new AiConversationStore(path.join(path.dirname(file),'ai-conversation.json')));
+  this.assistant.subscribe(state=>{if(state.phase!=='running'){const safe=this.assistant.storageSafeSuggestions();if(safe)usage?.updateSuggestions(state.id,safe);}if(!window.isDestroyed())window.webContents.send('ai:changed',state);});
   const record=(channel:string,result:OperationResult)=>{try{usage?.record({operation:channel.replace(':','.'),entry:'ai.assistant',result,version:'current'});}catch{/* Usage must not affect AI operations. */}};
   const handle=(channel:string,fn:(...args:any[])=>unknown)=>{
    this.channels.push(channel);ipcMain.handle(channel,(event,...args)=>{
@@ -31,6 +33,7 @@ export class AiController {
   handle('ai:context',(scope:AiScope)=>this.assistant.context(scope));
   handle('ai:get',()=>this.assistant.get());
   handle('ai:generate',input=>{if(this.testAbort)throw new AiError('busy','连接正在测试，请稍候。');return this.assistant.generate(input);});
+  handle('ai:reset',()=>this.assistant.reset());
   handle('ai:cancel',()=>{this.testAbort?.abort();return this.assistant.cancel();});
   handle('ai:apply',input=>this.assistant.apply(input));
   window.on('closed',this.dispose);

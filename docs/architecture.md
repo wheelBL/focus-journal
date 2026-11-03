@@ -1,6 +1,6 @@
 # 架构说明
 
-当前本地交付版本：0.30.0；日志数据结构：19。GitHub 公开版本以 Releases 为准。技术栈为 TypeScript、React、Electron 和 SQLite。
+当前本地交付版本：0.37.0；日志数据结构：22。GitHub 公开版本以 Releases 为准。技术栈为 TypeScript、React、Electron 和 SQLite。
 
 ## 责任边界
 
@@ -67,6 +67,10 @@ Windows 包从固定 Electron 运行时和应用构建生成，使用 app.asar�
 
 ## 桌面平台
 
-核心业务与 schema 19 继续共用。core/desktop-platform.ts 定义修饰键和全局记录默认值；src/platform.ts 读取受限预加载提供的平台标识，统一转换 Command 操作和提示。electron/desktop-platform.ts 管理原生窗口配置与菜单；macOS 不调用 Windows 标题栏覆盖 API，使用模板菜单栏图标并响应 Dock activate。
+核心业务与 schema 22 继续共用。core/desktop-platform.ts 定义修饰键和全局记录默认值；src/platform.ts 读取受限预加载提供的平台标识，统一转换 Command 操作和提示。electron/desktop-platform.ts 管理原生窗口配置与菜单；macOS 不调用 Windows 标题栏覆盖 API，使用模板菜单栏图标并响应 Dock activate。
 
 macOS 在原生 arm64 / x64 GitHub runner 分别构建和验证，生产与 QA 分开打包。QA 只改测试入口，不改业务代码；生产包不包含 QA 入口或数据库。ZIP / DMG 验证架构、ad-hoc 签名和归档完整性；目前不包含 Developer ID 签名或 Apple 公证。
+
+## 本轮职责整理
+
+0.37.0 将通用撤销/重做统一到业务历史与应用编辑路由；AI 会话、计划校验和设备持久化分开负责，接入已有事项审视命令。移除两处详情/提醒组件循环依赖，创建操作返回独立回执。剩余集中职责与后续建议见 [架构检查](architecture-review-2026-11-03.md)。

@@ -46,7 +46,7 @@ test('completion, reopening and cancellation cannot pin nonmatching rows or thei
   await h.mount();await h.click(h.label('任务'));await h.input(h.label('常用视图'),h.service.snapshot().state.views[0].id);
   const row=id=>document.querySelector(`[data-outline-id="${id}"]`);
   await h.click(h.label('完成当前事项'));assert.equal(row(a),null);assert.equal(row(p),null);assert.ok(row(b));assert.equal(document.querySelector('.retained-notice'),null);
-  await h.click(h.button('撤销状态调整',h.query('.outline-toolbar')));assert.ok(row(a));await h.key(row(a),' ');assert.equal(row(a),null);
+  await h.click(h.label('撤销上一步'));assert.ok(row(a));await h.key(row(a),' ');assert.equal(row(a),null);
   await h.command({type:'task.status',payload:{id:a,status:'open'}});await h.click(row(a));await h.command({type:'task.status',payload:{id:a,status:'cancelled'}});assert.equal(row(a),null);assert.equal(row(p),null);
   await h.click(h.label('今日'));await h.click(h.label('任务'));assert.equal(row(a),null);assert.equal(row(p),null);
  }finally{await h.close();}

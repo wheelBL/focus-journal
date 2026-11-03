@@ -29,3 +29,21 @@
 .ai-connection-form{margin-top:14px}.ai-connection-form fieldset{display:grid;gap:12px}.ai-settings{display:grid;gap:12px}.ai-connection-form input{width:100%}.ai-connection-form .actions{display:flex;gap:8px;flex-wrap:wrap}
 @media(max-width:620px){.ai-change{grid-template-columns:minmax(0,1fr)}.ai-suggestion>header{align-items:flex-start}.ai-compose-actions{flex-wrap:wrap}.ai-context summary span{display:block;margin-left:0}}
 @media(prefers-reduced-motion:reduce){.ai-assistant *{scroll-behavior:auto}}
+
+.ai-conversation-actions{display:flex;align-items:center;justify-content:space-between;gap:10px}.ai-conversation-actions>strong{font-size:13px;font-weight:600}.ai-conversation-actions .actions{display:flex;gap:5px;flex-wrap:wrap}.ai-conversation-actions button{font-size:12px;padding:5px 8px;min-height:30px}.ai-transcript{display:grid;gap:20px;min-width:0}.ai-transcript:empty{display:none}.ai-user-message{padding:10px 12px;border-left:2px solid var(--accent);background:var(--surface-alt);border-radius:4px;font-size:13px;line-height:1.65;white-space:pre-wrap;overflow-wrap:anywhere;user-select:text}.ai-user-message>strong{display:block;font-size:11px;color:var(--muted);font-weight:500;margin-bottom:3px}.ai-turn>.ai-response{border-top:0;padding-top:12px}.ai-historical{font-size:11px;color:var(--muted);white-space:nowrap}.ai-suggestion.is-historical{border-style:dashed}.ai-scope-change,.ai-conversation-notice{font-size:12px;line-height:1.6;margin:0;padding:8px 10px;border-left:2px solid var(--accent);background:var(--surface-alt);color:var(--muted)}.ai-transcript+.ai-compose{border-top:1px solid var(--line);padding-top:14px}@media(max-width:620px){.ai-conversation-actions{align-items:flex-start}.ai-historical{white-space:normal}}
+
+/* The transcript yields space to the composer; only conversation history scrolls. */
+.modal:has(>.ai-assistant){display:flex;flex-direction:column;overflow:hidden;max-height:calc(100dvh - 32px);padding:0 24px 16px}
+.modal:has(>.ai-assistant .ai-transcript:not(:empty)){height:min(820px,calc(100dvh - 48px))}
+.modal.wide:has(>.ai-assistant)>header{flex:none;position:static;margin:0 0 10px;padding-block:14px}
+.modal>.ai-assistant{display:flex;flex-direction:column;flex:1;min-height:0;gap:10px;overflow:hidden}
+.ai-assistant>.ai-intro,.ai-assistant>.ai-conversation-actions,.ai-assistant>.ai-conversation-notice,.ai-assistant>.ai-setup,.ai-assistant>.ai-error{flex:none}
+.ai-assistant>.ai-error,.ai-conversation-notice{max-height:70px;overflow:auto}
+.ai-assistant>.ai-transcript{display:flex;flex-direction:column;flex:1 1 180px;min-height:0;overflow-y:auto;overscroll-behavior:contain;scrollbar-gutter:stable;gap:16px;padding-right:4px}
+.ai-assistant>.ai-transcript:empty{display:none}.ai-transcript>.ai-turn{flex:none}.ai-transcript:focus-visible{outline:1px solid var(--focus-ring);outline-offset:-1px}
+.ai-assistant>.ai-compose{flex:none;min-height:0;gap:8px;border-top:1px solid var(--line);padding-top:10px}
+.ai-compose-context{display:grid;gap:7px;max-height:164px;min-height:0;overflow-y:auto;overscroll-behavior:contain}
+.ai-compose-context>.field:first-child{flex-direction:row;align-items:center;gap:10px}.ai-compose-context>.field:first-child select{width:auto;flex:1;min-width:0}
+.ai-compose .ai-context{padding:6px 9px}.ai-compose .ai-prompts button{min-height:25px}.ai-compose textarea{min-height:64px;height:76px;max-height:104px}.ai-compose-actions>small{min-width:0;flex:1}.ai-compose-actions>button{flex:none}
+@media(max-height:720px){.modal:has(>.ai-assistant){padding-bottom:12px}.modal.wide:has(>.ai-assistant)>header{padding-block:10px;margin-bottom:8px}.ai-assistant>.ai-intro{display:none}.modal>.ai-assistant{gap:8px}.ai-compose-context{max-height:126px;gap:5px}.ai-compose textarea{min-height:56px;height:60px;max-height:80px}.ai-compose-actions{flex-wrap:nowrap}.ai-compose-actions small{font-size:10px}}
+@media(max-width:620px){.modal:has(>.ai-assistant){padding-inline:14px}.ai-compose-context .ai-context summary span{display:inline;margin-left:6px}.ai-compose-context{max-height:148px}.ai-conversation-actions{gap:5px}.ai-conversation-actions .actions{gap:2px}.ai-conversation-actions button{font-size:11px;padding-inline:5px}}
