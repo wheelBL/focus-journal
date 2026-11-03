@@ -1,4 +1,5 @@
 import {configureCompanionWindow} from './desktop-platform';
+import {preserveWindowTransparency} from './window-background';
 import {BrowserWindow,ipcMain,screen} from 'electron';
 import {existsSync,readFileSync} from 'node:fs';
 import path from 'node:path';
@@ -44,6 +45,7 @@ export class FloatingTimerWindow {
   if(this.disposed)return;if(this.loading)return this.loading;if(this.win&&!this.win.isDestroyed())return;
   const win=this.win=new BrowserWindow({width:320,height:64,show:false,title:'专注记 · 屏边计时签',frame:false,transparent:true,backgroundColor:'#00000000',hasShadow:false,resizable:false,minimizable:false,maximizable:false,fullscreenable:false,skipTaskbar:true,alwaysOnTop:true,icon:this.icon,
    webPreferences:{preload:path.join(__dirname,'floating-timer-preload.cjs'),sandbox:true,contextIsolation:true,nodeIntegration:false,backgroundThrottling:false,focusOnNavigation:false}});
+  preserveWindowTransparency(win);
   configureCompanionWindow(win,process.platform);
   win.webContents.setWindowOpenHandler(()=>({action:'deny'}));win.webContents.on('will-navigate',e=>e.preventDefault());
   win.on('page-title-updated',e=>e.preventDefault());

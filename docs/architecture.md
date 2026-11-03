@@ -1,6 +1,6 @@
 # 架构说明
 
-当前本地交付版本：0.37.0；日志数据结构：22。GitHub 公开版本以 Releases 为准。技术栈为 TypeScript、React、Electron 和 SQLite。
+当前本地交付版本：0.37.1；日志数据结构：22。GitHub 公开版本以 Releases 为准。技术栈为 TypeScript、React、Electron 和 SQLite。
 
 ## 责任边界
 

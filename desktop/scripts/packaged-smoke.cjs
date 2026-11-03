@@ -1,5 +1,5 @@
 // Included only in the --release-qa --smoke package; never shipped in production.
-const {app,BrowserWindow}=require('electron');
+const {app,BrowserWindow,nativeTheme}=require('electron');
 const fs=require('node:fs'),path=require('node:path');
 module.exports=(dataDir,output,expectedVersion)=>{
  const restart=process.argv.includes('--restart-verification');
@@ -9,6 +9,10 @@ module.exports=(dataDir,output,expectedVersion)=>{
  const check=(ok,label)=>{if(!ok)throw Error(label);checks.push(label);};
  const run=(w,code)=>w.webContents.executeJavaScript(code);
  const until=async(fn,label)=>{for(let i=0;i<100;i++){if(await fn())return;await wait(40);}throw Error(label);};
+ const transparentCorners=async(w,label)=>{
+  const image=await w.webContents.capturePage(),{width,height}=image.getSize(),pixels=image.toBitmap();
+  check([[0,0],[width-1,0],[0,height-1],[width-1,height-1]].every(([x,y])=>pixels[(y*width+x)*4+3]===0),label);
+ };
  const timeout=setTimeout(()=>{failures.push('Packaged smoke timeout');app.quit();},90000);
  app.on('will-quit',()=>{clearTimeout(timeout);const remainingWindows=BrowserWindow.getAllWindows().length;if(!finished)failures.push('Smoke did not finish');if(remainingWindows)failures.push('Windows remain at exit');fs.writeFileSync(path.join(output,restart?'packaged-restart.json':'packaged-smoke.json'),JSON.stringify({version:app.getVersion(),checks,failures,diagnostics,remainingWindows,dataDir,packaged:app.isPackaged},null,2));});
  void app.whenReady().then(async()=>{try{
@@ -76,10 +80,19 @@ module.exports=(dataDir,output,expectedVersion)=>{
   await until(()=>run(strip,`!!window.floatingTimer&&!!document.querySelector('.floating-toggle')`),'Packaged preload missing');
   check(await run(strip,`document.documentElement.dataset.theme==='dark'&&document.documentElement.scrollWidth<=innerWidth`),'Floating timer inherits dark mode without horizontal overflow');
   fs.writeFileSync(path.join(output,'dark-floating.png'),(await strip.webContents.capturePage()).toPNG());
+  await transparentCorners(strip,'Packaged dark floating timer has transparent outside corners');
+  for(const theme of ['light','system','dark']){
+   await run(main,`window.journalAppearance.set({theme:'${theme}',motion:'reduce'})`);
+   const resolved=nativeTheme.shouldUseDarkColors?'dark':'light';
+   await until(()=>run(strip,`document.documentElement.dataset.theme==='${resolved}'`),'Floating theme change missing');await wait(80);
+   await transparentCorners(strip,`Packaged ${theme} floating timer preserves transparency after theme changes`);
+  }
   const state=await run(strip,'window.floatingTimer.snapshot()');check(state.selectedId===id,'Packaged preload shares service');
   check(state.timers.find(t=>t.sessionId===id).targetOffsetMs===adjusted.targetOffsetMs,'Packaged floating timer shares reminder offset');
   const remaining=await run(strip,`document.querySelector('.floating-readout time').textContent`);check(/2[45]:[0-5][0-9]/.test(remaining),'Packaged floating timer shows remaining target, not backfilled overtime');
   await run(strip,`window.floatingTimer.action('expand')`);await run(strip,`window.floatingTimer.action('pause',${JSON.stringify(id)})`);
+  await until(()=>run(strip,`!!document.querySelector('.floating-controls')`),'Expanded timer missing');await wait(80);
+  await transparentCorners(strip,'Packaged expanded floating controls preserve transparent corners');
   check((await run(main,'window.journal.snapshot()')).timers.find(t=>t.sessionId===id).paused,'Packaged pause updates main');
   await run(strip,`window.floatingTimer.action('resume',${JSON.stringify(id)})`);await run(strip,`window.floatingTimer.action('stop-rest',${JSON.stringify(id)})`);
   const stopped=await run(main,'window.journal.snapshot()');check(stopped.state.settings.rest.phase==='running'&&stopped.state.sessions.some(s=>s.id===id&&s.status==='ended'),'Packaged end and rest saves effort');

@@ -3,6 +3,7 @@ import {existsSync,readFileSync} from 'node:fs';
 import {pathToFileURL} from 'node:url';
 import {atomicWrite} from './sync-storage';
 import {defaultAppearance,parseAppearance,type Appearance} from '../core/appearance';
+import {applyWindowBackground} from './window-background';
 
 /** Owns device persistence, native captions and broadcasts to the app's windows. */
 export class AppearanceController {
@@ -26,8 +27,7 @@ export class AppearanceController {
  }
  private style(window:BrowserWindow){
   if(window.isDestroyed())return;
-  // Preserve the floating timer's transparent, rounded outer area.
-  if(window.getBackgroundColor()!=='#00000000')window.setBackgroundColor(nativeTheme.shouldUseDarkColors?'#26282D':'#FFFFFF');
+  applyWindowBackground(window,nativeTheme.shouldUseDarkColors);
   if(window===this.main&&process.platform!=='darwin')window.setTitleBarOverlay({color:nativeTheme.shouldUseDarkColors?'#26282D':'#FFFFFF',symbolColor:nativeTheme.shouldUseDarkColors?'#E2E6ED':'#4C535F',height:44});
  }
  private created=(_event:Electron.Event,window:BrowserWindow)=>{

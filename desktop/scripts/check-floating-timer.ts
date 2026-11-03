@@ -5,6 +5,8 @@ import {JournalService} from '../core/service';
 import {emptyState,type JournalState} from '../core/types';
 import {FloatingTimerWindow} from '../electron/floating-timer-window';
 import {ReminderWindow} from '../electron/reminder-window';
+import {AppearanceController} from '../electron/appearance';
+import {mainWindowChrome} from '../electron/desktop-platform';
 
 // Isolated native Electron, real IPC/input/renderer, simulated time and no production profile/tray.
 const root=process.cwd(),version=JSON.parse(readFileSync('package.json','utf8')).version;
@@ -15,7 +17,7 @@ let now=Date.parse('2026-10-21T10:00:00+08:00');const service=new JournalService
 service.execute({type:'reminder.settings',payload:{settings:{sound:false,volume:60,repeatSeconds:30}}});
 const add=(title:string)=>service.execute({type:'task.save',payload:{title,parentId:null}}).state.tasks.at(-1)!.id;
 const task=add('梳理接口与验证方案'),other=add('第二件事项');
-let main:BrowserWindow,manager:FloatingTimerWindow,reminders:ReminderWindow;
+let main:BrowserWindow,manager:FloatingTimerWindow,reminders:ReminderWindow,appearance:AppearanceController;
 const failures:string[]=[],checks:string[]=[],logs:unknown[]=[],geometry:unknown[]=[];
 const delay=(ms:number)=>new Promise(r=>setTimeout(r,ms));
 const run=(code:string,win:BrowserWindow)=>win.webContents.executeJavaScript(code);
@@ -26,14 +28,21 @@ async function pointer(win:BrowserWindow,selector:string){await ready(win,select
 async function button(win:BrowserWindow,label:string){await run(`(()=>{const b=[...document.querySelectorAll('button')].find(b=>b.textContent.trim()===${JSON.stringify(label)});if(!b)throw Error('Missing '+${JSON.stringify(label)});b.dataset.qaClick='yes';})()`,win);await pointer(win,'[data-qa-click=yes]');await run(`document.querySelector('[data-qa-click=yes]')?.removeAttribute('data-qa-click')`,win);}
 async function capture(win:BrowserWindow,name:string){writeFileSync(path.join(output,name+'.png'),(await win.webContents.capturePage()).toPNG());const g=await run(`({width:innerWidth,height:innerHeight,dpr:devicePixelRatio,overflow:document.documentElement.scrollWidth>innerWidth+1,buttons:[...document.querySelectorAll('button')].filter(e=>e.getBoundingClientRect().width).map(e=>({text:e.textContent,rect:JSON.parse(JSON.stringify(e.getBoundingClientRect()))}))})`,win);geometry.push({name,...g});check(!g.overflow,`${name}: no horizontal overflow`);}
 const floating=()=>BrowserWindow.getAllWindows().find(w=>w.getTitle()==='专注记 · 屏边计时签');
+async function checkTransparent(win:BrowserWindow,name:string){
+ const image=await win.webContents.capturePage(),{width,height}=image.getSize(),bitmap=image.toBitmap();
+ const alpha=(x:number,y:number)=>bitmap[(y*width+x)*4+3];
+ check([[0,0],[width-1,0],[0,height-1],[width-1,height-1]].every(([x,y])=>alpha(x,y)===0),`${name}: all outside corners remain transparent`);
+ check(alpha(Math.floor(width/2),Math.floor(25*height/win.getContentBounds().height))===255,`${name}: timer surface remains opaque`);
+}
 const reminder=()=>BrowserWindow.getAllWindows().find(w=>w.getTitle()==='专注记 · 到时提醒');
 function changed(){main?.webContents.send('journal:changed');reminders?.sync();manager?.sync();}
 async function advance(ms:number){now+=ms;service.tick();changed();await delay(150);}
 async function execute(type:string,payload?:Record<string,unknown>){const result=service.execute({type,payload});changed();await delay(100);return result;}
 async function mainCheck(){try{
  await app.whenReady();ipcMain.handle('journal:snapshot',()=>service.snapshot());ipcMain.handle('journal:clock',()=>service.clockSnapshot());ipcMain.handle('journal:command',(_e,c)=>{const result=service.execute(c);changed();return result;});
+ appearance=new AppearanceController(path.join(dataDir,'appearance.json'),path.join(root,'dist/client/index.html'));
  ipcMain.handle('journal:capture-preferences',()=>({shortcut:'',registered:false}));ipcMain.handle('sync:status',()=>({configured:false,phase:'idle'}));ipcMain.handle('journal:window',(_e,action)=>{if(action==='minimize')main.minimize();});
- main=new BrowserWindow({show:false,width:1060,height:720,title:'专注记 · 隔离验证',webPreferences:{preload:path.join(root,'dist-electron/preload.cjs'),sandbox:true,contextIsolation:true,nodeIntegration:false,backgroundThrottling:false}});
+ main=new BrowserWindow({show:false,width:1060,height:720,title:'专注记 · 隔离验证',...mainWindowChrome(process.platform),webPreferences:{preload:path.join(root,'dist-electron/preload.cjs'),sandbox:true,contextIsolation:true,nodeIntegration:false,backgroundThrottling:false}});appearance.setMain(main);
  const show=()=>{main.restore();main.show();};
  reminders=new ReminderWindow(service,changed,path.join(root,'assets/icon.png'),(event,detail)=>logs.push({event,detail}),()=>show(),()=>show(),reveal=>{if(reveal||main.isVisible()&&!main.isMinimized())show();},()=>manager?.sync());
  manager=new FloatingTimerWindow(service,main,changed,()=>reminders.isPresenting(),path.join(root,'assets/icon.png'),path.join(dataDir,'position.json'),show,()=>show(),(event,detail)=>logs.push({event,detail}));
@@ -42,6 +51,12 @@ async function mainCheck(){try{
  main.restore();main.show();await delay(200);
  const first=(await execute('focus.start',{taskId:task})).timer!.sessionId;await advance(17*60000+42000);logs.push({beforeMinimize:BrowserWindow.getAllWindows().map(w=>({title:w.getTitle(),visible:w.isVisible(),minimized:w.isMinimized(),url:w.webContents.getURL()}))});check(!floating()?.isVisible(),'Main visible keeps strip hidden');
  main.minimize();await until(()=>!!floating()?.isVisible(),'Strip did not appear on minimize');let strip=floating()!;await ready(strip,'.floating-toggle');check(!strip.isFocused()&&strip.isAlwaysOnTop(),'Minimize shows inactive topmost strip');await capture(strip,'compact');
+ for(const theme of ['light','dark','system']){
+  await run(`window.journalAppearance.set({theme:'${theme}',motion:'reduce'})`,main);
+  await delay(100);await capture(strip,`${theme}-compact`);await checkTransparent(strip,`${theme} compact`);
+  await run(`window.floatingTimer.action('expand')`,strip);await ready(strip,'.floating-controls');await capture(strip,`${theme}-expanded`);await checkTransparent(strip,`${theme} expanded`);
+  await run(`window.floatingTimer.action('collapse')`,strip);await delay(100);await checkTransparent(strip,`${theme} collapsed again`);
+ }
  check((await run(`document.querySelector('time').textContent`,strip))==='07:18','Remaining time matches shared clock');
  await pointer(strip,'.floating-toggle');await ready(strip,'.floating-controls');await capture(strip,'expanded');await button(strip,'暂停');await advance(12000);check(service.snapshot().timer!.paused,'Pause uses shared timer');check(service.snapshot().timer!.durationMs===1062000,'Pause excludes elapsed idle time');await capture(strip,'paused');
  await button(strip,'恢复');await execute('focus.start',{taskId:other});check((await run('window.floatingTimer.snapshot()',strip)).selectedId===first,'Another timer does not change displayed identity');await capture(strip,'multiple');
@@ -60,6 +75,6 @@ async function mainCheck(){try{
  await pointer(strip,'.floating-toggle');strip.webContents.sendInputEvent({type:'keyDown',keyCode:'Escape'});strip.webContents.sendInputEvent({type:'keyUp',keyCode:'Escape'});await delay(120);check(!(await run('window.floatingTimer.snapshot()',strip)).expanded,'Escape collapses controls');
  check(service.snapshot().state.sessions.find(s=>s.id===first)!.durationMs===1542000,'Original effort excludes pause and rest');
  }catch(e){failures.push(String(e));console.error(e);}
- finally{manager?.dispose();reminders?.dispose();main?.destroy();service.shutdown();const remaining=BrowserWindow.getAllWindows().length;if(remaining)failures.push(`${remaining} windows left`);writeFileSync(path.join(output,'results.json'),JSON.stringify({checks,failures,geometry,logs,remainingWindows:remaining,productionDataTouched:false},null,2));console.log(JSON.stringify({checks:checks.length,failures,output,remainingWindows:remaining}));app.exit(failures.length?1:0);}
+ finally{manager?.dispose();reminders?.dispose();appearance?.dispose();main?.destroy();service.shutdown();const remaining=BrowserWindow.getAllWindows().length;if(remaining)failures.push(`${remaining} windows left`);writeFileSync(path.join(output,'results.json'),JSON.stringify({checks,failures,geometry,logs,remainingWindows:remaining,productionDataTouched:false},null,2));console.log(JSON.stringify({checks:checks.length,failures,output,remainingWindows:remaining}));app.exit(failures.length?1:0);}
 }
 void mainCheck();

@@ -9,6 +9,7 @@ export class BrowserWindow extends EventEmitter {
  isDestroyed(){return this.destroyed;}isVisible(){return this.visible;}isMinimized(){return this.minimized;}isFocused(){return this.focused;}isAlwaysOnTop(){return this.top;}
  setBounds(bounds){this.bounds={...bounds};this.emit('move');}getBounds(){return this.bounds;}
  setAlwaysOnTop(top){this.top=top;}showInactive(){this.visible=true;this.focused=false;}hide(){const was=this.visible;this.visible=false;if(was)this.emit('hide');}
+ setBackgroundColor(color){this.backgroundColor=color;}
  show(){this.visible=true;this.emit('show');}minimize(){this.minimized=true;this.emit('minimize');}restore(){this.minimized=false;this.show();this.emit('restore');}
  destroy(){this.visible=false;this.destroyed=true;this.emit('closed');}
 }
