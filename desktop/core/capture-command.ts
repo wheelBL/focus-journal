@@ -1,7 +1,8 @@
 import {randomUUID} from 'node:crypto';
 import type {JournalState,Task} from './types';
 import {localDate} from './types';
-import {captureDestinations,type CaptureDraft} from './capture';
+import {type CaptureDraft} from './capture';
+import {resolveCaptureParent} from './capture-destination';
 import {assertParentAvailable,outlineIndex,moveRelative} from './outline';
 import {required,text,number,day,deadline,instant} from './validation';
 import {captureDraftErrors} from './capture-validation';
@@ -13,13 +14,12 @@ import {isTask,isNote,isEvent,isGroup,isReminder} from './item-kind';
 export function createCapture(s:JournalState,p:Record<string,unknown>,now:string):Task{
  const d=p.draft as CaptureDraft;if(!d||!['task','note','event','group'].includes(d.itemType))throw new Error('记录类型无效。');
  const errors=captureDraftErrors(d);if(errors.length)throw new Error(errors.join(' '));
- let parentId=p.parentId==null?null:required(p.parentId,100);
- if(d.parentQuery){const matches=captureDestinations(s,required(d.parentQuery,2000));if(matches.length!==1)throw new Error(matches.length?'归属有重名，请填写完整路径。':'找不到归属，请检查路径。');parentId=matches[0].id;}
+ const {parentId,useAfterId}=resolveCaptureParent(s,p,d);
  assertParentAvailable(s,parentId);
  const item:Task={id:randomUUID(),title:required(d.title),itemType:d.itemType,parentId,order:(outlineIndex(s).children.get(parentId)??[]).length,projectId:null,description:text(d.description??''),outcome:'',nextAction:'',status:'open',createdAt:now,startedAt:null,completedAt:null,estimateMinutes:d.estimateMinutes==null?null:number(d.estimateMinutes),plannedDate:d.plannedDate?day(d.plannedDate):null,dueAt:d.dueAt?deadline(d.dueAt):null,eventAt:d.eventAt?deadline(d.eventAt):isEvent(d)?localDate(now):null,eventEnd:d.eventEnd?instant(d.eventEnd):null,tagIds:[]};
  if(d.remindAt)setItemReminder(item,instant(d.remindAt));
  s.tasks.push(item);for(const name of d.tagNames)attachTag(s,item.id,name);
- if(p.afterId&&!d.parentQuery){const anchor=outlineIndex(s).nodes.get(String(p.afterId));if(!anchor||anchor.parentId!==parentId)throw new Error('新增位置已改变，请重新选择。');moveRelative(s,item.id,anchor.id,'after');}
+ if(p.afterId&&useAfterId){const anchor=outlineIndex(s).nodes.get(String(p.afterId));if(!anchor||anchor.parentId!==parentId)throw new Error('新增位置已改变，请重新选择。');moveRelative(s,item.id,anchor.id,'after');}
  s.settings.selectedTaskId=item.id;return item;
 }
 

@@ -1,4 +1,3 @@
-import {defaultCaptureParent} from './capture-destination';
 import {localDate,type Command,type Snapshot} from './types';
 
 /** The public API is an explicit subset of domain commands, not arbitrary IPC. */
@@ -13,13 +12,13 @@ const choice=(...values:unknown[]):Schema=>({enum:values});
 const obj=(properties:Record<string,Schema>,required:string[]=[]):Schema=>({type:'object',properties,required,additionalProperties:false});
 interface Definition {description:string;payload:Schema;map?:(p:Record<string,unknown>,s:Snapshot)=>Command}
 const define=(description:string,properties:Record<string,Schema>,required:string[]=[]):Definition=>({description,payload:obj(properties,required)});
-const itemFields={title:{...str(),minLength:1},description:str(10000),itemType:choice('task','note','event','group'),parentId:nullable(id),tagNames:{type:'array',items:str(80),maxItems:50} as Schema,plannedDate:date,dueAt:date,estimateMinutes:nullable(num(1)),remindAt:date,eventAt:date,eventEnd:date};
+const itemFields={title:{...str(),minLength:1},description:str(10000),itemType:choice('task','note','event','group'),parentId:nullable(id),parentQuery:nullable(str()),destination:choice('auto','inbox','unfiled'),tagNames:{type:'array',items:str(80),maxItems:50} as Schema,plannedDate:date,dueAt:date,estimateMinutes:nullable(num(1)),remindAt:date,eventAt:date,eventEnd:date};
 const recurrenceRule:Schema={type:['object','null'],properties:{mode:choice('calendar','completion'),unit:choice('day','week','month','year'),interval:num(1,365),anchor:str(10),weekdays:{type:'array',items:num(0,6),maxItems:7},until:date,reminderOffsetMs:num(-366*86400000,366*86400000)},required:['mode','unit','interval','anchor','weekdays','until'],additionalProperties:false};
 export const controlCommands:Record<string,Definition>={
  'item.handoff':define('将本人责任交接给他人并以 handed-off 关闭；不计完成。仅处理明确选择的本项或子项，相关计时需 confirmTimers。',{id,ids:{type:'array',items:id,maxItems:1000},assignee:str(120),note:str(2000),followUp:bool,followUpAt:date,at:date,confirmTimers:bool},['id','assignee']),
  'item.reclaim':define('重新接手本项或明确选择的子项，不启动计时。',{id,ids:{type:'array',items:id,maxItems:1000}},['id']),
  'item.completion':define('校正已完成事项的成果归属，历史投入保留。',{id,by:choice('self','other','shared','unknown'),at:date},['id','by']),
- 'item.create':{...define('原子创建事项、笔记或事件，可同时设置标签、计划和提醒；不自动计时。',itemFields,['title']),map:(p,s)=>({type:'capture.create',payload:{parentId:p.parentId===undefined?defaultCaptureParent(s.state):p.parentId,draft:{title:p.title,description:'',itemType:'task',tagNames:[],parentQuery:null,plannedDate:null,dueAt:null,estimateMinutes:null,remindAt:null,eventAt:null,eventEnd:null,...p}}})},
+ 'item.create':{...define('原子创建事项、笔记或事件，可同时设置标签、计划和提醒；不自动计时。',itemFields,['title']),map:p=>({type:'capture.create',payload:{destination:p.destination??'auto',...p.parentId!==undefined?{parentId:p.parentId}:{},draft:{title:p.title,description:'',itemType:'task',tagNames:[],parentQuery:null,plannedDate:null,dueAt:null,estimateMinutes:null,remindAt:null,eventAt:null,eventEnd:null,...p}}})},
  'outline.patch':define('修改单个字段；保持其他内容。项目是 isProject 标记。',{id,field:choice('title','description','isProject','plannedDate','dueAt','estimateMinutes','itemType'),value:{type:['string','number','boolean','null']}},['id','field','value']),
  'outline.move':define('原子移动整支，保留身份、投入和历史。',{id,targetId:nullable(id),position:choice('inside','before','after','root')},['id','targetId','position']),
  'item.focus':{...define('加入指定日期的重点；省略 date 表示今天，null 表示取消。',{id,date},['id']),map:(p,s)=>({type:'item.focus',payload:{...p,date:p.date===undefined?localDate(s.now):p.date}})},

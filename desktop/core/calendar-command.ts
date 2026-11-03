@@ -2,7 +2,6 @@ import type {JournalState} from './types';
 import {localDate} from './types';
 import {instant,required,text} from './validation';
 import {createCapture} from './capture-command';
-import {defaultCaptureParent} from './capture-destination';
 import {isInformation,isNote,isEvent,isGroup} from './item-kind';
 import {setItemReminder,reminderEligible} from './item-reminders';
 import {configureRecurrence} from './recurrence';
@@ -24,7 +23,7 @@ export function saveCalendarSelection(s:JournalState,p:Record<string,unknown>,no
  }else{
   const draft:CaptureDraft=p.draft as CaptureDraft??{title:required(p.title),description:'',itemType:mode==='event'?'event':'task',parentQuery:null,tagNames:[],plannedDate:null,dueAt:null,estimateMinutes:null,remindAt:null,eventAt:mode==='event'?start:null,eventEnd:mode==='event'?end:null};
   if(mode==='effort'&&isInformation(draft)||mode==='reminder'&&(isNote(draft)||isGroup(draft))||mode==='event'&&!isEvent(draft))throw new Error('记录类型与日历操作不符，请选择事项或事件。');
-  task=createCapture(s,{parentId:Object.hasOwn(p,'parentId')?p.parentId:defaultCaptureParent(s),draft:{...draft,...mode==='event'?{eventAt:start,eventEnd:end}:{} }},now);
+  task=createCapture(s,{destination:p.destination,parentId:Object.hasOwn(p,'parentId')?p.parentId:null,draft:{...draft,...mode==='event'?{eventAt:start,eventEnd:end}:{} }},now);
  }
  if(mode==='effort')saveManualSession(s,{taskId:task.id,date:localDate(start),minutes:1,start,end,summary:text(p.summary??'')},now);
  else if(mode==='reminder'){

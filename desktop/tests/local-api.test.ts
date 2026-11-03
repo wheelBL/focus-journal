@@ -251,3 +251,11 @@ test('API content commands preserve related records and independently repeating 
  const reminder=await h.command('reminder.create',{title:'direct',parentId:group,at,rule:null});assert.equal(reminder.status,200);assert.equal(h.s.snapshot().state.tasks.find(t=>t.id===reminder.body.data.createdItemIds[0])!.reminderHistory,undefined);
  assert.equal((await h.command('note.unlink-task',{id:note,taskId:task})).status,200);
 }finally{h.close();}});
+
+test('API event destination defaults unfiled and explicit inbox remains reviewable',async()=>{
+ const h=await setup();try{
+  const event=(await h.command('item.create',{title:'合成事件',itemType:'event',eventAt:'2026-10-20'}));assert.equal(event.status,200);const id=event.body.data.createdItemIds[0];assert.equal(h.s.snapshot().state.tasks.find(t=>t.id===id)!.parentId,null);
+  const queued=await h.command('item.create',{title:'合成待整理事件',itemType:'event',eventAt:'2026-10-20',destination:'inbox'});assert.equal(queued.status,200);const queuedId=queued.body.data.createdItemIds[0];assert.equal(h.s.snapshot().state.tasks.find(t=>t.id===queuedId)!.parentId,'inbox');
+  const moved=await h.command('inbox.organize',{id:queuedId,parentId:null});assert.equal(moved.status,200);const item=h.s.snapshot().state.tasks.find(t=>t.id===queuedId)!;assert.equal(item.parentId,null);assert.equal(item.itemType,'event');assert.equal(item.eventAt,'2026-10-20');
+ }finally{h.close();}
+});

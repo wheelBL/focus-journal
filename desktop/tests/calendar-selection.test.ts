@@ -22,7 +22,7 @@ test('calendar reminder and event preserve identity and create no artificial eff
 });
 test('calendar effort atomically creates or links an item and updates actual start, totals and midnight allocation',()=>{
  const {service:s}=setup();let state=save(s,{mode:'effort',title:'补记工作',start:at('2026-10-18T23:30'),end:at('2026-10-19T00:30'),summary:'完成第一段'}).state;
- const task=state.tasks.at(-1)!;assert.equal(task.parentId,'inbox');assert.equal(task.status,'open');assert.equal(task.completedAt,null);assert.equal(task.startedAt,at('2026-10-18T23:30'));assert.equal(taskMs(state,task.id),3600000);
+ const task=state.tasks.at(-1)!;assert.equal(task.parentId,null);assert.equal(task.status,'open');assert.equal(task.completedAt,null);assert.equal(task.startedAt,at('2026-10-18T23:30'));assert.equal(taskMs(state,task.id),3600000);
  assert.equal(sessionMsOnDate(state.sessions[0],'2026-10-18'),1800000);assert.equal(sessionMsOnDate(state.sessions[0],'2026-10-19'),1800000);
  state=save(s,{mode:'effort',taskId:task.id}).state;assert.equal(state.tasks.length,2);assert.equal(taskMs(state,task.id),7200000);assert.equal(state.sessions[0].summary,'完成第一段');
 });

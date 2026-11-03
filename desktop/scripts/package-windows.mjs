@@ -40,6 +40,7 @@ try{
       copyFileSync(path.join(root,'scripts/content-navigation-smoke.cjs'),path.join(stage,'qa-content-navigation.cjs'));
       copyFileSync(path.join(root,'scripts/shortcut-smoke.cjs'),path.join(stage,'qa-shortcuts.cjs'));
       copyFileSync(path.join(root,'scripts/telemetry-smoke.cjs'),path.join(stage,'qa-telemetry.cjs'));
+      copyFileSync(path.join(root,'scripts/capture-destination-smoke.cjs'),path.join(stage,'qa-capture-destination.cjs'));
       writeFileSync(path.join(stage,'qa-start.cjs'),`require('./qa-release-smoke.cjs')(${JSON.stringify(dataDir)},${JSON.stringify(path.join(root,`qa-evidence/release-${pkg.version}`))},${JSON.stringify(pkg.version)});\n`,{flag:'a'});
     }
     if(releaseQa)writeFileSync(path.join(stage,'qa-start.cjs'),`require('electron').app.whenReady().then(()=>{const {safeStorage}=require('electron'),fs=require('node:fs'),path=require('node:path');const sample='focus-journal-QA-synthetic-not-a-credential';try{const available=safeStorage.isEncryptionAvailable(),cipher=safeStorage.encryptString(sample),roundtrip=safeStorage.decryptString(cipher)===sample;fs.writeFileSync(path.join(${JSON.stringify(dataDir)},'vault-check.json'),JSON.stringify({available,roundtrip,cipherDiffers:!cipher.includes(Buffer.from(sample)),checkedAt:new Date().toISOString()}));}catch{fs.writeFileSync(path.join(${JSON.stringify(dataDir)},'vault-check.json'),JSON.stringify({available:false,roundtrip:false}));}});\n`,{flag:'a'});

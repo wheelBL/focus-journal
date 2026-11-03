@@ -44,7 +44,7 @@ export interface UsageBridge {record(value:OperationSummary):Promise<void>;snaps
 /** Designed route costs for the specified release, from the stated starting state.
  * Text entry is excluded; these are not measured user clicks or elapsed time. */
 export function designedRoute(operation:string,entry:string,version:string):{steps:number;start:string}|null {
- if(version!=='0.35.0')return null;
+ if(!['0.35.0','0.36.0'].includes(version))return null;
  const routes:Record<string,{steps:number;start:string}>={
   'item.rename|items.keyboard.rename':{steps:2,start:'已选中事项行：F2（或配置的改名键），输入名称后确认'},
   'item.rename|items.context.rename':{steps:3,start:'指向事项行：打开右键菜单、选择改名，输入名称后确认'},

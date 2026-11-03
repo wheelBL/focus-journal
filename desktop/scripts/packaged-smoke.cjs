@@ -188,6 +188,7 @@ module.exports=(dataDir,output,expectedVersion)=>{
   await require('./qa-content-navigation.cjs')({main,run,until,check,wait,output,groupId,childId});
   await require('./qa-shortcuts.cjs')({main,run,until,check,wait,output});
   await require('./qa-telemetry.cjs')({main,run,until,check,wait,output,groupId});
+  await require('./qa-capture-destination.cjs')({main,run,until,check,wait,output});
   await run(main,`window.journalAppearance.set({theme:'dark',motion:'reduce'})`);
   await run(main,`document.querySelector('.top-navigation [aria-label="今日"]').click()`);
   await until(()=>run(main,`!!document.querySelector('.today-page')`),'Today did not return after groups');

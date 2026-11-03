@@ -259,7 +259,7 @@ export class JournalService {
         case 'task.save': {
           const existing=p.id?this.task(s,p.id):undefined;
           const captured=existing?{title:required(p.title),itemType:existing.itemType??'task'}:captureItem(typeof p.title==='string'?p.title:'',p.itemType==='note'?'note':p.itemType==='event'?'event':'task');
-          const title=required(captured.title),projectId=p.projectId==null?(existing?existing.projectId:defaultCaptureParent(s)):required(p.projectId);
+          const title=required(captured.title),projectId=existing?(p.projectId==null?existing.projectId:required(p.projectId)):(p.projectId===undefined?(isEvent(captured)?null:defaultCaptureParent(s)):p.projectId===null?null:required(p.projectId));
           if(p.parentId===undefined&&projectId!==null&&(!existing||p.projectId!==undefined))assertParentAvailable(s,projectId);
           if(!isTask(captured)&&(p.start||p.estimateMinutes!=null||p.plannedDate||p.dueAt||isNote(captured)&&p.remindAt))throw new Error('笔记／信息无需计划或计时，请先转为事项。');
           const outcome=p.outcome===undefined?(existing?.outcome??''):text(p.outcome),nextAction=p.nextAction===undefined?(existing?.nextAction??''):text(p.nextAction);

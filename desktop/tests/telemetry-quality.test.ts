@@ -24,7 +24,7 @@ test('semantic events are bounded and failure classifications never inspect mess
  store.fail=false;assert.throws(()=>s.execute({type:'outline.patch',payload:{id,field:'dueAt',value:'not-a-date'},meta:{entry:'items.inspector'}}));assert.deepEqual(records.at(-1),{operation:'item.deadline.set',entry:'items.inspector',result:'failed.validation'});s.setOperationRecorder(()=>{throw Error('telemetry unavailable');});assert.doesNotThrow(()=>s.execute({type:'outline.patch',payload:{id,field:'title',value:'safe'}}));s.shutdown();
 });
 test('designed route is a release-specific catalog, not an inferred click count',()=>{
- assert.equal(designedRoute('item.rename','items.keyboard.rename','0.35.0')?.steps,2);assert.equal(designedRoute('item.rename','items.context.rename','0.35.0')?.steps,3);assert.equal(designedRoute('focus.start','items.row.timer','0.35.0')?.steps,1);assert.equal(designedRoute('item.rename','items.keyboard.rename','0.34.0'),null);assert.equal(designedRoute('item.rename','items.keyboard.rename','0.36.0'),null);assert.equal(designedRoute('item.rename','workspace','0.35.0'),null);
+ assert.equal(designedRoute('item.rename','items.keyboard.rename','0.35.0')?.steps,2);assert.equal(designedRoute('item.rename','items.context.rename','0.35.0')?.steps,3);assert.equal(designedRoute('focus.start','items.row.timer','0.35.0')?.steps,1);assert.equal(designedRoute('item.rename','items.keyboard.rename','0.34.0'),null);assert.equal(designedRoute('item.rename','items.keyboard.rename','0.36.0')?.steps,2);assert.equal(designedRoute('item.rename','items.keyboard.rename','0.37.0'),null);assert.equal(designedRoute('item.rename','workspace','0.35.0'),null);
 });
 
 test('node sqlite storage codes classify only known numeric primary or extended failures',()=>{

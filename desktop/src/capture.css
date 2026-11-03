@@ -13,3 +13,5 @@
 .capture-body-summary{display:flex;justify-content:space-between;align-items:center;gap:8px;padding:5px 8px}.capture-body-summary .text-button{font-size:11px}
 fieldset.capture-preview{padding:0;border:0;min-inline-size:0}
 .capture-panel>header button:disabled{opacity:.5;cursor:wait}
+
+.capture-destination{display:inline-flex;align-items:center;gap:5px;color:var(--muted);font-size:11px}.capture-destination select{font:inherit;max-width:130px;padding:3px 5px;border:1px solid var(--line-strong);border-radius:4px;background:var(--surface-alt);color:var(--ink)}.capture-parent{background:var(--surface-alt);border-color:var(--line);color:var(--muted)}.capture-hint{display:block;margin:5px 0;color:var(--muted);font-size:11px;line-height:1.5}
