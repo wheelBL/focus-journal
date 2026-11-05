@@ -3,7 +3,11 @@ export interface AiSettingsInput {baseUrl:string;model:string;/** Omit or leave 
 export interface AiSettingsStatus {baseUrl:string;model:string;hasKey:boolean;configured:boolean;error:string|null}
 export interface AiConnection {baseUrl:string;model:string;/** Main-process only; never return through IPC. */apiKey:string}
 export interface AiConnectionTest {message:string;latencyMs:number}
+export interface AiModelListInput {baseUrl:string;apiKey?:string}
+export interface AiModelListResult {baseUrl:string;models:string[];partial:boolean}
 export interface AiSettingsBridge {
+ listModels(input:AiModelListInput):Promise<AiModelListResult>;
+ cancelModels():Promise<void>;
  status():Promise<AiSettingsStatus>;
  configure(input:AiSettingsInput):Promise<AiSettingsStatus>;
  clearKey():Promise<AiSettingsStatus>;

@@ -88,7 +88,7 @@ test('AI local HTTP model can be configured and requested without Authorization'
 
 test('AI test connection sends only a minimal synthetic prompt and never returns the provider text',async()=>{
  const m=memory(),settings=new AiSettings('unused',vault,m.persistence);await settings.configure(connection);
- const result=await settings.test({fetch:async(url,init)=>{assert.equal(url,connection.baseUrl+'/chat/completions');const body=JSON.parse(init.body as string);assert.deepEqual(body.messages,[{role:'user',content:'Reply with OK.'}]);assert.equal(body.max_tokens,32);return complete('provider-text-and-secret');}});
+ const result=await settings.test({fetch:async(url,init)=>{assert.equal(url,connection.baseUrl+'/chat/completions');const body=JSON.parse(init.body as string);assert.deepEqual(body.messages,[{role:'user',content:'Reply with OK.'}]);assert.equal(body.max_tokens,32);assert.equal(body.tools[0].function.name,'connection_probe');assert.equal(body.tool_choice,'auto');assert.equal(JSON.stringify(body).includes('工作记录'),false);return complete('provider-text-and-secret');}});
  assert.match(result.message,/未发送任何工作记录/);assert.equal(JSON.stringify(result).includes('provider-text'),false);assert.ok(result.latencyMs>=0);
 });
 
@@ -159,3 +159,5 @@ test('AI cancellation suppresses subsequent callbacks within one frame and close
  deliver(new Response(new ReadableStream({cancel(){cancelled=true;}}),{headers:{'Content-Type':'text/event-stream'}}));
  await new Promise(resolve=>setTimeout(resolve,0));assert.equal(cancelled,true);
 });
+
+test('AI connection test reports providers rejecting tool parameters without executing tools',async()=>{const m=memory(),settings=new AiSettings('unused',vault,m.persistence);await settings.configure(connection);await assert.rejects(settings.test({fetch:async(_url,init)=>{const body=JSON.parse(init.body as string);assert.equal(body.tools[0].function.name,'connection_probe');return new Response('private upstream error',{status:400});}}),error=>errorCode('configuration')(error)&&!String(error).includes('private upstream error'));});

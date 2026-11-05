@@ -196,3 +196,32 @@ test('reopening the assistant restores priority mode despite an older general dr
  const props={onClose(){},onSettings(){}};await h.render('AiAssistant',props);await h.input(h.label('给 AI 的问题'),'保留普通草稿');await h.input(h.label('AI 对话模式'),'priorities');await h.input(h.label('AI 分析范围'),'recent');await h.input(h.label('给 AI 的问题'),'先澄清目标');await h.click(h.button('生成建议'));await h.input(h.label('给 AI 的问题'),'优先级待补充约束');await h.render(null);await h.render('AiAssistant',props);assert.equal(h.label('AI 对话模式').value,'priorities');assert.equal(h.label('AI 分析范围').value,'recent');assert.equal(h.label('给 AI 的问题').value,'优先级待补充约束');await h.input(h.label('AI 对话模式'),'general');assert.equal(h.label('给 AI 的问题').value,'保留普通草稿');
  }finally{await h.close();}
 });
+
+function modelsBridge(){const mock=mockBridge();mock.calls.models=[];mock.calls.cancelModels=0;mock.bridge.listModels=async input=>{mock.calls.models.push(input);return {baseUrl:input.baseUrl,models:['alpha-chat','beta-tools','gamma'],partial:false};};mock.bridge.cancelModels=async()=>{mock.calls.cancelModels++;};return mock;}
+
+test('model discovery works before model setup and selection stays a draft until save',async()=>{
+ const mock=modelsBridge();mock.setStatus({model:'',hasKey:false,configured:false});const h=await aiDom(mock.bridge);try{
+ await h.render('AiSettings');assert.equal(mock.calls.models.length,0);assert.equal(h.label('AI 模型').value,'');await h.input(h.label('AI 服务地址'),'https://model.example/v1');await h.input(h.label('AI API 密钥'),'synthetic-new-key');await h.click(h.button('获取模型列表'));assert.deepEqual(mock.calls.models,[{baseUrl:'https://model.example/v1',apiKey:'synthetic-new-key'}]);assert.equal(h.label('AI 模型').value,'');assert.equal(mock.calls.configure.length,0);assert.equal(h.label('选择 AI 模型').options.length,4);
+ await h.input(h.label('搜索 AI 模型'),'BETA');assert.match(h.query('.ai-model-discovery').textContent,/显示 1 \/ 3/);await h.input(h.label('选择 AI 模型'),'beta-tools');assert.equal(h.label('AI 模型').value,'beta-tools');assert.equal(mock.calls.configure.length,0);await h.click(h.button('保存 AI 设置'));assert.equal(mock.calls.configure[0].model,'beta-tools');assert.equal(h.label('AI API 密钥').value,'');await h.click(h.button('测试已保存连接'));assert.equal(mock.calls.test,1);
+ }finally{await h.close();}
+});
+
+test('model discovery preserves custom models, empty and partial lists and failures without changing configuration',async()=>{
+ const mock=modelsBridge(),h=await aiDom(mock.bridge);try{
+ await h.render('AiSettings');await h.input(h.label('AI 模型'),'custom-preserved');await h.click(h.button('获取模型列表'));assert.match(h.label('选择 AI 模型').selectedOptions[0].textContent,/当前 \/ 自定义/);assert.equal(h.label('AI 模型').value,'custom-preserved');await h.input(h.label('搜索 AI 模型'),'no-match');assert.match(h.query('.ai-model-discovery').textContent,/显示 0 \/ 3.*没有符合搜索/s);assert.equal(h.label('选择 AI 模型').value,'custom-preserved');
+ mock.bridge.listModels=async()=>({baseUrl:'https://model.example/v1',models:[],partial:true});await h.click(h.button('刷新模型列表'));assert.match(h.query('.ai-model-discovery').textContent,/已截断.*未返回模型/s);assert.equal(h.label('AI 模型').value,'custom-preserved');mock.bridge.listModels=async()=>{throw Error('服务暂不支持模型列表');};await h.click(h.button('刷新模型列表'));assert.match(h.query('.ai-model-discovery [role=alert]').textContent,/可继续手动填写/);assert.equal(h.label('AI 模型').value,'custom-preserved');assert.equal(mock.calls.configure.length,0);assert.equal(window.localStorage.length,0);
+ }finally{await h.close();}
+});
+
+test('editing credentials invalidates model results and cancellation prevents late responses from replacing newer drafts',async()=>{
+ const mock=modelsBridge(),h=await aiDom(mock.bridge);let finishOld,finishNew;try{
+ await h.render('AiSettings');mock.bridge.listModels=input=>{mock.calls.models.push(input);return new Promise(resolve=>{if(!finishOld)finishOld=resolve;else finishNew=resolve;});};await h.click(h.button('获取模型列表'));await h.click(h.button('正在获取模型…'));assert.equal(mock.calls.models.length,1);assert.equal(h.button('保存 AI 设置').disabled,true);await h.input(h.label('AI 服务地址'),'https://other.example/v1');assert.equal(mock.calls.cancelModels,1);assert.equal(document.querySelector('[aria-label="选择 AI 模型"]'),null);await h.input(h.label('AI API 密钥'),'synthetic-replacement');await h.click(h.button('获取模型列表'));await h.action(()=>finishNew({baseUrl:'https://other.example/v1',models:['new-only'],partial:false}));await h.action(()=>finishOld({baseUrl:'https://model.example/v1',models:['old-stale'],partial:false}));assert.match(h.label('选择 AI 模型').textContent,/new-only/);assert.equal(h.label('选择 AI 模型').textContent.includes('old-stale'),false);assert.equal(h.label('AI 模型').value,'example-chat');assert.equal(h.label('AI API 密钥').value,'synthetic-replacement');
+ await h.click(h.button('刷新模型列表'));await h.click(h.button('取消获取'));assert.equal(mock.calls.cancelModels,2);await h.render(null);assert.equal(mock.calls.configure.length,0);
+ }finally{await h.close();}
+});
+
+test('model discovery remains disabled until connection settings load and unmount cancels a pending request',async()=>{
+ const mock=modelsBridge(),h=await aiDom(mock.bridge);let finishStatus,finishList;try{
+ mock.bridge.status=()=>new Promise(resolve=>{finishStatus=resolve;});await h.render('AiSettings');assert.equal(h.button('获取模型列表').matches(':disabled'),true);assert.equal(mock.calls.models.length,0);await h.action(()=>finishStatus({baseUrl:'https://model.example/v1',model:'custom',hasKey:true,configured:true,error:null}));mock.bridge.listModels=()=>new Promise(resolve=>{finishList=resolve;});await h.click(h.button('获取模型列表'));await h.render(null);assert.equal(mock.calls.cancelModels,1);await h.action(()=>finishList({baseUrl:'https://model.example/v1',models:['late'],partial:false}));assert.equal(document.querySelector('[aria-label="选择 AI 模型"]'),null);assert.equal(mock.calls.configure.length,0);
+ }finally{await h.close();}
+});

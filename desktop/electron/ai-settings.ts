@@ -1,8 +1,9 @@
+import {fetchAiModels} from './ai-models';
 import {existsSync,readFileSync} from 'node:fs';
 import {performance} from 'node:perf_hooks';
-import {AiError,type AiConnection,type AiConnectionTest,type AiSettingsInput,type AiSettingsStatus} from '../core/ai-types';
+import {AiError,type AiConnection,type AiConnectionTest,type AiSettingsInput,type AiSettingsStatus,type AiModelListInput,type AiModelListResult} from '../core/ai-types';
 import {atomicWrite} from './sync-storage';
-import {chatCompletion,isLoopback,validateAiSettings,type AiFetch} from './ai-transport';
+import {chatCompletion,isLoopback,validateAiSettings,validateAiModelInput,type AiFetch} from './ai-transport';
 
 export interface AiVault {encrypt(secret:string):Promise<string>;decrypt(cipher:string):Promise<string>}
 export interface SavedAiSettings {baseUrl:string;model:string;encryptedKey:string|null}
@@ -47,9 +48,24 @@ export class AiSettings {
   if(saved.encryptedKey)try{apiKey=await this.vault.decrypt(saved.encryptedKey);if(!apiKey||apiKey.length>4096||/[\s\x00-\x1f\x7f]/.test(apiKey))throw Error();}catch{throw new AiError('credentials','密钥无法在这台电脑解密，请重新输入并保存密钥。');}
   return {baseUrl:saved.baseUrl,model:saved.model,apiKey};
  }
+ async listModels(input:AiModelListInput,options:{signal?:AbortSignal;fetch?:AiFetch;timeoutMs?:number}={}):Promise<AiModelListResult>{
+  if(this.busy)throw new AiError('busy','AI 设置正在保存或查询，请稍候。');
+  const value=validateAiModelInput(input),saved={...this.saved};let key=value.apiKey??'';
+  const sameOrigin=!!saved.baseUrl&&new URL(value.baseUrl).origin===new URL(saved.baseUrl).origin;
+  if(!key&&saved.encryptedKey&&!sameOrigin&&!isLoopback(new URL(value.baseUrl)))throw new AiError('credentials','查询其他服务时请重新输入密钥。');
+  this.busy=true;
+  let abort:()=>void=()=>{};
+  const stopped=new Promise<never>((_,reject)=>{abort=()=>reject(new AiError('cancelled','已取消模型列表查询。'));options.signal?.addEventListener('abort',abort,{once:true});if(options.signal?.aborted)abort();});
+  try{return await Promise.race([stopped,(async()=>{
+   if(options.signal?.aborted)throw new AiError('cancelled','已取消模型列表查询。');
+   if(!key&&saved.encryptedKey&&sameOrigin){try{key=await this.vault.decrypt(saved.encryptedKey);if(!key||key.length>4096||/[\s\x00-\x1f\x7f]/.test(key))throw Error();}catch{throw new AiError('credentials','密钥无法在这台电脑解密，请重新输入密钥。');}}
+   if(options.signal?.aborted)throw new AiError('cancelled','已取消模型列表查询。');
+   return fetchAiModels({baseUrl:value.baseUrl,apiKey:key},options);
+  })()]);}finally{options.signal?.removeEventListener('abort',abort);this.busy=false;}
+ }
  async test(options:{signal?:AbortSignal;fetch?:AiFetch;timeoutMs?:number}={}):Promise<AiConnectionTest>{
   const config=await this.connection(),start=performance.now();
-  await chatCompletion(config,{messages:[{role:'user',content:'Reply with OK.'}],maxTokens:32,timeoutMs:options.timeoutMs??30_000,signal:options.signal},options.fetch);
-  return {message:'连接成功，模型已响应；未发送任何工作记录。',latencyMs:Math.round(performance.now()-start)};
+  await chatCompletion(config,{messages:[{role:'user',content:'Reply with OK.'}],tools:[{type:'function',function:{name:'connection_probe',description:'Test function parameter acceptance; never execute.',parameters:{type:'object',properties:{},additionalProperties:false}}}],maxTokens:32,timeoutMs:options.timeoutMs??30_000,signal:options.signal},options.fetch);
+  return {message:'连接成功，服务已响应对话与工具参数测试；未发送任何工作记录。',latencyMs:Math.round(performance.now()-start)};
  }
 }

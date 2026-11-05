@@ -45,6 +45,7 @@ try{
       copyFileSync(path.join(root,'scripts/inbox-delete-smoke.cjs'),path.join(stage,'qa-inbox-delete.cjs'));
       copyFileSync(path.join(root,'scripts/dependencies-smoke.cjs'),path.join(stage,'qa-dependencies.cjs'));
       copyFileSync(path.join(root,'scripts/ai-priorities-smoke.cjs'),path.join(stage,'qa-ai-priorities.cjs'));
+      copyFileSync(path.join(root,'scripts/ai-models-smoke.cjs'),path.join(stage,'qa-ai-models.cjs'));
       writeFileSync(path.join(stage,'qa-start.cjs'),`require('./qa-release-smoke.cjs')(${JSON.stringify(dataDir)},${JSON.stringify(path.join(root,`qa-evidence/release-${pkg.version}`))},${JSON.stringify(pkg.version)});\n`,{flag:'a'});
     }
     if(releaseQa)writeFileSync(path.join(stage,'qa-start.cjs'),`require('electron').app.whenReady().then(()=>{const {safeStorage}=require('electron'),fs=require('node:fs'),path=require('node:path');const sample='focus-journal-QA-synthetic-not-a-credential';try{const available=safeStorage.isEncryptionAvailable(),cipher=safeStorage.encryptString(sample),roundtrip=safeStorage.decryptString(cipher)===sample;fs.writeFileSync(path.join(${JSON.stringify(dataDir)},'vault-check.json'),JSON.stringify({available,roundtrip,cipherDiffers:!cipher.includes(Buffer.from(sample)),checkedAt:new Date().toISOString()}));}catch{fs.writeFileSync(path.join(${JSON.stringify(dataDir)},'vault-check.json'),JSON.stringify({available:false,roundtrip:false}));}});\n`,{flag:'a'});
@@ -64,6 +65,7 @@ try{
   '精简操作层级：事项页的“视图选项”提供保存视图、显示已完成、展开折叠和视图管理；默认筛选不重复占一行，自定义条件仍显示。',
   '详情计划开始、截止、标签和提醒直接编辑；任务重复与提醒重复分别管理。笔记可保留原文生成关联任务；收件箱可以就地整理并进入下一条。',
   'Ctrl+F 搜索当前任务、笔记或提醒列表；Ctrl+K 搜索全部内容。设置 → 快捷键可以改键、清除和恢复默认，保存后立即生效，仅保存在本机。全局快速记录仍单独设置。',
+  'AI 设置：填服务地址和密钥后点获取模型列表，搜索选择，再保存并测试。已有同源密钥可留空沿用。获取/刷新不会自动换模型或保存，无法获取时仍可手动输入。列表只代表服务公布信息，连接测试会检查对话与工具参数请求。',
   '今日页可直接进入 AI 优先级澄清：先通过连续提问理解重要性、紧迫性、耗时和取舍，再提出有理由的下一步；可建议内容、截止、提醒、拆分与回顾调整，逐条确认后应用，下一轮读取最新记录。',
   '任务依赖：右侧详情添加前置任务，或多选后按顺序建立依赖链。默认保留原截止间隔，自动联动后续截止与已有计划开始；固定截止仅提示冲突。等待前置时仍能提前计时，一次日期联动可整体撤销。',
   '设置每次显示一个分类；切换分类保留未保存的输入，离开设置页前请保存。日历操作说明可按需展开，有已删除投入时才显示恢复入口。',

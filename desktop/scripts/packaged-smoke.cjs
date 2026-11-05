@@ -40,8 +40,12 @@ module.exports=(dataDir,output,expectedVersion)=>{
    check(await run(main,`JSON.parse(localStorage.getItem('journal.shortcuts.v1'))['search-current']==='Primary+G'`),'Restart preserves custom keyboard settings');
    await run(main,`document.querySelector('.top-navigation [aria-label="任务"]').click()`);
    await until(()=>run(main,`!!document.querySelector('[aria-label="在事项树中搜索"]')`),'Restart task search missing');
-   main.focus();main.webContents.sendInputEvent({type:'keyDown',keyCode:'G',modifiers:['control']});main.webContents.sendInputEvent({type:'keyUp',keyCode:'G',modifiers:['control']});await wait(80);
-   check(await run(main,`document.activeElement===document.querySelector('[aria-label="在事项树中搜索"]')`),'Restart activates configured current-list shortcut');finished=true;return;
+   main.focus();main.webContents.focus();
+   await until(()=>run(main,'document.hasFocus()'),'Restart native window focus missing');
+   await run(main,'new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(()=>resolve(true))))');
+   main.webContents.sendInputEvent({type:'keyDown',keyCode:'G',modifiers:['control']});main.webContents.sendInputEvent({type:'keyUp',keyCode:'G',modifiers:['control']});
+   await until(()=>run(main,`document.activeElement===document.querySelector('[aria-label="在事项树中搜索"]')`),'Restart activates configured current-list shortcut');
+   check(true,'Restart activates configured current-list shortcut');finished=true;return;
   }
   for(const timer of before.timers)await run(main,`window.journal.command({type:'focus.stop',payload:{sessionId:${JSON.stringify(timer.sessionId)}}})`);
   await run(main,`window.journal.command({type:'break.stop'})`);
@@ -210,6 +214,7 @@ module.exports=(dataDir,output,expectedVersion)=>{
   await require('./qa-inbox-delete.cjs')({main,run,until,check,wait,output});
   await require('./qa-dependencies.cjs')({main,run,until,check,wait,output});
   await require('./qa-ai-priorities.cjs')({main,run,until,check,wait,output});
+  await require('./qa-ai-models.cjs')({main,run,until,check,wait,output});
   await run(main,`window.journalAppearance.set({theme:'dark',motion:'reduce'})`);
   await run(main,`document.querySelector('.top-navigation [aria-label="今日"]').click()`);
   await until(()=>run(main,`!!document.querySelector('.today-page')`),'Today did not return after groups');

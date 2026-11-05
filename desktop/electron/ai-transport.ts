@@ -5,19 +5,23 @@ export type AiFetch=(input:string,init:RequestInit)=>Promise<Response>;
 export function isLoopback(url:URL):boolean{return url.hostname==='localhost'||url.hostname==='[::1]'||/^127(?:\.\d{1,3}){3}$/.test(url.hostname);}
 
 /** Deliberately accepts a provider base path (e.g. /v1), not arbitrary request URLs. */
-export function validateAiSettings(value:unknown):AiSettingsInput {
- const v=value as AiSettingsInput;
- if(!v||typeof v.baseUrl!=='string'||typeof v.model!=='string'||(v.apiKey!==undefined&&typeof v.apiKey!=='string'))throw new AiError('configuration','请填写 AI 服务地址和模型名称。');
+export function validateAiModelInput(value:unknown):{baseUrl:string;apiKey?:string} {
+ const v=value as {baseUrl:string;apiKey?:string};
+ if(!v||typeof v.baseUrl!=='string'||(v.apiKey!==undefined&&typeof v.apiKey!=='string'))throw new AiError('configuration','请填写 AI 服务地址。');
  const raw=v.baseUrl.trim();let url:URL;
- try{url=new URL(raw);}catch{throw new AiError('configuration','请输入完整的 AI 服务地址，例如 https://api.deepseek.com。');}
+ try{url=new URL(raw);}catch{throw new AiError('configuration','请输入完整的 AI 服务地址。');}
  if(raw.length>2048||/\s|[\x00-\x1f\x7f]/.test(raw)||url.username||url.password||raw.includes('?')||raw.includes('#')||!['http:','https:'].includes(url.protocol)||(url.protocol==='http:'&&!isLoopback(url)))throw new AiError('configuration','服务地址需使用 HTTPS；本机模型可用 localhost、127.0.0.1 或 [::1] 的 HTTP 地址。地址中不要包含密钥、参数或账号。');
- let pathname=url.pathname.replace(/\/+$/,'');
- if(pathname.endsWith('/chat/completions'))pathname=pathname.slice(0,-'/chat/completions'.length);
- const baseUrl=url.origin+pathname;
- const model=v.model.trim(),apiKey=v.apiKey?.trim();
- if(!model||model.length>200||/[\x00-\x1f\x7f]/.test(model))throw new AiError('configuration','请输入有效的模型名称（最多 200 个字符）。');
+ let pathname=url.pathname.replace(/\/+$/,'');if(pathname.endsWith('/chat/completions'))pathname=pathname.slice(0,-'/chat/completions'.length);
+ const baseUrl=url.origin+pathname,apiKey=v.apiKey?.trim();
  if(apiKey!==undefined&&(apiKey.length>4096||/[\s\x00-\x1f\x7f]/.test(apiKey)))throw new AiError('configuration','访问密钥格式无效，请重新粘贴。');
- return {baseUrl,model,...apiKey!==undefined?{apiKey}:{}};
+ if(apiKey&&baseUrl.includes(apiKey))throw new AiError('configuration','服务地址中不要包含访问密钥。');
+ return {baseUrl,...apiKey!==undefined?{apiKey}:{}};
+}
+export function validateAiSettings(value:unknown):AiSettingsInput {
+ const v=value as AiSettingsInput;if(!v||typeof v.model!=='string')throw new AiError('configuration','请填写 AI 服务地址和模型名称。');
+ const normalized=validateAiModelInput(value),model=v.model.trim();
+ if(!model||model.length>200||/[\x00-\x1f\x7f]/.test(model))throw new AiError('configuration','请输入有效的模型名称（最多 200 个字符）。');
+ return {...normalized,model};
 }
 
 function requestBody(connection:AiConnection,request:AiCompletionRequest){

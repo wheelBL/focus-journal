@@ -1,0 +1,43 @@
+// Packaged QA only: this helper uses the isolated demo profile and a synthetic loopback provider.
+const http=require('node:http'),fs=require('node:fs'),path=require('node:path');
+module.exports=async({main,run,until,check,wait,output})=>{
+ const key='qa-model-list-made-up-key',sockets=new Set(),events=[];let mode='models',listCount=0,postCount=0,validProbe=false,configured=false;
+ const server=http.createServer((req,res)=>{
+  if(req.method==='GET'&&req.url==='/v1/models'){
+   listCount++;events.push({kind:'list',authorized:req.headers.authorization===`Bearer ${key}`});
+   if(mode==='missing'){res.writeHead(404,{'Content-Type':'application/json'});res.end('{}');return;}
+   const data=mode==='empty'?[]:[{id:'qa-chat-b'},{id:'qa-image-unknown'},{id:'qa-chat-a'},{id:'qa-chat-b'}];
+   res.writeHead(200,{'Content-Type':'application/json'});res.end(JSON.stringify({object:'list',data}));return;
+  }
+  if(req.method==='POST'&&req.url==='/v1/chat/completions'){
+   let raw='';req.setEncoding('utf8');req.on('data',c=>{raw+=c;if(raw.length>100000)req.destroy();});req.on('error',()=>{});req.on('end',()=>{try{const body=JSON.parse(raw);postCount++;validProbe=req.headers.authorization===`Bearer ${key}`&&body.model==='qa-chat-b'&&Array.isArray(body.messages)&&body.messages.length===1&&body.messages[0].role==='user'&&body.messages[0].content==='Reply with OK.'&&body.tools?.length===1&&body.tools[0].type==='function'&&body.tools[0].function?.name==='connection_probe';events.push({kind:'probe',valid:validProbe});res.writeHead(200,{'Content-Type':'text/event-stream; charset=utf-8'});res.end(`data: ${JSON.stringify({choices:[{index:0,delta:{content:'OK'},finish_reason:null}]})}\n\ndata: ${JSON.stringify({choices:[{index:0,delta:{},finish_reason:'stop'}]})}\n\ndata: [DONE]\n\n`);}catch{res.writeHead(400);res.end();}});return;
+  }
+  events.push({kind:'unexpected'});res.writeHead(404);res.end();
+ });
+ server.on('connection',socket=>{sockets.add(socket);socket.on('close',()=>sockets.delete(socket));});
+ const input=(label,value)=>run(main,`(()=>{const e=document.querySelector('[aria-label='+JSON.stringify(${JSON.stringify(label)})+']');if(!e)throw Error('Missing model form field');const p=e.tagName==='SELECT'?HTMLSelectElement.prototype:HTMLInputElement.prototype;Object.getOwnPropertyDescriptor(p,'value').set.call(e,${JSON.stringify(value)});e.dispatchEvent(new Event(e.tagName==='SELECT'?'change':'input',{bubbles:true}));})()`);
+ const click=label=>run(main,`(()=>{const e=[...document.querySelectorAll('#settings-ai button')].find(b=>b.textContent.trim()===${JSON.stringify(label)});if(!e||e.disabled)throw Error('Missing or disabled model control: '+${JSON.stringify(label)});e.click();})()`);
+ const selected=()=>run(main,`document.querySelector('[aria-label="AI 模型"]').value`);
+ const options=()=>run(main,`[...document.querySelector('[aria-label="选择 AI 模型"]').options].map(o=>o.value).filter(Boolean)`);
+ const metrics=()=>run(main,`(()=>{const root=document.querySelector('#settings-ai'),controls=[...root.querySelectorAll('input,select,button')].filter(e=>e.offsetParent!==null),r=root.getBoundingClientRect();return {x:controls.every(e=>{const b=e.getBoundingClientRect();return b.left>=0&&b.right<=innerWidth+1&&b.left>=r.left-1&&b.right<=r.right+1;}),labeled:controls.every(e=>e.getAttribute('aria-label')||e.closest('label')||e.textContent.trim()),overflow:root.scrollWidth<=root.clientWidth+2};})()`);
+ try{
+  const before=await run(main,'window.journal.snapshot()');check(before.demo===true,'Model discovery runs in isolated demo profile');
+  const prior=await run(main,'window.journalAI.get()');const savedBefore=await run(main,'window.journalAI.status()');
+  await new Promise((resolve,reject)=>{server.once('error',reject);server.listen(0,'127.0.0.1',()=>{server.off('error',reject);resolve();});});const port=server.address().port;
+  await run(main,`document.querySelector('.sidebar-bottom [aria-label="设置"]').click()`);await until(()=>run(main,`!!document.querySelector('#settings-nav-ai')`),'Settings categories did not open');await run(main,`document.querySelector('#settings-nav-ai').click()`);await until(()=>run(main,`!!document.querySelector('#settings-ai [aria-label="AI 服务地址"]')&&!document.querySelector('#settings-ai fieldset').disabled`),'AI settings did not open');
+  await input('AI 服务地址',`http://127.0.0.1:${port}/v1`);await input('AI API 密钥',key);await input('AI 模型','');await click('获取模型列表');await until(()=>run(main,`!!document.querySelector('[aria-label="选择 AI 模型"]')&&!document.querySelector('#settings-ai [aria-busy="true"]')`),'Models did not load');
+  const found=await options();check(found.length===3&&new Set(found).size===3&&['qa-chat-a','qa-chat-b','qa-image-unknown'].every(x=>found.includes(x)),'Model list retains unknown identifiers and removes duplicates');check((await selected())===''&&JSON.stringify(await run(main,'window.journalAI.status()'))===JSON.stringify(savedBefore),'Loading models neither selects nor saves configuration');check(listCount===1&&events[0].authorized,'Model discovery uses the synthetic credential');
+  fs.writeFileSync(path.join(output,'ai-models-list.png'),(await main.webContents.capturePage()).toPNG());
+  await input('搜索 AI 模型','chat-b');check((await options()).join(',')==='qa-chat-b','Search narrows the returned model identifiers');await input('选择 AI 模型','qa-chat-b');check(await selected()==='qa-chat-b','Selecting a model fills the editable model field');await click('保存 AI 设置');configured=true;await until(()=>run(main,`!!document.querySelector('#settings-ai .ai-success')?.textContent.includes('设置已保存')`),'Model settings did not save');const saved=await run(main,'window.journalAI.status()');check(saved.model==='qa-chat-b'&&saved.configured,'Selected model is saved only after explicit save');
+  await click('测试已保存连接');await until(()=>run(main,`!!document.querySelector('#settings-ai .ai-success')?.textContent.includes('连接成功')`),'Connection test did not finish');check(postCount===1&&validProbe,'Connection test sends only the synthetic message and inert probe tool');
+  mode='missing';await click('刷新模型列表');await until(()=>run(main,`!!document.querySelector('#settings-ai .ai-error')`),'Missing models endpoint was not reported');check(await selected()==='qa-chat-b','Failed refresh preserves selected model');
+  mode='empty';await click('刷新模型列表');await until(()=>run(main,`document.querySelector('#settings-ai')?.textContent.includes('服务未返回模型标识')`),'Empty model list was not displayed');check(await selected()==='qa-chat-b','Empty refresh preserves selected model');await input('AI 模型','qa-custom-model');mode='missing';await click('刷新模型列表');await until(()=>run(main,`!!document.querySelector('#settings-ai .ai-error')`),'Refresh failure was not displayed');check(await selected()==='qa-custom-model','Custom model stays editable after refresh failure');
+  await run(main,`document.querySelector('[aria-label="AI 模型"]').scrollIntoView({block:'center'})`);await wait(100);check((await metrics()).x&&(await metrics()).labeled&&(await metrics()).overflow,'Model form controls remain labeled and fit horizontally');fs.writeFileSync(path.join(output,'ai-models.png'),(await main.webContents.capturePage()).toPNG());
+  const bounds=main.getBounds(),minimum=main.getMinimumSize();try{main.setMinimumSize(760,520);main.setContentSize(900,600);await wait(150);await run(main,`document.querySelector('[aria-label="AI 模型"]').scrollIntoView({block:'center'})`);const m=await metrics();check(m.x&&m.labeled&&m.overflow,'Narrow model settings keep controls labeled and within the viewport');fs.writeFileSync(path.join(output,'ai-models-narrow.png'),(await main.webContents.capturePage()).toPNG());}finally{main.setMinimumSize(...minimum);main.setBounds(bounds);await wait(100);}
+  const after=await run(main,'window.journalAI.get()');check(prior.conversationId===after.conversationId&&prior.turns.length===after.turns.length&&prior.purpose===after.purpose,'Model settings do not reset the existing priorities conversation');check(!events.some(e=>e.kind==='unexpected')&&listCount===4&&postCount===1,'Synthetic service receives only expected requests');
+  fs.writeFileSync(path.join(output,'ai-models-evidence.json'),JSON.stringify({listRequests:listCount,probeRequests:postCount,selectedModel:'qa-chat-b',conversationId:after.conversationId,turns:after.turns.length},null,2));
+ }finally{
+  try{await run(main,`(async()=>{await window.journalAI.cancelModels?.();${configured?'await window.journalAI.clearKey();':''}document.querySelector('.top-navigation [aria-label="今日"]')?.click();})()`);}catch{}
+  for(const socket of sockets)socket.destroy();await new Promise(resolve=>server.close(()=>resolve()));
+ }
+};
