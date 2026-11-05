@@ -118,3 +118,8 @@ test('AI notification failures do not turn generated suggestions or committed ch
  const h=setup(undefined,()=>{throw Error('window closed');});h.assistant.subscribe(()=>{throw Error('renderer unavailable');});
  const state=await h.generate();assert.equal(state.phase,'done');const applied=h.assistant.apply({runId:state.id,suggestionId:'1'});assert.equal(applied.suggestions[0].state,'applied');assert.equal(applied.suggestions[0].error,undefined);
 });
+
+test('AI refreshes dependency previews after confirming an earlier suggestion',async()=>{
+ let h:ReturnType<typeof setup>;h=setup(async()=>response([{type:'outline.patch',payload:{id:h.child,field:'title',value:'更新名称'}},{type:'dependency.chain',payload:{ids:[h.child,h.other]}}]));
+ const state=await h.generate();assert.equal(state.phase,'done');const first=h.assistant.apply({runId:state.id,suggestionId:'1'});assert.equal(first.suggestions[0].state,'applied');assert.match(first.suggestions[1].after,/更新名称/);const next=h.assistant.apply({runId:state.id,suggestionId:'2'});assert.equal(next.suggestions[1].state,'applied');assert.equal(h.journal.snapshot().state.tasks.find(t=>t.id===h.other)?.dependencyPlan?.predecessors[0].id,h.child);
+});

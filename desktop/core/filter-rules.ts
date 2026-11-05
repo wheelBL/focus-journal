@@ -182,7 +182,7 @@ export function matchesRules(r:FilterRule,t:Task,index:OutlineIndex,now:string):
   return r.op==='contains'?value.includes(text):!value.includes(text);
  }
  if(field==='completionBy'&&t.status!=='done')return false;
- const actual=field==='responsibility'?(t.ownership?t.ownership.followUp?'following':'handed-off':'self'):field==='completionBy'?(t.completionBy??'unknown'):field==='itemType'?(t.itemType??'task'):field==='status'?t.status:field==='availability'?(outlinePath(index,t.id).some(n=>(n.record as Task).availability==='paused')?'paused':'active'):field==='isProject'?!!t.isProject:field==='scope'?branchIds(index,String(r.value)).has(t.id):!t.ownership&&!blockedReason(index,t.id);
+ const actual=field==='responsibility'?(t.ownership?t.ownership.followUp?'following':'handed-off':'self'):field==='completionBy'?(t.completionBy??'unknown'):field==='itemType'?(t.itemType??'task'):field==='status'?t.status:field==='availability'?(outlinePath(index,t.id).some(n=>(n.record as Task).availability==='paused')?'paused':'active'):field==='isProject'?!!t.isProject:field==='scope'?branchIds(index,String(r.value)).has(t.id):!t.ownership&&!blockedReason(index,t.id)&&!(t.dependencyPlan?.predecessors.some(e=>(index.nodes.get(e.id)?.record as Task|undefined)?.status!=='done'));
  const expected=field==='scope'?true:r.value;return r.op==='is'?actual===expected:actual!==expected;
 }
 

@@ -41,7 +41,7 @@ test('GitCode configuration rejects credentials in URLs, other hosts and invalid
 test('two machines upload, download and continue with hierarchy, tags, views and all journal collections',async()=>{
  const a=setup(),b=setup(a.remote);a.service.seedDemo();
  const initial=a.service.snapshot().state;initial.tags=[{id:'tag',name:'自定义'}];initial.tasks.filter((t:{id:string})=>t.id!=='inbox')[0].tagIds=['tag'];initial.views=[{id:'view',name:'本周',filter:{view:'all',query:'',showDone:false,scopeId:null,tagIds:['tag'],tagMode:'all',planned:'any',completed:'any',due:'this-week',projectsOnly:false}}];
- a.service.importJson(JSON.stringify({format:'focus-journal',version:7,state:initial}));
+ a.service.importJson(JSON.stringify({format:'focus-journal',version:initial.schemaVersion,state:initial}));
  assert.equal((await a.sync.run()).phase,'ok');assert.equal((await b.sync.run()).phase,'ok');
  assert.equal(fingerprint(a.service.snapshot().state),fingerprint(b.service.snapshot().state));assert.equal(b.backups.length,1);
  const id=b.service.snapshot().state.tasks.filter((t:{id:string})=>t.id!=='inbox')[0].id;rename(b.service,id,'第二台电脑继续');await b.sync.run();await a.sync.run();assert.equal(a.service.snapshot().state.tasks.find(t=>t.id===id)!.title,'第二台电脑继续');

@@ -71,7 +71,7 @@ export class AiAssistantService {
    const eligible=this.entries.filter(e=>e.view.state==='pending'&&planStillCurrent(e,before));
    const after=this.journal.execute({...controlCommand(entry.command,before),meta:{source:'ai',entry:'ai.suggestion.apply',aiRunId:this.state.id}});
    entry.view={...entry.view,state:'applied',error:undefined};
-   for(const next of eligible)if(next!==entry)refreshPlanBaseline(next,after);
+   for(const next of eligible)if(next!==entry){try{refreshPlanBaseline(next,after);}catch{next.view.error='相关联动超出参考范围，请扩大范围后重新生成。';}}
    try{this.changed();}catch{/* A notification failure cannot undo a committed journal change. */}this.emit();
   }catch(error){entry.view.error=error instanceof Error?this.redact(error.message):'这条建议未保存，请重试。';this.emit();}
   return this.get();

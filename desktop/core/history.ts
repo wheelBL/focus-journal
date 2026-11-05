@@ -5,7 +5,7 @@ import {assertParentAvailable,openDescendants,outlineIndex} from './outline';
 import {blockedReason} from './item-state';
 
 // Only business fields are reversible. Clock, effort, activity and audit records stay live.
-const fields: (keyof Task)[]=['title','description','relatedTaskIds','itemType','eventAt','eventEnd','focusDate','isProject','archived','availability','deletedAt','reviewSchedule','reminder','tagIds','outcome','nextAction','parentId','order','reminderRecurrence','recurrence','recurrenceNextId','recurrencePreviousId','estimateMinutes','plannedDate','dueAt','status','completedAt','ownership','completionBy','reminderHistory','groupHistory'];
+const fields: (keyof Task)[]=['dependencyPlan','title','description','relatedTaskIds','itemType','eventAt','eventEnd','focusDate','isProject','archived','availability','deletedAt','reviewSchedule','reminder','tagIds','outcome','nextAction','parentId','order','reminderRecurrence','recurrence','recurrenceNextId','recurrencePreviousId','estimateMinutes','plannedDate','dueAt','status','completedAt','ownership','completionBy','reminderHistory','groupHistory'];
 const same=(a:unknown,b:unknown)=>JSON.stringify(a)===JSON.stringify(b);
 const clone=<T>(v:T):T=>structuredClone(v);
 type Change={id:string;key:keyof Task;before:unknown;after:unknown};
@@ -16,7 +16,7 @@ export function historyLabel(command:Command):{label:string;category:HistoryEntr
  if(['item.change','task.status','item.handoff','item.reclaim','item.completion'].includes(t)||t==='focus.stop'&&p.complete===true||t==='items.batch'&&isBatchLifecycle(p.action))return {label:'事项状态',category:'state'};
  if(t==='outline.move')return {label:'移动事项',category:'move'};
  if(['outline.create','capture.create','reminder.create','note.create-task'].includes(t)||((t==='task.save'||t==='project.save')&&!p.id))return {label:'新增事项',category:'organize'};
- if(['note.update','note.link-task','note.unlink-task','reminder.update','item-reminder.set','reminder.schedule','reminder.stop','reminder.convert','inbox.organize','recurrence.set','items.batch','item.focus','event.save','outline.patch','task.plan','task.save','project.save','project.archive','item-review.configure','item-review.defer'].includes(t)||t.startsWith('tag.'))return {label:t.startsWith('tag.')?'修改标签':'编辑事项',category:'organize'};
+ if(['dependency.set','dependency.chain','note.update','note.link-task','note.unlink-task','reminder.update','item-reminder.set','reminder.schedule','reminder.stop','reminder.convert','inbox.organize','recurrence.set','items.batch','item.focus','event.save','outline.patch','task.plan','task.save','project.save','project.archive','item-review.configure','item-review.defer'].includes(t)||t.startsWith('tag.'))return {label:t.startsWith('tag.')?'修改标签':'编辑事项',category:'organize'};
  return null;
 }
 export function makeHistoryEntry(before:JournalState,after:JournalState,meta:{label:string;category:HistoryEntry['category']}):HistoryEntry|null {

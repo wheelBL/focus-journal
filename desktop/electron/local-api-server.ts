@@ -1,3 +1,4 @@
+import {deriveDependencyStatuses} from '../core/dependencies';
 import {createServer,type IncomingMessage,type ServerResponse} from 'node:http';
 import {createHash,randomUUID,timingSafeEqual} from 'node:crypto';
 import {controlCommand,controlCommands,controlOpenApi,ControlInputError} from '../core/control-api';
@@ -57,10 +58,10 @@ export async function startLocalApi(options:Options):Promise<RunningLocalApi>{
     return {items:values.slice(offset,offset+limit),total:values.length,offset,limit,nextOffset:offset+limit<values.length?offset+limit:null};
    };
    const summarize=(s:Snapshot,filter:ReturnType<typeof emptyFilter>,offset?:unknown,limit?:unknown)=>{
-    const index=outlineIndex(s.state),matched=filterOutline(s.state,filter,s.now,null,index).matches;
+    const statuses=deriveDependencyStatuses(s.state),index=outlineIndex(s.state),matched=filterOutline(s.state,filter,s.now,null,index).matches;
     const items=itemSorter(index,filter.sort??'smart',s.now,false)(index.ordered.filter(n=>matched.has(n.id))).map(n=>{
      const t=n.record as Task,stats=index.stats.get(n.id)!;
-     return {...t,tagNames:(t.tagIds??[]).map(id=>s.state.tags.find(tag=>tag.id===id)?.name??''),ownEffortMs:stats.ownMs,branchEffortMs:stats.totalMs,blockedReason:blockedReason(index,t.id)};
+     return {...t,tagNames:(t.tagIds??[]).map(id=>s.state.tags.find(tag=>tag.id===id)?.name??''),ownEffortMs:stats.ownMs,branchEffortMs:stats.totalMs,blockedReason:blockedReason(index,t.id),dependencyStatus:statuses.get(t.id)??null};
     });
     return page(items,offset,limit);
    };
@@ -122,7 +123,7 @@ export async function startLocalApi(options:Options):Promise<RunningLocalApi>{
     }else if(/^\/v1\/items\/[^/]+$/.test(path)){
      listParams([]);let id:string;try{id=decodeURIComponent(path.slice('/v1/items/'.length));}catch{fail(400,'invalid_id','事项 ID 无效。');}
      const task=s.state.tasks.find(t=>t.id===id);if(!task)fail(404,'item_not_found','事项不存在。');
-     const index=outlineIndex(s.state);data={item:task,path:outlinePath(index,id!).map(n=>({id:n.id,title:n.title})),childIds:(index.children.get(id!)??[]).map(n=>n.id),effort:index.stats.get(id!),estimate:task!.itemType==='note'||task!.itemType==='event'||task!.itemType==='group'?null:estimateProgress(s.state,id!),estimates:s.state.estimates.filter(e=>e.taskId===id),reviews:s.state.reviews.filter(r=>r.taskId===id),blockedReason:blockedReason(index,id!)};
+     const index=outlineIndex(s.state);data={item:task,path:outlinePath(index,id!).map(n=>({id:n.id,title:n.title})),childIds:(index.children.get(id!)??[]).map(n=>n.id),effort:index.stats.get(id!),estimate:task!.itemType==='note'||task!.itemType==='event'||task!.itemType==='group'?null:estimateProgress(s.state,id!),estimates:s.state.estimates.filter(e=>e.taskId===id),reviews:s.state.reviews.filter(r=>r.taskId===id),blockedReason:blockedReason(index,id!),dependencyStatus:deriveDependencyStatuses(s.state).get(id!)??null};
     }else if(path==='/v1/timers'){listParams([]);data={timers:s.timers,rest:s.state.settings.rest??null,breakUntil:s.state.settings.breakUntil};}
     else if(path==='/v1/sessions'){
      listParams(['taskId','from','to','offset','limit','deleted']);if(params.has('deleted')&&!['true','false'].includes(params.get('deleted')!))fail(400,'invalid_filter','deleted 应为 true 或 false。');const from=params.get('from'),to=params.get('to');

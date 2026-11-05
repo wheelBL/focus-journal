@@ -52,6 +52,8 @@
 | `tag.attach` / `tag.detach` | `{"id":"事项ID","name":"标签"}` / `{"id":"事项ID","tagId":"标签ID"}` |
 | `task.status` | `{"id":"事项ID","status":"done"}`，也支持 open/cancelled |
 | `item.change` | `{"id":"事项ID","action":"pause"}`，也支持 resume/delete/restore |
+| `dependency.set` | `{"id":"后续任务ID","predecessorIds":["前置任务ID"],"mode":"follow"}`；`fixed` 保持截止固定，空数组解除依赖 |
+| `dependency.chain` | `{"ids":["准备材料ID","内部对齐ID","正式评审ID"]}`；按顺序补充相邻依赖，不移除原有关系 |
 | `item-reminder.set` | `{"id":"事项ID","at":"2026-10-21T13:50:00+08:00"}`；at:null 取消 |
 | `event.save` | `{"id":"事件ID","at":"2026-10-22T10:00:00+08:00","end":"2026-10-22T11:00:00+08:00"}` |
 | `focus.start` | `{"taskId":"事项ID","targetMinutes":25}` |

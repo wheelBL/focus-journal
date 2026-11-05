@@ -85,10 +85,10 @@ test('review: schema 19 migration backs up the old database and changes no busin
  const dir=mkdtempSync(path.resolve('qa-evidence/groups-schema19-')),file=path.join(dir,'journal.sqlite');
  const original=new SqliteJournalStore(file);original.save(old);original.close();
  const migrated=new JournalService(new SqliteJournalStore(file));try{
-  const now=migrated.snapshot().state;assert.equal(now.schemaVersion,22);
+  const now=migrated.snapshot().state;assert.equal(now.schemaVersion,23);
   assert.deepEqual({...now,schemaVersion:19},old);
  }finally{migrated.shutdown();}
- const backup=readdirSync(path.join(dir,'backups')).find(name=>name.startsWith('before-schema-19-to-22-'));assert.ok(backup);
+ const backup=readdirSync(path.join(dir,'backups')).find(name=>name.startsWith('before-schema-19-to-23-'));assert.ok(backup);
  const db=new DatabaseSync(path.join(dir,'backups',backup!),{readOnly:true});try{
   assert.equal((db.prepare('PRAGMA user_version').get() as {user_version:number}).user_version,19);
   const rows=db.prepare("SELECT data FROM records WHERE kind='sessions'").all() as {data:string}[];

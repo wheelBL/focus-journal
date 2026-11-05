@@ -1,0 +1,18 @@
+import {test} from 'node:test';
+import assert from 'node:assert/strict';
+import {buildAiContext,buildAiPlan,planStillCurrent} from '../core/ai-assistant';
+import {emptyState,type Snapshot,type Task,type Command} from '../core/types';
+const task=(id:string,parentId:string|null=null,extra:Partial<Task>={}):Task=>({id,title:id,parentId,projectId:null,order:0,itemType:'task',description:'',outcome:'',nextAction:'',estimateMinutes:null,plannedDate:null,dueAt:null,status:'open',createdAt:'2026-10-01T00:00:00Z',startedAt:null,completedAt:null,...extra});
+const snapshot=():Snapshot=>{const state=emptyState();state.tasks=[task('root'),task('a','root',{dueAt:'2026-11-10'}),task('b','root',{dueAt:'2026-11-12'}),task('outside',null,{title:'SECRET',dueAt:'2026-11-15'})];return {state,revision:1,timers:[],timer:null,now:'2026-11-05T00:00:00Z',dataPath:'',demo:true};};
+const proposal=(command:Command)=>({summary:'',changes:[{command}]});
+const context=(s:Snapshot)=>buildAiContext(s,{kind:'item',itemId:'root'});
+const chain:Command={type:'dependency.chain',payload:{ids:['a','b']}};
+test('AI chain checks scope and shows visible relationship',()=>{const s=snapshot();const entry=buildAiPlan(proposal(chain),context(s)).entries[0];assert.match(entry.view.after,/a → b/);assert.throws(()=>buildAiPlan(proposal({type:'dependency.chain',payload:{ids:['a','outside']}}),context(s)),/范围/);});
+test('AI hides external predecessor and refuses to replace unseen relationship',()=>{const s=snapshot();s.state.tasks[2].dependencyPlan={mode:'follow',predecessors:[{id:'outside',offset:{unit:'days',value:0}}]};const c=context(s);assert.equal(c.content.includes('SECRET'),false);assert.equal(c.content.includes('outside'),false);assert.match(c.content,/hiddenPredecessors/);assert.throws(()=>buildAiPlan(proposal({type:'dependency.set',payload:{id:'b',predecessorIds:[]}}),c),/范围/);});
+test('AI blocks out of scope cascade and invalidates preview when a new edge appears',()=>{const s=snapshot();s.state.tasks[3].dependencyPlan={mode:'follow',predecessors:[{id:'a',offset:{unit:'days',value:5}}]};const cmd:Command={type:'outline.patch',payload:{id:'a',field:'dueAt',value:'2026-11-11'}};assert.throws(()=>buildAiPlan(proposal(cmd),context(s)),/范围/);delete s.state.tasks[3].dependencyPlan;const entry=buildAiPlan(proposal(cmd),context(s)).entries[0];s.state.tasks[3].dependencyPlan={mode:'follow',predecessors:[{id:'a',offset:{unit:'days',value:5}}]};assert.equal(planStillCurrent(entry,s),false);});
+test('AI displays in scope cascading dates and rejects group as predecessor',()=>{const s=snapshot();s.state.tasks[2].dependencyPlan={mode:'follow',predecessors:[{id:'a',offset:{unit:'days',value:2}}]};const entry=buildAiPlan(proposal({type:'outline.patch',payload:{id:'a',field:'dueAt',value:'2026-11-11'}}),context(s)).entries[0];assert.match(entry.view.after,/b：截止 2026-11-12 → 2026-11-13/);s.state.tasks[0].itemType='group';assert.throws(()=>buildAiPlan(proposal({type:'dependency.set',payload:{id:'a',predecessorIds:['root']}}),context(s)));});
+
+test('AI dependency chain invalidates changed connected tasks but ignores unrelated edits',()=>{
+ for(const change of [(t:Task)=>{t.archived=true;},(t:Task)=>{t.status='done';},(t:Task)=>{t.status='handed-off';},(t:Task)=>{t.title='renamed';},(t:Task)=>{t.parentId=null;},(t:Task)=>{t.dueAt='2026-11-11';}]){const s=snapshot(),entry=buildAiPlan(proposal(chain),context(s)).entries[0];change(s.state.tasks[1]);assert.equal(planStillCurrent(entry,s),false);}
+ const s=snapshot(),entry=buildAiPlan(proposal(chain),context(s)).entries[0];s.state.tasks[3].title='unrelated';assert.equal(planStillCurrent(entry,s),true);
+});

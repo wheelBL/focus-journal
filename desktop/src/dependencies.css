@@ -1,0 +1,29 @@
+/* Dependencies own a vertical flow instead of the inspector's two-column facts grid. */
+.inspector-properties .inspector-field.dependency-editor,
+.journal-style .inspector-properties .inspector-field.dependency-editor{
+ display:flex;flex-direction:column;align-items:stretch;grid-template-columns:none;
+ gap:8px;min-width:0;max-width:100%;margin-block:6px 16px;
+}
+.dependency-editor>*{min-width:0;max-width:100%;box-sizing:border-box}
+.dependency-editor>label:first-child{font-weight:500}
+.dependency-editor>label:has(select){display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:6px 12px}
+.dependency-editor select{min-width:0;max-width:100%;flex:0 1 164px}
+.dependency-editor>button{align-self:flex-start;max-width:100%;white-space:normal;text-align:left}
+.dependency-editor ul{list-style:none;padding:0;margin:0}
+.dependency-editor li{display:grid;grid-template-columns:minmax(0,1fr) auto;align-items:start;gap:3px 8px;padding-block:5px;min-width:0}
+.dependency-editor li>.text-button{grid-column:1;text-align:left;white-space:normal;overflow-wrap:anywhere;min-width:0;max-width:100%}
+.dependency-editor li>small{grid-column:1;color:var(--muted);font-size:11px}
+.dependency-editor li>button:last-child{grid-column:2;grid-row:1 / 3;align-self:center}
+.inspector-properties .inspector-field.dependency-editor>small,
+.dependency-editor>p{display:block;width:100%;margin:0;font-size:11px;line-height:1.65;overflow-wrap:anywhere;grid-column:auto}
+.dependency-editor fieldset{border:0;padding:4px 0 0;margin:0;min-width:0;width:100%;box-sizing:border-box}
+.dependency-editor fieldset>input{width:100%;min-width:0;max-width:100%;box-sizing:border-box}
+.dependency-editor fieldset p{font-size:11px;line-height:1.65;overflow-wrap:anywhere}
+.dependency-editor .actions{display:flex;flex-wrap:wrap;gap:6px}
+.dependency-editor .actions button{min-width:0;max-width:100%;white-space:normal}
+.dependency-options{display:flex;flex-direction:column;max-height:180px;overflow:auto;margin:6px 0;min-width:0}
+.dependency-options button{display:flex;flex-direction:column;align-items:flex-start;gap:3px;text-align:left;padding:7px 6px;white-space:normal;overflow-wrap:anywhere;min-width:0;max-width:100%}
+.dependency-options button small{display:block;color:var(--muted);font-size:10px;line-height:1.4;max-width:100%;overflow-wrap:anywhere}
+.dependency-chain li{padding:8px}
+.dependency-chain li>div{display:inline-flex;gap:4px;margin-left:12px}
+.dependency-chain li>span{display:block;font-size:12px}

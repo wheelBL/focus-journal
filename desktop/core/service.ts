@@ -1,3 +1,4 @@
+import {applyDependencyCommand,reconcileDependencies,validateDependencyGraph,deriveDependencyStatuses,type DependencyCommand} from './dependencies';
 import {semanticOperation,operationFailure,type OperationResult} from './usage-types';
 import {contentGroupId,visible as contentVisible} from './content-workspace';
 import {inboxItems,inboxReviewSettings,inboxReviewDue,validateInboxReviewSettings} from './inbox-review';
@@ -43,7 +44,7 @@ export class JournalService {
   private history:HistoryEntry[]=[];
   private redoHistory:HistoryEntry[]=[];
   constructor(private store: JournalStore,private clock: WorkClock=realClock,public demo=false,private appVersion='development') {
-    const loaded=store.load();this.state=migrateOutline(loaded);
+    const loaded=store.load();this.state=migrateOutline(loaded);validateDependencyGraph(this.state);
     if(JSON.stringify(loaded)!==JSON.stringify(this.state))store.save(this.state);
     this.anchor=clock.monotonic(); this.checkpointAt=clock.monotonic();
     // A stopped host is not evidence of continued work. Keep the last durable checkpoint.
@@ -71,7 +72,7 @@ export class JournalService {
   }
   private commit(change:(state:JournalState,now:string)=>void,command?:Command) {
     const at=this.clock.monotonic(),now=this.iso();
-    const draft=this.live(at,now);change(draft,now);generateTaskSuccessors(this.state,draft,now);ensureOutlineFields(draft);assertOutline(draft);syncProjectOwnership(draft);
+    const draft=this.live(at,now);change(draft,now);generateTaskSuccessors(this.state,draft,now);ensureOutlineFields(draft);assertOutline(draft);reconcileDependencies(this.state,draft,{skipPropagation:!!command&&(['history.undo','history.redo','item.undo','organize.undo','outline.undo'].includes(command.type))});syncProjectOwnership(draft);
     for(const task of draft.tasks)if((task.status!=='open'&&task.status!=='handed-off'||task.deletedAt||task.archived)&&task.reminder){task.reminder.state='dismissed';task.reminder.snoozedUntil=null;}
     for(const task of draft.tasks)if(task.status!=='open'&&task.reviewSchedule?.enabled){task.reviewSchedule.enabled=false;task.reviewSchedule.nextDate=null;}
     const oldTasks=new Map(this.state.tasks.map(t=>[t.id,t]));
@@ -142,6 +143,7 @@ export class JournalService {
     const meta=historyLabel(command);
     this.commit((s,now)=>{
       switch(command.type) {
+        case 'dependency.set': case 'dependency.chain': {applyDependencyCommand(s,command as DependencyCommand);break;}
         case 'note.update': {const t=this.task(s,p.id);if(!isNote(t)||!contentVisible(outlineIndex(s),t.id))throw new Error('请选择可用笔记。');t.title=required(p.title);t.description=text(p.description);break;}
         case 'reminder.stop': {const t=this.task(s,p.id),r=effectiveItemReminder(t);if(!r||t.deletedAt||t.archived)throw new Error('此提醒已经停止或不可用。');r.state='dismissed';r.snoozedUntil=null;if(!t.ownership){if(isReminder(t))t.recurrence=null;else if(isTask(t))t.reminderRecurrence=null;}break;}
         case 'reminder.schedule': {const t=this.task(s,p.id);if(!Object.hasOwn(p,'rule')||!p.at||isNote(t)||isGroup(t))throw new Error('请选择提醒时间和重复方式。');if(t.ownership&&p.rule!==null)throw new Error('交接跟进提醒暂不支持重复。');setItemReminder(t,p.at);if(isReminder(t)||isEvent(t))configureRecurrence(t,p.rule,now);else if(!t.ownership){if(p.rule===null)t.reminderRecurrence=null;else{const r=validateRecurrence(p.rule);if(r.mode!=='calendar'||r.reminderOffsetMs!==undefined||r.anchor>localDay(t.reminder!.at))throw new Error('请选择有效的固定日历重复方式。');t.reminderRecurrence=r;}}break;}
@@ -374,9 +376,10 @@ export class JournalService {
     if(direction){const source=direction==='undo'?this.history:this.redoHistory,target=direction==='undo'?this.redoHistory:this.history;source.pop();target.push(entry!);}
     else {const next=meta&&makeHistoryEntry(before,this.state,meta);if(next){this.history.push(next);if(this.history.length>50)this.history.shift();this.redoHistory=[];}else if(!['task.select','focus.start','focus.start-unassigned','focus.resume','focus.pause','focus.stop'].includes(command.type)&&JSON.stringify({tasks:before.tasks,tags:before.tags,views:before.views,notes:before.notes,estimates:before.estimates,reviews:before.reviews,itemReviews:before.itemReviews,sessions:before.sessions,deletedSessions:before.deletedSessions})!==JSON.stringify({tasks:this.state.tasks,tags:this.state.tags,views:this.state.views,notes:this.state.notes,estimates:this.state.estimates,reviews:this.state.reviews,itemReviews:this.state.itemReviews,sessions:this.state.sessions,deletedSessions:this.state.deletedSessions})){this.redoHistory=[];}}
     const result=this.snapshot();
+    const beforeById=new Map(before.tasks.map(t=>[t.id,t]));const clearedFollow=this.state.tasks.find(t=>{const old=beforeById.get(t.id);return old?.dependencyPlan?.mode==='follow'&&old.dueAt&&!t.dueAt&&t.dependencyPlan?.mode==='fixed';});if(clearedFollow)result.itemNotice=`「${clearedFollow.title}」已清除截止时间，自动跟随已关闭。`;
     const previousIds=new Set(before.tasks.map(t=>t.id)),createdItemIds=this.state.tasks.filter(t=>!previousIds.has(t.id)).map(t=>t.id);
     if(createdItemIds.length)result.commandResult={createdItemIds};
-    if(['focus.start','focus.start-unassigned','focus.resume'].includes(command.type)&&result.timers.filter(t=>!t.paused).length>1)result.focusReminder='每次只做一件事情，更容易专注。当前有多个事项同时计时，各项投入会分别累计。';
+    if(['focus.start','focus.start-unassigned','focus.switch','focus.resume'].includes(command.type)){const newRunning=result.timers.filter(t=>!t.paused&&!before.sessions.some(x=>x.id===t.sessionId&&x.status==='running'));const statuses=deriveDependencyStatuses(result.state);const waiting=newRunning.some(t=>t.taskId&&statuses.get(t.taskId)?.waiting);const notices:string[]=[];if(waiting)notices.push('前置事项尚未完成，你仍可提前开始。');if(result.timers.filter(t=>!t.paused).length>1)notices.push('每次只做一件事情，更容易专注。当前有多个事项同时计时，各项投入会分别累计。');if(notices.length)result.focusReminder=notices.join(' ');}
     if(command.type==='task.status'&&p.status!=='open'||command.type==='focus.stop'&&p.complete===true){const taskId=p.id??result.state.sessions.find(r=>r.id===p.sessionId)?.taskId,parent=result.state.tasks.find(t=>t.id===result.state.tasks.find(t=>t.id===taskId)?.parentId);if(parent&&parent.status==='open'&&!openDescendants(result.state,parent.id).length)result.itemNotice=`子项已结束，可以检查父项「${parent.title}」是否完成；父项保持未完成。`;}
     return result;
   }
@@ -468,15 +471,15 @@ export class JournalService {
 export function parseJournalBackup(content:string):JournalState {
   let parsed:unknown;try{parsed=JSON.parse(content);}catch{throw new Error('文件不是有效 JSON。');}
   const data=parsed as {format?:string;version?:number;state?:JournalState};
-  if(!data||data.format!=='focus-journal'||![1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22].includes(data.version??0)||!data.state)throw new Error('这不是支持的专注记备份。');
-  validateState(data.state);return migrateOutline(data.state);
+  if(!data||data.format!=='focus-journal'||![1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23].includes(data.version??0)||!data.state)throw new Error('这不是支持的专注记备份。');
+  if(data.version!==data.state.schemaVersion)throw new Error('备份版本不一致。');validateState(data.state);const migrated=migrateOutline(data.state);validateDependencyGraph(migrated);return migrated;
 }
 function validateState(s:JournalState) {
   const invalid=()=>{throw new Error('备份数据无效或不完整。');};
   const bool=(v:unknown)=>{if(typeof v!=='boolean')invalid();};
   const stamp=(v:unknown)=>{if(instant(v)!==v)invalid();};
   const nullableStamp=(v:unknown)=>{if(v!==null)stamp(v);};
-  if(!s||typeof s!=='object'||![1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22].includes(s.schemaVersion))throw new Error('备份版本不受支持。');
+  if(!s||typeof s!=='object'||![1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23].includes(s.schemaVersion))throw new Error('备份版本不受支持。');
   for(const k of ['projects','tasks','sessions','notes','estimates','reviews','audit'] as const){
     if(!Array.isArray(s[k])||s[k].length>100000)invalid();
     const ids=new Set();
@@ -490,6 +493,7 @@ function validateState(s:JournalState) {
   if(s.schemaVersion<13&&!s.projects.some(p=>p.id==='inbox'&&!p.archived))invalid();
   for(const p of s.projects){required(p.name);text(p.description);bool(p.archived);stamp(p.createdAt);}
   for(const t of s.tasks){
+    if(t.dependencyPlan!==undefined&&s.schemaVersion<23)invalid();
     if(t.status==='handed-off'&&s.schemaVersion<19)invalid();validateOwnership(t);if(t.ownership)validateItemReminder(t.ownership.reminder);if(s.schemaVersion>=19&&t.status==='open'&&t.ownership)invalid();
     required(t.title);text(t.outcome);text(t.nextAction);
     if(isReminder(t)&&s.schemaVersion<22&&!t.reminderHistory)invalid();if(t.reminderRecurrence!==undefined&&t.reminderRecurrence!==null){if(s.schemaVersion<22||!isTask(t)||!t.reminder||t.reminderRecurrence.mode!=='calendar'||t.reminderRecurrence.reminderOffsetMs!==undefined)invalid();validateRecurrence(t.reminderRecurrence);}

@@ -17,7 +17,7 @@ test('automatic capture resolves type and explicit destinations without migratin
  const s=setup(),group=createGroup(s),before=structuredClone(s.snapshot().state.tasks);const event=capture(s,'o 火车');assert.equal(event.parentId,null);assert.match(event.eventAt!,/^2026-11-03$/);assert.equal(inboxItems(s.snapshot().state).length,0);assert.equal(inboxReviewDue(s.snapshot().state,s.snapshot().now),false);
  assert.equal(capture(s,'办理手续').parentId,'inbox');assert.equal(capture(s,'- 行程笔记').parentId,'inbox');assert.equal(capture(s,'o 住宿 #旅行').parentId,group.id);assert.equal(capture(s,'o 会面',{parentId:group.id}).parentId,group.id);assert.equal(capture(s,'普通事项',{parentId:null}).parentId,null);
  const forced=capture(s,'o 日程 #旅行',{destination:'inbox',parentId:group.id});assert.equal(forced.parentId,'inbox');assert.equal(capture(s,'待办 #旅行',{destination:'unfiled',parentId:group.id}).parentId,null);assert.equal(capture(s,'旧命令',{destination:undefined}).parentId,null);
- assert.deepEqual(s.snapshot().state.tasks.slice(0,before.length),before);assert.equal(s.snapshot().state.schemaVersion,22);s.shutdown();
+ assert.deepEqual(s.snapshot().state.tasks.slice(0,before.length),before);assert.equal(s.snapshot().state.schemaVersion,23);s.shutdown();
 });
 test('an explicit inbox request fails safely if unavailable while automatic fallback stays unfiled',()=>{
  const s=setup();s.execute({type:'item.change',payload:{id:'inbox',action:'delete',confirmBranch:true}});const before=s.exportJson();assert.throws(()=>capture(s,'o 稍后',{destination:'inbox'}),/收件箱不可用/);assert.equal(s.exportJson(),before);assert.equal(capture(s,'任务').parentId,null);assert.equal(capture(s,'o 事件').parentId,null);s.shutdown();

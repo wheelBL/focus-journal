@@ -114,7 +114,7 @@ module.exports=(dataDir,output,expectedVersion)=>{
   const groupCreated=await run(main,`window.journal.command({type:'outline.create',payload:{title:'发布验证：工作分类',kind:'group',parentId:null}})`),groupId=groupCreated.state.tasks.at(-1).id;
   const subgroupCreated=await run(main,`window.journal.command({type:'outline.create',payload:{title:'发布验证：嵌套分类',kind:'group',parentId:${JSON.stringify(groupId)}}})`),subgroupId=subgroupCreated.state.tasks.at(-1).id;
   const groupChild=await run(main,`window.journal.command({type:'outline.create',payload:{title:'发布验证：分类中的实际工作',parentId:${JSON.stringify(subgroupId)}}})`),childId=groupChild.state.tasks.at(-1).id;
-  check(groupChild.state.schemaVersion===22&&groupChild.state.tasks.find(t=>t.id===subgroupId).parentId===groupId,'Packaged groups persist explicit type and arbitrary nested identities');
+  check(groupChild.state.schemaVersion===23&&groupChild.state.tasks.find(t=>t.id===subgroupId).parentId===groupId,'Packaged groups persist explicit type and arbitrary nested identities');
   check(await run(main,`window.journal.command({type:'focus.start',payload:{taskId:${JSON.stringify(groupId)}}}).then(()=>false,()=>true)`),'Packaged backend refuses execution on a group');
   const childStarted=await run(main,`window.journal.command({type:'focus.start',payload:{taskId:${JSON.stringify(childId)}}})`);
   check(childStarted.timers.some(t=>t.taskId===childId),'A task under nested groups remains executable');
@@ -208,6 +208,7 @@ module.exports=(dataDir,output,expectedVersion)=>{
   await require('./qa-capture-destination.cjs')({main,run,until,check,wait,output});
   await require('./qa-ai-conversation.cjs')({main,run,until,check,wait,output});
   await require('./qa-inbox-delete.cjs')({main,run,until,check,wait,output});
+  await require('./qa-dependencies.cjs')({main,run,until,check,wait,output});
   await run(main,`window.journalAppearance.set({theme:'dark',motion:'reduce'})`);
   await run(main,`document.querySelector('.top-navigation [aria-label="今日"]').click()`);
   await until(()=>run(main,`!!document.querySelector('.today-page')`),'Today did not return after groups');

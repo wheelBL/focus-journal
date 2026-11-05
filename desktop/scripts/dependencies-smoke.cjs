@@ -1,0 +1,58 @@
+// Runs only inside the synthetic QA application, never in a personal profile.
+const fs=require('node:fs'),path=require('node:path');
+module.exports=async({main,run,until,check,wait,output})=>{
+ const command=c=>run(main,`window.journal.command(${JSON.stringify(c)})`);
+ const snapshot=()=>run(main,'window.journal.snapshot()');
+ const click=(text,scope='document')=>run(main,`(()=>{const b=[...${scope}.querySelectorAll('button')].find(b=>b.textContent.trim()===${JSON.stringify(text)});if(!b)throw Error('Missing dependency control: '+${JSON.stringify(text)});b.click();})()`);
+ const setInput=(selector,value)=>run(main,`(()=>{const e=document.querySelector(${JSON.stringify(selector)});if(!e)throw Error('Missing dependency input');Object.getOwnPropertyDescriptor(HTMLInputElement.prototype,'value').set.call(e,${JSON.stringify(value)});e.dispatchEvent(new Event('input',{bubbles:true}));})()`);
+ const group=(await command({type:'outline.create',payload:{title:'发布验证：任务依赖',kind:'group',parentId:null}})).state.tasks.at(-1).id;
+ const ids=[];for(let i=0;i<4;i++){const result=await command({type:'task.save',payload:{title:['依赖验证：准备材料','依赖验证：内部对齐','依赖验证：正式评审','依赖验证：申请确认'][i],parentId:group,dueAt:`2026-11-${String(10+i).padStart(2,'0')}`,plannedDate:`2026-11-${String(9+i).padStart(2,'0')}`,estimateMinutes:25}});ids.push(result.state.tasks.at(-1).id);}
+ await command({type:'session.manual',payload:{taskId:ids[1],date:'2026-11-01',minutes:5,summary:'联动必须保留的真实投入'}});
+ const original=(await snapshot()).state,originalEffort=JSON.stringify(original.sessions);
+ await run(main,`document.querySelector('.top-navigation [aria-label="任务"]').click()`);
+ await until(()=>run(main,`!!document.querySelector('.tree-page')`),'Task page missing for dependencies');
+ await click('全部任务',`document.querySelector('[aria-label="事项视图"]')`);
+ await run(main,`[...document.querySelectorAll('button')].find(b=>b.textContent.trim()==='清除筛选')?.click()`);
+ await setInput('[aria-label="在事项树中搜索"]','');
+ await run(main,`document.querySelector('[data-content-group="${group}"] button:last-child').click()`);
+ await until(()=>run(main,`${JSON.stringify(ids)}.every(id=>document.querySelector('[data-outline-id="'+id+'"]'))`),'Dependency tasks not visible');
+ for(let i=0;i<ids.length;i++){await run(main,`document.querySelector('[data-outline-id="${ids[i]}"]').dispatchEvent(new MouseEvent('click',{bubbles:true,ctrlKey:${i>0}}))`);await wait(20);}
+ await click('按顺序建立依赖…');
+ await until(()=>run(main,`!!document.querySelector('dialog[aria-label="按顺序建立依赖"]')`),'Dependency chain preview missing');
+ check(await run(main,`document.querySelectorAll('.dependency-chain li').length===4`),'Native chain preview includes all four selected tasks');
+ check(!(await snapshot()).state.tasks.find(t=>t.id===ids[1]).dependencyPlan,'Opening chain preview does not change task relationships');
+ await run(main,`window.journalAppearance.set({theme:'dark',motion:'reduce'})`);await wait(50);
+ fs.writeFileSync(path.join(output,'dependencies-chain-dark.png'),(await main.webContents.capturePage()).toPNG());
+ await click('确认建立依赖');
+ await until(async()=>!!(await snapshot()).state.tasks.find(t=>t.id===ids[3]).dependencyPlan,'Chain did not persist');
+ const chain=(await snapshot()).state;
+ check(ids.slice(1).every((id,i)=>chain.tasks.find(t=>t.id===id).dependencyPlan.predecessors[0].id===ids[i]),'Native multi-selection creates dependencies in the displayed task order');
+ await run(main,`document.querySelector('[data-outline-id="${ids[0]}"]').click()`);
+ await until(()=>run(main,`!!document.querySelector('button[aria-label^="详情截止时间："]')`),'Inspector deadline missing');
+ await run(main,`document.querySelector('button[aria-label^="详情截止时间："]').click()`);
+ await until(()=>run(main,`!!document.querySelector('input[aria-label="详情截止时间"]')`),'Deadline editor missing');
+ await setInput('input[aria-label="详情截止时间"]','2026-11-13');await click('保存截止');
+ await until(async()=>(await snapshot()).state.tasks.find(t=>t.id===ids[3]).dueAt==='2026-11-16','Deadline edit did not cascade through the chain');
+ const shifted=(await snapshot()).state;
+ check(ids.every((id,i)=>{const t=shifted.tasks.find(t=>t.id===id);return t.dueAt===`2026-11-${13+i}`&&(!i||t.plannedDate===`2026-11-${12+i}`)&&t.completedAt===null;}),'Native deadline edit preserves gaps and dependent planned spans');
+ check(JSON.stringify(shifted.sessions)===originalEffort,'Dependency scheduling leaves all historical effort unchanged');
+ const undone=(await command({type:'history.undo'})).state;
+ check(ids.every(id=>undone.tasks.find(t=>t.id===id).dueAt===original.tasks.find(t=>t.id===id).dueAt),'One undo restores the entire dependent deadline change');
+ await command({type:'history.redo'});
+ await run(main,`document.querySelector('[data-outline-id="${ids[1]}"]').click()`);
+ await until(()=>run(main,`document.querySelector('.dependency-editor')?.textContent.includes('依赖验证：准备材料')`),'Predecessor not shown in details');
+ check(await run(main,`document.querySelector('[data-outline-id="${ids[1]}"]').textContent.includes('等待前置')`),'Task tree distinguishes work waiting for a prerequisite');
+ await run(main,`document.querySelector('[data-outline-id="${ids[1]}"] .row-start').click()`);
+ await until(async()=>(await snapshot()).timers.some(t=>t.taskId===ids[1]&&!t.paused),'Waiting task could not start early');
+ check(await run(main,`document.body.textContent.includes('前置事项尚未完成')`),'Starting early reminds without blocking the timer');
+ const timer=(await snapshot()).timers.find(t=>t.taskId===ids[1]);await command({type:'focus.stop',payload:{sessionId:timer.sessionId}});
+ await run(main,`(()=>{const e=document.querySelector('[aria-label="依赖截止安排"]');Object.getOwnPropertyDescriptor(HTMLSelectElement.prototype,'value').set.call(e,'fixed');e.dispatchEvent(new Event('change',{bubbles:true}));})()`);
+ await until(()=>run(main,`!![...document.querySelectorAll('.dependency-editor button')].find(b=>b.textContent==='保存依赖')`),'Fixed deadline draft did not open');
+ await click('保存依赖',`document.querySelector('.dependency-editor')`);
+ await until(async()=>(await snapshot()).state.tasks.find(t=>t.id===ids[1]).dependencyPlan.mode==='fixed','Fixed deadline did not persist');
+ await command({type:'outline.patch',payload:{id:ids[0],field:'dueAt',value:'2026-11-20'}});
+ check((await snapshot()).state.tasks.find(t=>t.id===ids[1]).dueAt==='2026-11-14','Fixed deadline remains unchanged after its prerequisite moves');
+ await until(()=>run(main,`document.querySelector('.dependency-editor')?.textContent.includes('固定截止早于前置安排')`),'Fixed deadline conflict missing');
+ await run(main,`window.journalAppearance.set({theme:'light',motion:'reduce'})`);await wait(50);
+ fs.writeFileSync(path.join(output,'dependencies-fixed-light.png'),(await main.webContents.capturePage()).toPNG());
+};
