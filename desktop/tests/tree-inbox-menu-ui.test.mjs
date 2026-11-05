@@ -42,7 +42,7 @@ test('outline menu portals out of clipped panes, clamps to the viewport and keep
 test('Inbox is a dedicated view with pending organization count and return to tasks',async()=>{
  const h=await appDom();try{
   const task=h.add('待整理事项'),note=addKind(h,'待整理笔记','inbox','note'),child=h.add('保留嵌套',task),outside=h.add('范围外事项',null);
-  await h.mount();await h.click(h.label('收件箱'));const page=h.query('.inbox-page'),list=h.label('收件箱内容');assert.match(page.textContent,/2 条待整理/);assert.match(list.textContent,/待整理事项/);assert.match(list.textContent,/待整理笔记/);assert.doesNotMatch(list.textContent,/保留嵌套|范围外事项/);assert.match(list.textContent,/事项/);assert.match(list.textContent,/笔记/);
+  await h.mount();await h.click(h.label('收件箱'));const page=h.query('.inbox-page'),list=h.label('收件箱内容');assert.match(page.textContent,/2 条待澄清/);assert.match(list.textContent,/待整理事项/);assert.match(list.textContent,/待整理笔记/);assert.doesNotMatch(list.textContent,/保留嵌套|范围外事项/);assert.match(list.textContent,/事项/);assert.match(list.textContent,/笔记/);
   await h.click(h.label('任务'));assert.ok(row(outside));assert.ok(row(task));assert.ok(row(child));assert.equal(row(note),null);assert.equal(h.get(child).parentId,task);
  }finally{await h.close();}
 });
@@ -66,6 +66,6 @@ test('native Inbox request takes priority over stale locate and never recreates 
 
 test('organizing an Inbox item into a group preserves its identity and makes it visible in that task scope',async()=>{
  const h=await appDom();try{
-  const item=h.add('收件箱内容'),group=addKind(h,'另一个范围',null,'group');await h.mount();await h.click(h.label('收件箱'));assert.equal(h.label('收件箱条目名称').value,'收件箱内容');await h.input(h.label('归属分组'),group);await h.click(h.button('保存并下一条'));assert.equal(h.get(item).parentId,group);assert.match(h.query('.inbox-page').textContent,/整理完成/);await h.click(h.label('任务'));assert.ok(row(item));
+  const item=h.add('收件箱内容'),group=addKind(h,'另一个范围',null,'group');await h.mount();await h.click(h.label('收件箱'));assert.equal(h.label('收件箱条目名称').value,'收件箱内容');await h.input(h.label('归属分组'),group);await h.click(h.button('保存并下一条'));assert.equal(h.get(item).parentId,group);assert.match(h.query('.inbox-page').textContent,/没有待澄清内容/);await h.click(h.label('任务'));assert.ok(row(item));
  }finally{await h.close();}
 });
