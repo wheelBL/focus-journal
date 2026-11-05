@@ -123,7 +123,7 @@ test('follow-up keeps ordered requests and answers, clears sent text, and makes 
 test('scope changes explain the new conversation and prevent applying a prior scope proposal',async()=>{
  const mock=conversationBridge(),h=await aiDom(mock.bridge);try{
   await h.render('AiAssistant',{onClose(){},onSettings(){}});await h.input(h.label('给 AI 的问题'),'今日事项');await h.click(h.button('生成建议'));assert.ok(h.label('确认应用 明确事项名称'));await h.input(h.label('AI 分析范围'),'recent');assert.match(h.query('.ai-scope-change').textContent,/开始新对话.*不发送上一范围/);assert.equal(document.querySelector('[aria-label="确认应用 明确事项名称"]'),null);assert.equal(mock.calls.apply.length,0);
-  await h.click(h.button('安排审视'));assert.match(h.label('给 AI 的问题').value,/item-review.configure.*item-review.defer/);assert.match(h.label('给 AI 的问题').value,/不要创建.*收件箱任务/);await h.click(h.button('生成建议'));assert.equal(mock.calls.generate.at(-1).scope.kind,'recent');assert.equal(document.querySelectorAll('.ai-turn').length,1);assert.doesNotMatch(h.query('.ai-transcript').textContent,/回答：今日事项/);assert.match(h.query('.ai-conversation-notice').textContent,/上一范围的对话不会发送/);
+  await h.click(h.button('安排审视'));assert.match(h.label('给 AI 的问题').value,/个人计划.*外部承诺.*移除旧截止.*设置回顾日/);assert.match(h.label('给 AI 的问题').value,/保留任务与已有投入.*不要另建回顾任务/);await h.click(h.button('生成建议'));assert.equal(mock.calls.generate.at(-1).scope.kind,'recent');assert.equal(document.querySelectorAll('.ai-turn').length,1);assert.doesNotMatch(h.query('.ai-transcript').textContent,/回答：今日事项/);assert.match(h.query('.ai-conversation-notice').textContent,/上一范围的对话不会发送/);
  }finally{await h.close();}
 });
 

@@ -50,3 +50,15 @@ test('full review flow isolates scope, distinguishes browsing from review, and p
   });
  }finally{await h.close();}
 });
+
+test('past review dates request neutral reconsideration without task overdue pressure and remain directly reachable from Today',async()=>{
+ const h=await appDom();try{
+ const id=h.add('截止已失效，稍后重新判断',null,{dueAt:'2026-10-10'}),real=h.add('真实外部截止',null,{dueAt:'2026-10-18'});
+ h.service.execute({type:'outline.patch',payload:{id,field:'dueAt',value:null}});h.service.execute({type:'item-review.configure',payload:{id,enabled:true,nextDate:'2026-10-17',interval:{unit:'once',count:1}}});window.sessionStorage.setItem('review-tab','effort');
+ await h.mount();assert.match(h.label('待回顾事项').textContent,/1 项需要重新判断/);assert.equal(h.get(id).status,'open');assert.equal(h.get(id).completedAt,null);assert.equal(h.service.snapshot().state.itemReviews.length,0);
+ await h.input(h.label('查看日期'),'2026-10-18');assert.equal(document.querySelector('[aria-label="待回顾事项"]'),null);await h.input(h.label('查看日期'),'2026-10-19');h.clock.advance(86400000);await h.command({type:'task.select',payload:{id}});assert.match(h.label('待回顾事项').textContent,/1 项需要重新判断/);
+ await h.click(h.label('打开需要重新判断的事项'));assert.equal(h.query('[data-review-tab="items"]').getAttribute('aria-selected'),'true');assert.match(h.query('.review-date-meaning').textContent,/回顾日是重新判断安排的日期，不是完成期限/);assert.equal(document.querySelectorAll('.review-queue>button').length,1);assert.match(h.query('.review-current-top').textContent,/需要重新判断/);assert.equal(h.query(`[data-outline-id="${id}"]`).classList.contains('row-overdue'),false);assert.equal(h.query('.task-inspector').querySelector('.overdue'),null);assert.match(h.query('.regular-review-settings summary').textContent,/需要重新判断/);
+ await h.click(h.button('稍后审视'));await h.click(h.button('明天再看'));assert.equal(h.get(id).dueAt,null);assert.equal(h.get(id).status,'open');assert.equal(h.service.snapshot().state.itemReviews.length,0);await h.click(h.label('今日'));assert.equal(document.querySelector('[aria-label="待回顾事项"]'),null);
+ await h.click(h.label('任务'));assert.equal(h.query(`[data-outline-id="${real}"]`).classList.contains('row-overdue'),true);assert.equal(h.query(`[data-outline-id="${id}"]`).classList.contains('row-overdue'),false);
+ }finally{await h.close();}
+});

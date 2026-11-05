@@ -83,3 +83,5 @@ test('review intent is cleared by explicit cancellation and latest recurrence ov
  const previous=[{id:'one',scope:{kind:'all' as const},prompt:'安排审视，每两周一次',phase:'done' as const,text:'',error:null,context:null,suggestions:[]}];
  assert.equal(reviewIntent('取消之前的要求',previous).focusReview,false);assert.equal(reviewIntent('算了',previous).focusReview,false);assert.equal(reviewIntent('请帮我新建一个普通任务',previous).focusReview,false);assert.deepEqual(reviewIntent('不用每周，改成每月',previous).interval,{unit:'months',count:1});assert.deepEqual(reviewIntent('改成只这一次',previous).interval,{unit:'once',count:1});assert.deepEqual(reviewIntent('今天，先安排一次。',previous).interval,{unit:'once',count:1});
 });
+
+test('review wording distinguishes task reconsideration from effort reflection and negation',()=>{for(const text of ['回顾投入','回顾本周投入记录','番茄复盘','不要回顾这项任务'])assert.equal(reviewIntent(text,[]).focusReview,false,text);for(const text of ['重新判断这项任务','下周回顾这项任务是否还值得做'])assert.equal(reviewIntent(text,[]).focusReview,true,text);});

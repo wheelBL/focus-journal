@@ -13,7 +13,9 @@ export function validateReviewSchedule(value:unknown):ReviewSchedule {
  return structuredClone(v);
 }
 export function reviewQueue(state:JournalState,today:string,mode:'due'|'upcoming'|'all'='due'):Task[]{
- const index=outlineIndex(state),items=state.tasks.filter(t=>t.status==='open'&&t.reviewSchedule?.enabled&&t.reviewSchedule.nextDate&&!outlinePath(index,t.id).some(n=>(n.record as Task).deletedAt)&&(mode==='all'||(mode==='due'?t.reviewSchedule.nextDate<=today:t.reviewSchedule.nextDate>today)));
+ const index=outlineIndex(state),hidden=new Set<string>();
+ for(const node of index.ordered){const task=node.record as Task;if(task.deletedAt||task.archived||node.parentId&&hidden.has(node.parentId))hidden.add(node.id);}
+ const items=state.tasks.filter(t=>t.status==='open'&&t.reviewSchedule?.enabled&&t.reviewSchedule.nextDate&&!hidden.has(t.id)&&(mode==='all'||(mode==='due'?t.reviewSchedule.nextDate<=today:t.reviewSchedule.nextDate>today)));
  const ids=new Set(items.map(t=>t.id)),groups=new Map<string,Task[]>();
  for(const item of items){const root=outlinePath(index,item.id).find(n=>ids.has(n.id))!.id;const group=groups.get(root)??[];group.push(item);groups.set(root,group);}
  const order=new Map(index.ordered.map((n,i)=>[n.id,i]));

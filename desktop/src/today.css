@@ -24,3 +24,5 @@
 @media(max-width:640px){.today-progress-row{grid-template-columns:48px minmax(0,1fr) auto;gap:8px}.today-progress-row>.subtle{grid-column:2/-1;justify-self:start}.today-now,.today-plan,.today-progress{padding:12px}.today-now .focus-area{grid-template-columns:minmax(0,1fr)}.today-now .focus-actions{flex-direction:row;flex-wrap:wrap}.today-now .task-title-row{flex-wrap:wrap}}
 
 .today-now .task-card:before{display:none}
+
+.today-review-entry{display:flex;align-items:center;flex-wrap:wrap;gap:4px 12px;margin:4px 0 12px;color:var(--muted);font-size:12px}.today-review-entry button{font-size:12px;min-height:28px;padding:3px 6px}
