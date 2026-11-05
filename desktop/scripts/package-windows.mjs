@@ -44,6 +44,7 @@ try{
       copyFileSync(path.join(root,'scripts/ai-conversation-smoke.cjs'),path.join(stage,'qa-ai-conversation.cjs'));
       copyFileSync(path.join(root,'scripts/inbox-delete-smoke.cjs'),path.join(stage,'qa-inbox-delete.cjs'));
       copyFileSync(path.join(root,'scripts/dependencies-smoke.cjs'),path.join(stage,'qa-dependencies.cjs'));
+      copyFileSync(path.join(root,'scripts/ai-repair-smoke.cjs'),path.join(stage,'qa-ai-repair.cjs'));
       copyFileSync(path.join(root,'scripts/ai-priorities-smoke.cjs'),path.join(stage,'qa-ai-priorities.cjs'));
       copyFileSync(path.join(root,'scripts/ai-models-smoke.cjs'),path.join(stage,'qa-ai-models.cjs'));
       writeFileSync(path.join(stage,'qa-start.cjs'),`require('./qa-release-smoke.cjs')(${JSON.stringify(dataDir)},${JSON.stringify(path.join(root,`qa-evidence/release-${pkg.version}`))},${JSON.stringify(pkg.version)});\n`,{flag:'a'});

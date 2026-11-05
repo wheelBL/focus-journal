@@ -26,6 +26,7 @@ export const controlCommands:Record<string,Definition>={
  'outline.patch':define('修改单个字段；保持其他内容。项目是 isProject 标记。',{id,field:choice('title','description','isProject','plannedDate','dueAt','estimateMinutes','itemType'),value:{type:['string','number','boolean','null']}},['id','field','value']),
  'outline.move':define('原子移动整支，保留身份、投入和历史。',{id,targetId:nullable(id),position:choice('inside','before','after','root')},['id','targetId','position']),
  'item.focus':{...define('加入当前重点并持续到结束或移除；省略 date 表示今天，未来日期到期生效，null 移除并保留重点日期。',{id,date},['id']),map:(p,s)=>({type:'item.focus',payload:{...p,date:p.date===undefined?localDate(s.now):p.date}})},
+ 'task.plan':define('原子设置计划开始与截止；date 必须为 YYYY-MM-DD 或 null，省略 dueAt 保留原截止，null 清除截止；可同时开启 review 审视安排。',{id,date:{type:['string','null'],minLength:10,maxLength:10},dueAt:date,review:obj({nextDate:{...str(10),minLength:10},interval:obj({unit:choice('once','days','weeks','months'),count:num(1,120)},['unit','count'])},['nextDate'])},['id','date']),
  'task.status':define('完成、取消或重新打开；如有未完成子项，需显式指定 children。',{id,completionBy:choice('self','other','shared','unknown'),status:choice('open','done','cancelled'),children:choice('done','cancelled')},['id','status']),
  'item.change':define('暂停、恢复、移入回收站或从回收站恢复。整支删除需要 confirmBranch:true。',{id,action:choice('pause','resume','delete','restore'),confirmBranch:bool},['id','action']),
  'tag.attach':define('为事项添加自定义标签。',{id,name:str(80)},['id','name']),

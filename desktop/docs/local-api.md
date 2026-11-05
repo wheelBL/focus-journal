@@ -47,6 +47,7 @@
 | `item.create` | `{"title":"参考资料","itemType":"note","parentId":"父项ID"}` |
 | `item.create` | `{"title":"团队交流","itemType":"event","eventAt":"2026-10-21T14:00:00+08:00","eventEnd":"2026-10-21T15:00:00+08:00"}` |
 | `outline.patch` | `{"id":"事项ID","field":"description","value":"补充说明"}` |
+| `task.plan` | `{"id":"事项ID","date":"2026-11-06","dueAt":"2026-11-07"}`，原子调整计划和截止 |
 | `outline.move` | `{"id":"事项ID","targetId":"父项ID","position":"inside"}` |
 | `item.focus` | `{"id":"事项ID"}`（今天）；`{"id":"事项ID","date":null}`（取消） |
 | `tag.attach` / `tag.detach` | `{"id":"事项ID","name":"标签"}` / `{"id":"事项ID","tagId":"标签ID"}` |
@@ -69,6 +70,8 @@
 | `break.start` / `break.finish` / `break.continue` / `break.stop` | `{}`（开始休息可传 sessionId） |
 
 从 0.36.0 起，`item.create` 默认使用自动去向：省略 parentId 时，任务、笔记进入当前有效收件箱，事件、分组放到最外层；明确的 parentId（含 null）继续生效。可传 `destination:"inbox"` 明确稍后整理，或 `destination:"unfiled"` 直接保存到最外层，这两种明确选择覆盖 parentId 和 parentQuery。自动模式可传 `parentQuery` 指定唯一归属路径，它优先于 parentId；路径不存在或重名时拒绝保存。显式收件箱不可用时拒绝保存，不偷偷改去向。旧记录不会自动搬动。
+
+`task.plan` 的 `date` 必填（本地 `YYYY-MM-DD` 或 `null`），省略 `dueAt` 保留旧截止，显式 `null` 清除；两项日期按最终组合验证，一次提交、一次撤销，并保留既有依赖日期联动。可同时传 `review:{nextDate:"2026-11-09"}` 开启事项审视，日期必须为今天或未来；省略 `interval` 保留已有周期，否则默认为单次。这不是标记已审视或补记投入。
 
 项目是事项的 `isProject` 标记，使用 `outline.patch` 设置；没有另一个项目类型。名称按正文保存，不隐式解析日期语义。笔记和分组没有计时、截止或完成状态。分组可以嵌套任意层并承载子项；历史直接投入保留，不能新增分组投入。
 

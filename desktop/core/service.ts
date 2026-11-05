@@ -278,6 +278,7 @@ export class JournalService {
         case 'task.plan': {
           const task=this.task(s,p.id);requireAction(task);const planned=p.date?day(p.date):null;const before=task.plannedDate;
           if(p.dueAt!==undefined)task.dueAt=p.dueAt?deadline(p.dueAt):null;validateSchedule({...task,plannedDate:planned});
+          if(p.review!==undefined){const review=p.review;if(!review||typeof review!=='object'||Array.isArray(review)||Object.keys(review).some(k=>!['nextDate','interval'].includes(k))||!Object.hasOwn(review,'nextDate'))throw new Error('审视安排无效，请填写审视日期。');if(task.status!=='open'||task.deletedAt||task.archived)throw new Error('请先重新打开或恢复事项，再开启审视。');const input=review as {nextDate:unknown;interval?:unknown},nextDate=day(input.nextDate);if(nextDate<localDate(now))throw new Error('审视请选择今天或之后的日期。');if(input.interval!==undefined&&(!input.interval||typeof input.interval!=='object'||Array.isArray(input.interval)||Object.keys(input.interval).sort().join(',')!=='count,unit'))throw new Error('审视周期无效。');task.reviewSchedule=validateReviewSchedule({enabled:true,nextDate,interval:input.interval??task.reviewSchedule?.interval??{unit:'once',count:1},lastReviewedAt:task.reviewSchedule?.lastReviewedAt??null});}
           if(before!==planned) {task.plannedDate=planned;s.notes.push({id:randomUUID(),kind:'migration',taskId:task.id,text:`${task.title}：计划开始 ${before??'未设置'} → ${planned??'未设置'}${p.reason?` · ${text(p.reason)}`:''}`,createdAt:now});}break;
         }
         case 'task.status': {

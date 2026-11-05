@@ -38,13 +38,17 @@ module.exports=(dataDir,output,expectedVersion)=>{
    check((await run(main,'window.journalAppearance.get()')).theme==='dark','Restart preserves device appearance');
    await until(()=>run(main,`document.documentElement.dataset.theme==='dark'`),'Restart dark theme missing');
    check(await run(main,`JSON.parse(localStorage.getItem('journal.shortcuts.v1'))['search-current']==='Primary+G'`),'Restart preserves custom keyboard settings');
+   main.setContentSize(1024,640);
    await run(main,`document.querySelector('.top-navigation [aria-label="任务"]').click()`);
    await until(()=>run(main,`!!document.querySelector('[aria-label="在事项树中搜索"]')`),'Restart task search missing');
+   await until(()=>run(main,`(()=>{const e=document.querySelector('[aria-label="在事项树中搜索"]'),r=e.getBoundingClientRect();return r.width>0&&r.height>0&&r.left>=0&&r.right<=innerWidth})()`),'Restart narrow task search is hidden');
+   check(true,'Narrow task layout keeps current-list search visible');
    main.focus();main.webContents.focus();
    await until(()=>run(main,'document.hasFocus()'),'Restart native window focus missing');
    await run(main,'new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(()=>resolve(true))))');
    main.webContents.sendInputEvent({type:'keyDown',keyCode:'G',modifiers:['control']});main.webContents.sendInputEvent({type:'keyUp',keyCode:'G',modifiers:['control']});
    await until(()=>run(main,`document.activeElement===document.querySelector('[aria-label="在事项树中搜索"]')`),'Restart activates configured current-list shortcut');
+   fs.writeFileSync(path.join(output,'restart-narrow-search.png'),(await main.webContents.capturePage()).toPNG());
    check(true,'Restart activates configured current-list shortcut');finished=true;return;
   }
   for(const timer of before.timers)await run(main,`window.journal.command({type:'focus.stop',payload:{sessionId:${JSON.stringify(timer.sessionId)}}})`);
@@ -213,6 +217,7 @@ module.exports=(dataDir,output,expectedVersion)=>{
   await require('./qa-ai-conversation.cjs')({main,run,until,check,wait,output});
   await require('./qa-inbox-delete.cjs')({main,run,until,check,wait,output});
   await require('./qa-dependencies.cjs')({main,run,until,check,wait,output});
+  await require('./qa-ai-repair.cjs')({main,run,until,check,wait,output});
   await require('./qa-ai-priorities.cjs')({main,run,until,check,wait,output});
   await require('./qa-ai-models.cjs')({main,run,until,check,wait,output});
   await run(main,`window.journalAppearance.set({theme:'dark',motion:'reduce'})`);

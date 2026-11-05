@@ -27,6 +27,11 @@ module.exports=async({main,run,until,check,wait,output})=>{
  await nav('任务');await until(()=>run(main,`!!document.querySelector('[aria-label="在事项树中搜索"]')`),'Task search did not return');
  await press('K');await press('F');check(await focused('搜索任务和笔记'),'Old current-search binding stops after rebinding');
  await press('G');check(await focused('在事项树中搜索'),'New current-search binding works immediately');
+ main.setSize(1024,640);await wait(100);
+ await until(()=>run(main,`(()=>{const input=document.querySelector('[aria-label="在事项树中搜索"]'),r=input?.getBoundingClientRect();return !!r&&r.width>0&&r.height>0;})()`),'Narrow task search is hidden');
+ await press('K');await press('G');check(await focused('在事项树中搜索'),'Narrow native window keeps the current-list search visible and focuses its configured shortcut');
+ check(await run(main,`(()=>{const header=document.querySelector('.tree-page-header'),r=header.getBoundingClientRect();return [...header.querySelectorAll('input,button')].every(el=>{const b=el.getBoundingClientRect();return b.width===0||b.left>=r.left-1&&b.right<=r.right+1;});})()`),'Narrow task header wraps search and actions without horizontal overflow');
+ main.setBounds(original);await wait(70);
  const id=await run(main,`window.journal.command({type:'task.save',payload:{title:'QA撤销原名',parentId:null}}).then(s=>s.commandResult.createdItemIds[0])`);
  await run(main,`window.journal.command({type:'outline.patch',payload:{id:${JSON.stringify(id)},field:'title',value:'QA撤销改名'}})`);
  await nav('今日');await run(main,`document.activeElement?.blur()`);await press('Z');
