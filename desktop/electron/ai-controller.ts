@@ -7,7 +7,7 @@ import {chatCompletion} from './ai-transport';
 import {AiAssistantService} from '../core/ai-assistant-service';
 import {AiError,type AiSettingsInput} from '../core/ai-types';
 import type {JournalService} from '../core/service';
-import type {AiScope} from '../core/ai-assistant-types';
+import type {AiScope,AiPurpose} from '../core/ai-assistant-types';
 import {aiOperationResult,operationFailure,type OperationResult} from '../core/usage-types';
 
 /** Main-window-only capability. No credentials or arbitrary commands enter renderer space. */
@@ -30,7 +30,7 @@ export class AiController {
   handle('ai:configure',(input:AiSettingsInput)=>{idle();return this.settings.configure(input);});
   handle('ai:clear-key',()=>{idle();return this.settings.clearKey();});
   handle('ai:test',async()=>{idle();const abort=new AbortController();this.testAbort=abort;try{return await this.settings.test({signal:abort.signal,fetch});}finally{if(this.testAbort===abort)this.testAbort=null;}});
-  handle('ai:context',(scope:AiScope)=>this.assistant.context(scope));
+  handle('ai:context',(scope:AiScope,purpose?:AiPurpose)=>this.assistant.context(scope,purpose));
   handle('ai:get',()=>this.assistant.get());
   handle('ai:generate',input=>{if(this.testAbort)throw new AiError('busy','连接正在测试，请稍候。');return this.assistant.generate(input);});
   handle('ai:reset',()=>this.assistant.reset());

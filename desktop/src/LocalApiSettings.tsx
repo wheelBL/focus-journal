@@ -12,7 +12,7 @@ export function LocalApiSettings(){
  const apply=(s:LocalApiStatus)=>{setStatus(s);setEnabled(s.enabled);setPort(String(s.port));setAccess(s.access);};
  const readStatus=()=>action.perform(()=>api.localApi!.status(),apply);
  useEffect(()=>{if(api.localApi)void readStatus();},[]);
- return <section className="settings-section" id="settings-api"><h2>AI 与本机 API</h2><p>让这台电脑上的 AI 或脚本查询事项、管理今日重点、控制计时、补记投入和同步数据。应用运行时可用，收起到托盘后仍可调用。</p>
+ return <section className="settings-section" id="settings-api"><h2>AI 与本机 API</h2><p>让这台电脑上的 AI 或脚本查询事项、管理当前重点、控制计时、补记投入和同步数据。应用运行时可用，收起到托盘后仍可调用。</p>
  {!api.localApi?<p className="muted">此功能在 Windows 桌面版中提供。</p>:<>
  <form aria-busy={busy} onSubmit={e=>{e.preventDefault();setMessage('');void action.perform(()=>api.localApi!.configure({enabled,port:Number(port),access}),s=>{apply(s);setToken('');setMessage(s.running?'本机 API 已启用':s.enabled?'本机 API 未能启动，请查看下方原因。':'本机 API 已关闭');});}}><fieldset disabled={busy||!status} className="settings-fields local-api-form">
  <label className="local-api-enable"><input type="checkbox" aria-label="启用本机 API" checked={enabled} onChange={e=>setEnabled(e.target.checked)}/>启用本机 API</label>

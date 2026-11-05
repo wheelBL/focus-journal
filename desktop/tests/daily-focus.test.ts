@@ -1,3 +1,7 @@
+import {mkdtempSync,readdirSync,rmSync} from 'node:fs';
+import path from 'node:path';
+import {DatabaseSync} from 'node:sqlite';
+import {SqliteJournalStore} from '../core/store';
 import {test} from 'node:test';
 import assert from 'node:assert/strict';
 import {JournalService} from '../core/service';
@@ -26,8 +30,8 @@ test('daily intention leads automatic siblings and ancestor branches without cha
   const roots=index.children.get(null)!.filter(n=>n.id!=='inbox');
   assert.deepEqual(order.sorted(roots).map(n=>n.id),[parent,urgent]);
   assert.deepEqual(order.sorted(index.children.get(parent)!).map(n=>n.id),[nested,other]);
-  assert.match(order.reason(parent),/因子项「今天要推进」已加入今日重点/);
-  assert.equal(order.reason(focus),'已加入今日重点');
+  assert.match(order.reason(parent),/因子项「今天要推进」已加入当前重点/);
+  assert.equal(order.reason(focus),'已加入当前重点');
   assert.deepEqual(itemSorter(index,'manual',snapshot.now)(roots).map(n=>n.id),[urgent,parent]);
   assert.deepEqual(itemSorter(index,'due',snapshot.now)(roots).map(n=>n.id),[urgent,parent]);
   assert.equal(s.exportJson(),before);assert.equal(snapshot.state.tasks.find(t=>t.id===focus)!.plannedDate,'2026-11-01');
@@ -35,7 +39,7 @@ test('daily intention leads automatic siblings and ancestor branches without cha
  }finally{s.shutdown();}
 });
 
-test('same focus priority uses deadline then plan, undo/removal restores natural order and yesterday never remains promoted',()=>{
+test('same focus priority uses deadline then plan, undo/removal restores natural order and focus persists across days',()=>{
  const {s,clock,add,pin,patch}=setup();try{
   const early=add('早到期'),late=add('晚到期'),plain=add('无日期');
   patch(early,'dueAt','2026-10-20');patch(late,'dueAt','2026-10-22');pin(late);pin(plain);pin(early);
@@ -43,12 +47,12 @@ test('same focus priority uses deadline then plan, undo/removal restores natural
   assert.deepEqual(ids(),[early,late,plain]);pin(plain,null);assert.deepEqual(ids(),[early,late,plain]);
   s.execute({type:'organize.undo'});assert.equal(s.snapshot().state.tasks.find(t=>t.id===plain)!.focusDate,'2026-10-19');
   clock.time=Date.parse('2026-10-20T00:00:00');
-  assert.equal(dailyFocusItems(outlineIndex(s.snapshot().state),localDate(s.snapshot().now)).length,0);
+  assert.equal(dailyFocusItems(outlineIndex(s.snapshot().state),localDate(s.snapshot().now)).length,3);
   assert.deepEqual(ids(),[early,late,plain]);assert.equal(s.snapshot().state.tasks.find(t=>t.id===plain)!.focusDate,'2026-10-19');
  }finally{s.shutdown();}
 });
 
-test('closed or inherited-paused focuses cannot promote branches; daily panel retains paused and completed progress',()=>{
+test('closed or inherited-paused focuses cannot promote branches; current focus retains paused but excludes completed',()=>{
  const {s,add,pin,patch}=setup();try{
   const urgent=add('急事'),parent=add('暂停分支'),child=add('暂停重点',parent),done=add('完成重点');
   patch(urgent,'dueAt','2026-10-18');pin(child);pin(done);
@@ -56,25 +60,29 @@ test('closed or inherited-paused focuses cannot promote branches; daily panel re
   let snap=s.snapshot(),index=outlineIndex(snap.state),order=itemOrdering(index,'smart',snap.now);
   assert.equal(order.sorted(index.children.get(null)!).filter(n=>n.id!=='inbox')[0].id,urgent);
   assert.doesNotMatch(order.reason(parent),/重点/);assert.equal(isDailyFocus(snap.state.tasks.find(t=>t.id===done)!,'2026-10-19'),false);
-  assert.deepEqual(new Set(dailyFocusItems(index,'2026-10-19').map(t=>t.id)),new Set([child,done]));
+  assert.deepEqual(new Set(dailyFocusItems(index,'2026-10-19').map(t=>t.id)),new Set([child]));
   s.execute({type:'item.change',payload:{id:parent,action:'delete',confirmBranch:true}});
-  assert.deepEqual(dailyFocusItems(outlineIndex(s.snapshot().state),'2026-10-19').map(t=>t.id),[done]);
+  assert.deepEqual(dailyFocusItems(outlineIndex(s.snapshot().state),'2026-10-19').map(t=>t.id),[]);
  }finally{s.shutdown();}
 });
 
 test('focus rule uses the shared dynamic date filter, preserves saved views and excludes empty ancestors after completion',()=>{
  const {s,clock,add,pin}=setup();try{
   const parent=add('层级路径'),id=add('本日重点',parent),old=add('昨日重点');pin(id);pin(old,'2026-10-18');
-  const filter=withRules(emptyFilter(),group([condition('status','is','open'),condition('focusDate','period','today')]));
+  const filter=withRules(emptyFilter(),group([condition('status','is','open'),condition('focusActive','is',true)]));
   assert.equal(hasTodayFocusRule(filter),true);validateFilter(filter,s.snapshot().state);
   s.execute({type:'view.save',payload:{name:'我的重点',filter}});
   let snap=s.snapshot(),result=filterOutline(snap.state,filter,snap.now);
-  assert.deepEqual([...result.matches],[id]);assert.deepEqual(new Set(result.keep),new Set([id,parent]));
+  assert.deepEqual(new Set(result.matches),new Set([id,old]));assert.deepEqual(new Set(result.keep),new Set([id,parent,old]));
   s.execute({type:'task.status',payload:{id, status:'done'}});
-  snap=s.snapshot();assert.equal(filterOutline(snap.state,filter,snap.now).keep.size,0);
+  snap=s.snapshot();assert.deepEqual([...filterOutline(snap.state,filter,snap.now).matches],[old]);
   const saved=s.snapshot().state.views[0];assert.deepEqual(saved.filter.rules,filter.rules);
   const copy=new JournalService(new Store(),clock);try{copy.importJson(s.exportJson());assert.deepEqual(copy.snapshot().state.views[0],saved);}finally{copy.shutdown();}
   clock.time=Date.parse('2026-10-20T00:00:00');const next=add('第二天重点');pin(next,'2026-10-20');
-  snap=s.snapshot();assert.deepEqual([...filterOutline(snap.state,saved.filter,snap.now).matches],[next]);
+  snap=s.snapshot();assert.deepEqual(new Set(filterOutline(snap.state,saved.filter,snap.now).matches),new Set([old,next]));
  }finally{s.shutdown();}
 });
+
+test('current focus persists across days, removal keeps history, close and undo are explicit',()=>{const {s,clock,add,pin}=setup(),id=add('重点');pin(id);clock.time=Date.parse('2026-10-21T10:00:00');let task=s.snapshot().state.tasks.find(t=>t.id===id)!;assert.equal(isDailyFocus(task,'2026-10-21'),true);assert.equal(isDailyFocus(task,'2026-10-18'),false);pin(id,'2026-10-18');task=s.snapshot().state.tasks.find(t=>t.id===id)!;assert.equal(isDailyFocus(task,'2026-10-19'),true);const added=add('稍后标记');pin(added,'2026-10-18');assert.equal(isDailyFocus(s.snapshot().state.tasks.find(t=>t.id===added)!,'2026-10-19'),false);pin(id,null);task=s.snapshot().state.tasks.find(t=>t.id===id)!;assert.equal(task.focusDate,'2026-10-18');assert.equal(isDailyFocus(task,'2026-10-21'),false);pin(id,'2026-10-21');s.execute({type:'task.status',payload:{id,status:'done'}});assert.equal(s.snapshot().state.tasks.find(t=>t.id===id)!.focusActive,undefined);s.execute({type:'history.undo'});assert.equal(s.snapshot().state.tasks.find(t=>t.id===id)!.focusActive,true);s.execute({type:'task.status',payload:{id,status:'done'}});s.execute({type:'task.status',payload:{id,status:'open'}});task=s.snapshot().state.tasks.find(t=>t.id===id)!;assert.equal(task.focusActive,undefined);assert.equal(task.focusDate,'2026-10-21');});
+test('future focus begins only on its specified date and date filter remains historical',()=>{const {s,add,pin}=setup(),id=add('未来');pin(id,'2026-10-21');let snap=s.snapshot();const task=snap.state.tasks.find(t=>t.id===id)!;assert.equal(isDailyFocus(task,'2026-10-19'),false);assert.equal(isDailyFocus(task,'2026-10-21'),true);const filter=withRules(emptyFilter(),group([condition('focusDate','period','today')]));assert.equal(hasTodayFocusRule(filter),false);assert.equal(filterOutline(snap.state,filter,snap.now).matches.has(id),false);assert.equal(filterOutline(snap.state,filter,'2026-10-21T12:00:00').matches.has(id),true);});
+test('schema 23 to 24 backs up and migrates only still valid focus from upgrade day',()=>{const dir=mkdtempSync(path.resolve('qa-data/current-focus-migration-'));try{const fixture=setup(),today=fixture.add('当天'),old=fixture.add('旧日'),done=fixture.add('已完成'),parent=fixture.add('归档父级'),hidden=fixture.add('隐藏重点',parent);const state=fixture.s.snapshot().state;for(const t of state.tasks){if([today,done,hidden].includes(t.id))t.focusDate='2026-10-19';if(t.id===old)t.focusDate='2026-10-18';if(t.id===done){t.status='done';t.completedAt='2026-10-19T06:00:00.000Z';}if(t.id===parent)t.archived=true;}state.schemaVersion=23;const file=path.join(dir,'journal.sqlite'),store=new SqliteJournalStore(file);store.save(state);store.close();const service=new JournalService(new SqliteJournalStore(file),fixture.clock);const migrated=service.snapshot().state;assert.equal(migrated.schemaVersion,24);assert.equal(migrated.tasks.find(t=>t.id===today)!.focusActive,true);for(const id of [old,done,hidden])assert.equal(migrated.tasks.find(t=>t.id===id)!.focusActive,undefined);assert.deepEqual(migrated.tasks.map(t=>t.focusDate),state.tasks.map(t=>t.focusDate));service.shutdown();const backup=readdirSync(path.join(dir,'backups')).find(x=>x.startsWith('before-schema-23-to-24-'));assert.ok(backup);const db=new DatabaseSync(path.join(dir,'backups',backup),{readOnly:true});try{assert.equal((db.prepare('PRAGMA user_version').get() as {user_version:number}).user_version,23);}finally{db.close();fixture.s.shutdown();}}finally{rmSync(dir,{recursive:true,force:true});}});

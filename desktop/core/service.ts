@@ -44,7 +44,7 @@ export class JournalService {
   private history:HistoryEntry[]=[];
   private redoHistory:HistoryEntry[]=[];
   constructor(private store: JournalStore,private clock: WorkClock=realClock,public demo=false,private appVersion='development') {
-    const loaded=store.load();this.state=migrateOutline(loaded);validateDependencyGraph(this.state);
+    const loaded=store.load();this.state=migrateOutline(loaded,localDate(clock.now()));validateDependencyGraph(this.state);
     if(JSON.stringify(loaded)!==JSON.stringify(this.state))store.save(this.state);
     this.anchor=clock.monotonic(); this.checkpointAt=clock.monotonic();
     // A stopped host is not evidence of continued work. Keep the last durable checkpoint.
@@ -73,6 +73,7 @@ export class JournalService {
   private commit(change:(state:JournalState,now:string)=>void,command?:Command) {
     const at=this.clock.monotonic(),now=this.iso();
     const draft=this.live(at,now);change(draft,now);generateTaskSuccessors(this.state,draft,now);ensureOutlineFields(draft);assertOutline(draft);reconcileDependencies(this.state,draft,{skipPropagation:!!command&&(['history.undo','history.redo','item.undo','organize.undo','outline.undo'].includes(command.type))});syncProjectOwnership(draft);
+    for(const task of draft.tasks)if(task.status!=='open'||task.deletedAt||task.archived||!isTask(task)){delete task.focusActive;delete task.focusStartedOn;}
     for(const task of draft.tasks)if((task.status!=='open'&&task.status!=='handed-off'||task.deletedAt||task.archived)&&task.reminder){task.reminder.state='dismissed';task.reminder.snoozedUntil=null;}
     for(const task of draft.tasks)if(task.status!=='open'&&task.reviewSchedule?.enabled){task.reviewSchedule.enabled=false;task.reviewSchedule.nextDate=null;}
     const oldTasks=new Map(this.state.tasks.map(t=>[t.id,t]));
@@ -171,7 +172,7 @@ export class JournalService {
         case 'items.batch': {applyBatch(s,p,now);break;}
         case 'calendar.save': {saveCalendarSelection(s,p,now);break;}
         case 'capture.create': {const item=createCapture(s,p,now);if(p.start===true){requireAction(item);this.startSession(s,{taskId:item.id,skipEstimate:true,mode:p.mode},now);}break;}
-        case 'item.focus': {const task=this.task(s,p.id);requireAction(task);if(task.status!=='open'||task.deletedAt)throw new Error('请选择未完成事项。');task.focusDate=p.date?day(p.date):null;break;}
+        case 'item.focus': {const task=this.task(s,p.id);requireAction(task);if(task.status!=='open'||task.deletedAt)throw new Error('请选择未完成事项。');if(p.date===null){delete task.focusActive;delete task.focusStartedOn;}else{task.focusDate=p.date===undefined?localDate(now):day(p.date);task.focusStartedOn??=localDate(now);task.focusActive=true;}break;}
         case 'recurrence.set': {configureRecurrence(this.task(s,p.id),p.rule,now);break;}
         case 'event.save': {const task=this.task(s,p.id);if(!isEvent(task))throw new Error('请选择事件。');task.eventAt=deadline(p.at);task.eventEnd=p.end?instant(p.end):null;if(task.recurrence){task.recurrence.anchor=localDay(task.eventAt);if(task.recurrence.until&&task.recurrence.until<task.recurrence.anchor)throw new Error('事件日期晚于重复结束日，请先调整重复范围。');if(task.reminder&&task.recurrence.reminderOffsetMs!==undefined)task.reminder={at:new Date(Date.parse(task.eventAt.length===10?`${task.eventAt}T00:00:00`:task.eventAt)+task.recurrence.reminderOffsetMs).toISOString(),state:'scheduled',snoozedUntil:null};}break;}
         case 'item-reminder.set': {const task=this.task(s,p.id);setItemReminder(task,p.at);if(isTask(task)&&!task.ownership&&task.reminderRecurrence){if(!task.reminder)task.reminderRecurrence=null;else{task.reminderRecurrence.anchor=localDay(task.reminder.at);validateRecurrence(task.reminderRecurrence);}}if(task.recurrence&&isReminder(task)&&task.reminder){task.recurrence.anchor=localDay(task.reminder.at);validateRecurrence(task.recurrence);}if(task.recurrence&&isEvent(task)){delete task.recurrence.reminderOffsetMs;if(task.reminder)configureRecurrence(task,task.recurrence,now);}break;}
@@ -471,7 +472,7 @@ export class JournalService {
 export function parseJournalBackup(content:string):JournalState {
   let parsed:unknown;try{parsed=JSON.parse(content);}catch{throw new Error('文件不是有效 JSON。');}
   const data=parsed as {format?:string;version?:number;state?:JournalState};
-  if(!data||data.format!=='focus-journal'||![1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23].includes(data.version??0)||!data.state)throw new Error('这不是支持的专注记备份。');
+  if(!data||data.format!=='focus-journal'||![1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23,24].includes(data.version??0)||!data.state)throw new Error('这不是支持的专注记备份。');
   if(data.version!==data.state.schemaVersion)throw new Error('备份版本不一致。');validateState(data.state);const migrated=migrateOutline(data.state);validateDependencyGraph(migrated);return migrated;
 }
 function validateState(s:JournalState) {
@@ -479,7 +480,7 @@ function validateState(s:JournalState) {
   const bool=(v:unknown)=>{if(typeof v!=='boolean')invalid();};
   const stamp=(v:unknown)=>{if(instant(v)!==v)invalid();};
   const nullableStamp=(v:unknown)=>{if(v!==null)stamp(v);};
-  if(!s||typeof s!=='object'||![1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23].includes(s.schemaVersion))throw new Error('备份版本不受支持。');
+  if(!s||typeof s!=='object'||![1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23,24].includes(s.schemaVersion))throw new Error('备份版本不受支持。');
   for(const k of ['projects','tasks','sessions','notes','estimates','reviews','audit'] as const){
     if(!Array.isArray(s[k])||s[k].length>100000)invalid();
     const ids=new Set();
@@ -493,7 +494,7 @@ function validateState(s:JournalState) {
   if(s.schemaVersion<13&&!s.projects.some(p=>p.id==='inbox'&&!p.archived))invalid();
   for(const p of s.projects){required(p.name);text(p.description);bool(p.archived);stamp(p.createdAt);}
   for(const t of s.tasks){
-    if(t.dependencyPlan!==undefined&&s.schemaVersion<23)invalid();
+    if(t.dependencyPlan!==undefined&&s.schemaVersion<23)invalid();if(t.focusActive!==undefined&&(s.schemaVersion<24||typeof t.focusActive!=='boolean'||t.focusActive&&(!isTask(t)||t.status!=='open'||!!t.deletedAt||!!t.archived||!t.focusDate)))invalid();if(t.focusStartedOn!==undefined){if(s.schemaVersion<24||!t.focusActive)invalid();day(t.focusStartedOn);}
     if(t.status==='handed-off'&&s.schemaVersion<19)invalid();validateOwnership(t);if(t.ownership)validateItemReminder(t.ownership.reminder);if(s.schemaVersion>=19&&t.status==='open'&&t.ownership)invalid();
     required(t.title);text(t.outcome);text(t.nextAction);
     if(isReminder(t)&&s.schemaVersion<22&&!t.reminderHistory)invalid();if(t.reminderRecurrence!==undefined&&t.reminderRecurrence!==null){if(s.schemaVersion<22||!isTask(t)||!t.reminder||t.reminderRecurrence.mode!=='calendar'||t.reminderRecurrence.reminderOffsetMs!==undefined)invalid();validateRecurrence(t.reminderRecurrence);}

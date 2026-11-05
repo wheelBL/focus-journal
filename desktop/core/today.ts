@@ -1,3 +1,4 @@
+import {isDailyFocus} from './daily-focus';
 import {isInformation} from './item-kind';
 import {blockedReason} from './item-state';
 import {itemSorter} from './item-order';
@@ -11,9 +12,9 @@ export function todayCandidates(state:JournalState,now:string){
  const active=new Set(state.sessions.filter(s=>s.status!=='ended').map(s=>s.taskId));
  const leaves=eligible.filter(t=>!active.has(t.id)&&!(index.children.get(t.id)??[]).some(n=>!(n.record as Task).deletedAt&&!(n.record as Task).archived));
  const worked=new Set(state.sessions.map(s=>s.taskId));
- const available=leaves.filter(t=>!t.plannedDate||t.plannedDate<=date||t.focusDate===date);
+ const available=leaves.filter(t=>(!t.plannedDate||t.plannedDate<=date||isDailyFocus(t,date))&&!t.dependencyPlan?.predecessors.some(e=>(index.nodes.get(e.id)?.record as Task|undefined)?.status!=='done'));
  const selected=eligible.find(t=>t.id===state.settings.selectedTaskId&&!active.has(t.id));
- const next=selected??(!active.size?(available.find(t=>t.focusDate===date)??available.find(t=>t.plannedDate===date||isDeadlineOverdue(t.dueAt,now))??available.find(t=>worked.has(t.id))??available.find(t=>!t.isProject)):undefined);
+ const next=selected??(!active.size?(available.find(t=>isDailyFocus(t,date))??available.find(t=>t.plannedDate===date||isDeadlineOverdue(t.dueAt,now))??available.find(t=>worked.has(t.id))??available.find(t=>!t.isProject)):undefined);
  return {index,eligible,available,next};
 }
 

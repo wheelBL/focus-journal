@@ -47,3 +47,6 @@
 .ai-compose .ai-context{padding:6px 9px}.ai-compose .ai-prompts button{min-height:25px}.ai-compose textarea{min-height:64px;height:76px;max-height:104px}.ai-compose-actions>small{min-width:0;flex:1}.ai-compose-actions>button{flex:none}
 @media(max-height:720px){.modal:has(>.ai-assistant){padding-bottom:12px}.modal.wide:has(>.ai-assistant)>header{padding-block:10px;margin-bottom:8px}.ai-assistant>.ai-intro{display:none}.modal>.ai-assistant{gap:8px}.ai-compose-context{max-height:126px;gap:5px}.ai-compose textarea{min-height:56px;height:60px;max-height:80px}.ai-compose-actions{flex-wrap:nowrap}.ai-compose-actions small{font-size:10px}}
 @media(max-width:620px){.modal:has(>.ai-assistant){padding-inline:14px}.ai-compose-context .ai-context summary span{display:inline;margin-left:6px}.ai-compose-context{max-height:148px}.ai-conversation-actions{gap:5px}.ai-conversation-actions .actions{gap:2px}.ai-conversation-actions button{font-size:11px;padding-inline:5px}}
+
+.ai-history-limit{flex:none;font-size:11px;line-height:1.4;color:var(--muted)}
+.ai-assistant>.field{flex:none;margin:0;flex-direction:row;align-items:center;gap:10px}.ai-assistant>.field select{flex:1;width:auto;min-width:0}

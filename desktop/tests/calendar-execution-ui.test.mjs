@@ -27,7 +27,7 @@ test('Today execution comes before history; focus selection starts work directly
  const h=await appDom();try{
   const id=h.add('今天推进'),other=h.add('另一件待做');for(const [start,end] of [['09:00','09:10'],['09:20','09:30']])h.service.execute({type:'calendar.save',payload:{mode:'effort',taskId:id,start:`2026-10-19T${start}`,end:`2026-10-19T${end}`}});
   await h.mount();assert.ok(h.query('.today-execution-grid').compareDocumentPosition(h.query('.today-history'))&window.Node.DOCUMENT_POSITION_FOLLOWING);assert.equal(document.querySelectorAll(`[data-progress-id="${id}"]`).length,1);assert.match(h.query(`[data-progress-id="${id}"]`).textContent,/20 分钟/);assert.equal(document.querySelectorAll('.session-entry').length,2);
-  await h.click(h.button('选择重点'));await h.click(h.label('加入今日重点 今天推进',h.query('.today-focus-picker')));await h.click(h.label('开始计时 今天推进',h.query('.today-focus-list')));assert.equal(h.service.snapshot().timers[0].taskId,id);
+  await h.click(h.button('选择重点'));await h.click(h.label('加入当前重点 今天推进',h.query('.today-focus-picker')));await h.click(h.label('开始计时 今天推进',h.query('.today-focus-list')));assert.equal(h.service.snapshot().timers[0].taskId,id);
   await h.command({type:'focus.pause',payload:{taskId:id}});await h.click(h.label('恢复计时 今天推进',h.query('.today-focus-list')));assert.equal(h.service.snapshot().timers[0].paused,false);
   await h.command({type:'focus.stop',payload:{taskId:id,complete:true}});assert.match(h.query(`[data-progress-id="${id}"]`).textContent,/已完成/);await h.click(h.label('任务'));assert.equal(document.querySelector(`[data-outline-id="${id}"]`),null);assert.ok(h.query(`[data-outline-id="${other}"]`));
  }finally{await h.close();}

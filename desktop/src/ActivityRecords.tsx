@@ -7,7 +7,7 @@ import {api} from './api';
 import {Button,Field,Modal,useWorkspaceJournal} from './ui';
 const sourceLabels={user:'本人操作',ai:'AI 建议后确认',api:'API',sync:'同步',system:'系统'};
 const value=(v:unknown)=>v===null||v===undefined?'未设置':typeof v==='object'?JSON.stringify(v,null,2):String(v);
-const fieldLabels:Record<string,string>={itemType:'内容类型',relatedTaskIds:'关联任务',reminderRecurrence:'提醒重复安排',ownership:'责任安排',completionBy:'完成归属',status:'结束状态',dueAt:'截止时间',plannedDate:'计划开始',title:'名称',description:'说明',parentId:'父项',order:'顺序',focusDate:'今日重点',created:'创建',sessions:'投入',deletedSessions:'已删除投入',estimates:'剩余估计',reviews:'复盘',itemReviews:'事项审视',tagIds:'标签',availability:'执行安排',reminder:'提醒',reviewSchedule:'审视安排',recurrence:'重复',completedAt:'实际完成'};
+const fieldLabels:Record<string,string>={itemType:'内容类型',relatedTaskIds:'关联任务',reminderRecurrence:'提醒重复安排',ownership:'责任安排',completionBy:'完成归属',status:'结束状态',dueAt:'截止时间',plannedDate:'计划开始',title:'名称',description:'说明',parentId:'父项',order:'顺序',focusDate:'重点日期',focusActive:'当前重点',created:'创建',sessions:'投入',deletedSessions:'已删除投入',estimates:'剩余估计',reviews:'复盘',itemReviews:'事项审视',tagIds:'标签',availability:'执行安排',reminder:'提醒',reviewSchedule:'审视安排',recurrence:'重复',completedAt:'实际完成'};
 
 export function ActivityRecords(){
  const {data,notify}=useWorkspaceJournal(),[kind,setKind]=useState('business'),[source,setSource]=useState('all'),[item,setItem]=useState('all'),[start,setStart]=useState(''),[end,setEnd]=useState(''),[operation,setOperation]=useState(''),[limit,setLimit]=useState(50);

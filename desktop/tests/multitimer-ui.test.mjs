@@ -57,7 +57,7 @@ test('full app concurrent timers keep tree, Today, dock and summaries synchroniz
   });
   await t.test('an unestimated item can start another timer; the expandable dock controls its own entries',async()=>{
    // Selecting another pending task while a timer is running exposes the normal estimate flow.
-   await click(button('选择重点'));await click(label('加入今日重点 练习',query('.today-focus-picker')));
+   await click(button('选择重点'));await click(label('加入当前重点 练习',query('.today-focus-picker')));
    await click(label('开始计时 练习',query('.today-focus-list')));assert.equal(service.snapshot().state.tasks.find(t=>t.id===c).estimateMinutes,null);
    assert.equal(service.snapshot().timers.length,2);assert.match(query('.toast[role=status]').textContent,/每次只做一件事情/);
    await click(label('日历'));await click(label('管理所有计时器'));assert.equal(document.querySelectorAll('.dock-timer-row').length,2);

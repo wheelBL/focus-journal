@@ -1,7 +1,7 @@
 import {randomUUID} from 'node:crypto';
 import type {Command,JournalState} from './types';
 import type {BusinessActivity} from './activity';
-const taskFields=['dependencyPlan','title','description','itemType','relatedTaskIds','reminderRecurrence','parentId','order','isProject','status','completedAt','completionBy','ownership','plannedDate','dueAt','focusDate','availability','deletedAt','tagIds','reminder','reviewSchedule','recurrence','eventAt','eventEnd','estimateMinutes'] as const;
+const taskFields=['focusStartedOn','focusActive','dependencyPlan','title','description','itemType','relatedTaskIds','reminderRecurrence','parentId','order','isProject','status','completedAt','completionBy','ownership','plannedDate','dueAt','focusDate','availability','deletedAt','tagIds','reminder','reviewSchedule','recurrence','eventAt','eventEnd','estimateMinutes'] as const;
 export function appendActivity(before:JournalState,after:JournalState,command:Command,at:string){
  if(['task.select','activity.import'].includes(command.type)||command.type.startsWith('usage.'))return;
  const changes:BusinessActivity['changes']=[];

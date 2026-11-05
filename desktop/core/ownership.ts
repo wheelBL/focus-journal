@@ -17,7 +17,7 @@ export function changeOwnership(s:JournalState,p:Record<string,unknown>,now:stri
   if(remindAt&&!followUp)throw Error('请先选择继续跟进，再设置跟进时间。');
   const sessions=s.sessions.filter(r=>r.taskId===id&&r.status!=='ended');if(sessions.length&&p.confirmTimers!==true)throw Error('交接会结束并保存选中事项的计时，请确认。');
   for(const r of sessions){r.status='ended';r.end=now;r.updatedAt=now;}
-  t.ownership={assignee:required(p.assignee,120),followUp,at,note:text(p.note??'',2000),reminder:remindAt?{at:remindAt,state:'scheduled',snoozedUntil:null}:null};t.status='handed-off';t.completedAt=null;t.focusDate=null;delete t.completionBy;validateOwnership(t);
+  t.ownership={assignee:required(p.assignee,120),followUp,at,note:text(p.note??'',2000),reminder:remindAt?{at:remindAt,state:'scheduled',snoozedUntil:null}:null};t.status='handed-off';t.completedAt=null;delete t.completionBy;validateOwnership(t);
  }
 }
 export function setCompletion(t:Task,p:Record<string,unknown>,now:string){

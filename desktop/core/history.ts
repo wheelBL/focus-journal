@@ -5,7 +5,7 @@ import {assertParentAvailable,openDescendants,outlineIndex} from './outline';
 import {blockedReason} from './item-state';
 
 // Only business fields are reversible. Clock, effort, activity and audit records stay live.
-const fields: (keyof Task)[]=['dependencyPlan','title','description','relatedTaskIds','itemType','eventAt','eventEnd','focusDate','isProject','archived','availability','deletedAt','reviewSchedule','reminder','tagIds','outcome','nextAction','parentId','order','reminderRecurrence','recurrence','recurrenceNextId','recurrencePreviousId','estimateMinutes','plannedDate','dueAt','status','completedAt','ownership','completionBy','reminderHistory','groupHistory'];
+const fields: (keyof Task)[]=['focusStartedOn','focusActive','dependencyPlan','title','description','relatedTaskIds','itemType','eventAt','eventEnd','focusDate','isProject','archived','availability','deletedAt','reviewSchedule','reminder','tagIds','outcome','nextAction','parentId','order','reminderRecurrence','recurrence','recurrenceNextId','recurrencePreviousId','estimateMinutes','plannedDate','dueAt','status','completedAt','ownership','completionBy','reminderHistory','groupHistory'];
 const same=(a:unknown,b:unknown)=>JSON.stringify(a)===JSON.stringify(b);
 const clone=<T>(v:T):T=>structuredClone(v);
 type Change={id:string;key:keyof Task;before:unknown;after:unknown};

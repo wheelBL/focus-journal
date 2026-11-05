@@ -25,7 +25,7 @@ export const controlCommands:Record<string,Definition>={
  'item.create':{...define('原子创建事项、笔记或事件，可同时设置标签、计划和提醒；不自动计时。',itemFields,['title']),map:p=>({type:'capture.create',payload:{destination:p.destination??'auto',...p.parentId!==undefined?{parentId:p.parentId}:{},draft:{title:p.title,description:'',itemType:'task',tagNames:[],parentQuery:null,plannedDate:null,dueAt:null,estimateMinutes:null,remindAt:null,eventAt:null,eventEnd:null,...p}}})},
  'outline.patch':define('修改单个字段；保持其他内容。项目是 isProject 标记。',{id,field:choice('title','description','isProject','plannedDate','dueAt','estimateMinutes','itemType'),value:{type:['string','number','boolean','null']}},['id','field','value']),
  'outline.move':define('原子移动整支，保留身份、投入和历史。',{id,targetId:nullable(id),position:choice('inside','before','after','root')},['id','targetId','position']),
- 'item.focus':{...define('加入指定日期的重点；省略 date 表示今天，null 表示取消。',{id,date},['id']),map:(p,s)=>({type:'item.focus',payload:{...p,date:p.date===undefined?localDate(s.now):p.date}})},
+ 'item.focus':{...define('加入当前重点并持续到结束或移除；省略 date 表示今天，未来日期到期生效，null 移除并保留重点日期。',{id,date},['id']),map:(p,s)=>({type:'item.focus',payload:{...p,date:p.date===undefined?localDate(s.now):p.date}})},
  'task.status':define('完成、取消或重新打开；如有未完成子项，需显式指定 children。',{id,completionBy:choice('self','other','shared','unknown'),status:choice('open','done','cancelled'),children:choice('done','cancelled')},['id','status']),
  'item.change':define('暂停、恢复、移入回收站或从回收站恢复。整支删除需要 confirmBranch:true。',{id,action:choice('pause','resume','delete','restore'),confirmBranch:bool},['id','action']),
  'tag.attach':define('为事项添加自定义标签。',{id,name:str(80)},['id','name']),
@@ -93,7 +93,7 @@ export function controlOpenApi(baseUrl:string){
  const syncPost=(summary:string,schema:Schema)=>({summary,parameters:writeHeaders,requestBody:{required:true,content:{'application/json':{schema}}},responses:{202:{description:'已接受异步操作，返回 data.operation.id 和 data.operationUrl。轮询操作 URL 直到 state=finished；result.phase 才表示同步结果。'},400:response,403:response,409:response,412:response,428:response}});
  return {openapi:'3.1.0',info:{title:'专注记本机控制 API',version:'1.0.0',description:'仅本机。先读取 revision，再写入；写操作必须携带 If-Match 与唯一 Idempotency-Key。'},servers:[{url:baseUrl}],security:[{bearerAuth:[]}],components:{securitySchemes:{bearerAuth:{type:'http',scheme:'bearer'}},schemas:{Command:{oneOf:Object.entries(controlCommands).map(([type,d])=>({...obj({type:{const:type} as Schema,payload:d.payload},['type','payload']),description:d.description}))}}},paths:{
   '/status':{get:get('当前时间、修订号和接口能力')},
-  '/items':{get:{...get('分页事项列表；默认未完成，支持 query、status、focus=today、scopeId、viewId、offset、limit'),parameters:['query','status','focus','scopeId','viewId','offset','limit'].map(name=>({name,in:'query',schema:{type:'string'}}))}},
+  '/items':{get:{...get('分页事项列表；默认未完成，支持 query、status、focus=current（today 为兼容别名）、scopeId、viewId、offset、limit'),parameters:['query','status','focus','scopeId','viewId','offset','limit'].map(name=>({name,in:'query',schema:{type:'string'}}))}},
   '/items/{id}':{get:{...get('事项详情、父级路径、直接子项、实际投入、估计与复盘'),parameters:[{name:'id',in:'path',required:true,schema:{type:'string'}}]}},
   '/items/query':{post:{summary:'按应用的完整筛选模型查询；只读，不修改数据。',requestBody:{required:true,content:{'application/json':{schema:obj({filter:{type:'object'},offset:num(),limit:num(1,200)},['filter'])}}},responses:{200:response}}},
   '/timers':{get:get('当前计时器和休息状态')},

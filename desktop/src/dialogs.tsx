@@ -36,7 +36,7 @@ export default function Dialogs({spec}:{spec:DialogSpec}){
  const {data,dialog,navigate}=useJournal();
  if(spec.type==='handoff')return <OwnershipDialog id={spec.id!} entry={spec.entry}/>;
  if(spec.type==='completion')return <CompletionDialog id={spec.id!}/>;
- if(spec.type==='ai')return <AiAssistant itemId={spec.id} onClose={()=>dialog(null)} onSettings={()=>{dialog(null);requestSettingsSection('ai');navigate('settings');}}/>;
+ if(spec.type==='ai')return <AiAssistant itemId={spec.id} initialPurpose={spec.purpose} onClose={()=>dialog(null)} onSettings={()=>{dialog(null);requestSettingsSection('ai');navigate('settings');}}/>;
  if(spec.type==='timer-start')return <SessionStartDialog id={spec.id!}/>;
  if(spec.type==='discard-effort')return <DiscardEffortDialog id={spec.id!}/>;
  if(spec.type==='deleted-effort')return <DeletedEffortDialog close={()=>dialog(null)}/>;

@@ -24,7 +24,7 @@
 | `GET /status` | 当前时间、本地日期、时区、版本、权限和支持的命令说明 |
 | `GET /items` | 事项列表，默认未完成；只返回实际匹配项，父级路径不会冒充结果 |
 | `GET /items?status=all&query=周报` | 搜索所有状态及笔记、事件；status 可选 open/done/cancelled/handed-off/all |
-| `GET /items?focus=today` | 今日重点；重点日期与计划开始、截止时间独立 |
+| `GET /items?focus=current` | 当前重点；未完成时跨日保留，`focus=today` 为兼容别名，历史重点日期仍可用 `focusDate` 规则查询 |
 | `GET /items?scopeId=<id>` | 指定事项及其后代范围 |
 | `GET /items?viewId=<id>` | 使用保存视图的完整条件，包括动态日期 |
 | `GET /items/<id>` | 详情、父级路径、直接子项 ID、投入、估计及复盘 |

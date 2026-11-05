@@ -1,10 +1,11 @@
 export type Id = string;
-export const JOURNAL_SCHEMA_VERSION=23;
+export const JOURNAL_SCHEMA_VERSION=24;
 export interface Project { id: Id; name: string; description: string; archived: boolean; createdAt: string; parentId?: Id | null; order?: number }
 export type DependencyOffset={unit:'days'|'milliseconds';value:number};
 export type DependencyPlan={mode:'follow'|'fixed';predecessors:{id:Id;offset:DependencyOffset|null}[]};
 export interface Task {
   dependencyPlan?:DependencyPlan;
+  focusActive?:boolean; focusStartedOn?:string;
   reminderHistory?:{reminderRecurrence?:Recurrence|null;estimateMinutes:number|null;plannedDate:string|null;dueAt:string|null;focusDate:string|null;reviewSchedule:ReviewSchedule|null;reminder:ItemReminder|null;recurrence:Recurrence|null;isProject:boolean};
   groupHistory?:{initialEstimateMinutes:number|null;reminder:ItemReminder|null;reviewSchedule:ReviewSchedule|null};
   ownership?:import('./activity').Ownership|null;completionBy?:import('./activity').CompletionBy;
@@ -40,7 +41,7 @@ export interface RestCycle {id:string;phase:'offered'|'running'|'ready';sessionI
 export interface InboxReviewSettings {enabled:boolean;time:string;pendingDate:string|null;lastHandledDate:string|null;snoozedUntil:string|null}
 export interface Settings { inboxReview?:InboxReviewSettings; rest?:RestCycle|null; reminders?:ReminderSettings; targetMinutes: number; breakMinutes: number; selectedTaskId: Id | null; breakUntil: string | null }
 export interface Tag { id: Id; name: string }
-export type FilterField = 'responsibility'|'assignee'|'completionBy'|'handedOffAt'|'focusDate'|'itemType'|'status'|'availability'|'plannedDate'|'dueAt'|'completedAt'|'tags'|'title'|'description'|'isProject'|'estimateMinutes'|'actualMinutes'|'scope'|'actionable';
+export type FilterField = 'responsibility'|'assignee'|'completionBy'|'handedOffAt'|'focusDate'|'focusActive'|'itemType'|'status'|'availability'|'plannedDate'|'dueAt'|'completedAt'|'tags'|'title'|'description'|'isProject'|'estimateMinutes'|'actualMinutes'|'scope'|'actionable';
 export type FilterOperator = 'is'|'is-not'|'before'|'after'|'period'|'between'|'set'|'unset'|'all'|'any'|'none'|'contains'|'not-contains'|'greater'|'less';
 export type DateAnchor = 'now'|'today'|'tomorrow'|'week-start'|'next-week'|'month-start'|'next-month';
 export type DatePoint = {kind:'relative';anchor:DateAnchor;days?:number}|{kind:'fixed';date:string};
@@ -52,7 +53,7 @@ export type FilterRule = FilterCondition|FilterGroup;
 export interface ItemFilter { trash?:boolean; view: 'all'|'actions'|'unplanned'|'done'; query: string; showDone: boolean; scopeId: Id|null; tagIds: Id[]; tagMode: 'all'|'any'; planned: 'any'|'today'|'through-today'|'unplanned'; completed: 'any'|'today'|'this-week'; due: 'any'|'today'|'this-week'|'overdue'; projectsOnly: boolean; rules?:FilterGroup; sort?:'smart'|'manual'|'due'|'planned'|'title'|'created' }
 export interface SavedView { id: Id; name: string; filter: ItemFilter }
 export interface JournalState {
-  schemaVersion: 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10 | 11 | 12 | 13 | 14 | 15 | 16 | 17 | 18 | 19 | 20 | 21 | 22 | 23; activities?:import('./activity').BusinessActivity[];itemReviews:ItemReviewLog[]; moves:MoveRecord[]; tags: Tag[]; views: SavedView[]; projects: Project[]; tasks: Task[]; sessions: Session[]; deletedSessions:DeletedSession[]; notes: Note[];
+  schemaVersion: 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10 | 11 | 12 | 13 | 14 | 15 | 16 | 17 | 18 | 19 | 20 | 21 | 22 | 23 | 24; activities?:import('./activity').BusinessActivity[];itemReviews:ItemReviewLog[]; moves:MoveRecord[]; tags: Tag[]; views: SavedView[]; projects: Project[]; tasks: Task[]; sessions: Session[]; deletedSessions:DeletedSession[]; notes: Note[];
   estimates: Estimate[]; reviews: Review[]; audit: Audit[]; settings: Settings;
 }
 export interface TimerView { sessionId: Id; taskId: Id | null; durationMs: number; targetMinutes: number; targetOffsetMs?:number; paused: boolean; recovered: boolean }

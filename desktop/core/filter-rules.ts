@@ -1,10 +1,11 @@
+import {isDailyFocus} from './daily-focus';
 import {isInformation,isGroup} from './item-kind';
 import {blockedReason} from './item-state';
 import {deadlineTime} from './deadlines';
 import {localDate,shiftDate,type DatePoint,type FilterCondition,type FilterField,type FilterGroup,type FilterOperator,type FilterRule,type ItemFilter,type JournalState,type Task} from './types';
 import {outlinePath,branchIds,type OutlineIndex} from './outline';
 
-export const fieldLabels:Record<FilterField,string>={responsibility:'责任安排',assignee:'接手人',completionBy:'完成归属',handedOffAt:'交接日期',focusDate:'重点日期',itemType:'条目类型',status:'结束状态',availability:'可执行情况',plannedDate:'计划开始',dueAt:'截止时间',completedAt:'实际完成',tags:'标签',title:'名称',description:'说明',isProject:'项目标记',estimateMinutes:'原始估计（分钟）',actualMinutes:'实际投入（本项分钟）',scope:'所属范围（含后代）',actionable:'可执行'};
+export const fieldLabels:Record<FilterField,string>={responsibility:'责任安排',assignee:'接手人',completionBy:'完成归属',handedOffAt:'交接日期',focusDate:'重点日期',focusActive:'当前重点',itemType:'条目类型',status:'结束状态',availability:'可执行情况',plannedDate:'计划开始',dueAt:'截止时间',completedAt:'实际完成',tags:'标签',title:'名称',description:'说明',isProject:'项目标记',estimateMinutes:'原始估计（分钟）',actualMinutes:'实际投入（本项分钟）',scope:'所属范围（含后代）',actionable:'可执行'};
 export const operatorLabels:Record<FilterOperator,string>={is:'是','is-not':'不是',before:'早于',after:'晚于',period:'处于',between:'介于',set:'已设置',unset:'未设置',all:'包含全部',any:'包含任一',none:'不包含',contains:'包含','not-contains':'不包含',greater:'大于',less:'小于'};
 export const anchorLabels={now:'此刻',today:'今天零点',tomorrow:'明天零点','week-start':'本周一零点','next-week':'下周一零点','month-start':'本月一日零点','next-month':'下月一日零点'};
 export const periodLabels={today:'今天','this-week':'本周','next-7-days':'未来 7 天（含今天）','this-month':'本月'};
@@ -24,7 +25,7 @@ export function defaultCondition(field:FilterField,op=operators(field)[0]):Filte
  if(isDateField(field))return op==='period'?condition(field,op,'today'):condition(field,op,relative('today'),op==='between'?relative('tomorrow'):undefined);
  if(field==='tags')return condition(field,op,[]);
  if(field==='estimateMinutes'||field==='actualMinutes')return condition(field,op,0,op==='between'?60:undefined);
- return condition(field,op,field==='responsibility'?'self':field==='completionBy'?'self':field==='itemType'?'task':field==='status'?'open':field==='availability'?'active':['isProject','actionable'].includes(field)?true:'');
+ return condition(field,op,field==='responsibility'?'self':field==='completionBy'?'self':field==='itemType'?'task':field==='status'?'open':field==='availability'?'active':['isProject','actionable','focusActive'].includes(field)?true:'');
 }
 
 export function datePointTime(point:DatePoint,now:string):number{
@@ -93,7 +94,7 @@ export function allowsStatus(rule:FilterRule,status:Task['status']):boolean{
 }
 export function hasRuleField(rule:FilterRule,field:FilterField):boolean{return rule.kind==='group'?rule.children.some(c=>hasRuleField(c,field)):rule.field===field;}
 export function hasTodayFocusRule(f:ItemFilter):boolean{
- const r=rulesFor(f);return r.mode==='all'&&r.children.some(c=>c.kind==='condition'&&c.field==='focusDate'&&c.op==='period'&&c.value==='today');
+ const r=rulesFor(f);return r.mode==='all'&&r.children.some(c=>c.kind==='condition'&&c.field==='focusActive'&&c.op==='is'&&c.value===true);
 }
 export function simpleStatusValue(rules:FilterCondition[]):string{
  const status=rules.filter(c=>c.field==='status');
@@ -144,7 +145,7 @@ export function validateRules(value:unknown,state:JournalState):FilterGroup{
   else if(r.field==='responsibility')valid=['self','handed-off','following'].includes(r.value as string);
   else if(r.field==='completionBy')valid=['self','other','shared','unknown'].includes(r.value as string);
   else if(r.field==='availability')valid=['active','paused'].includes(r.value as string);
-  else if(r.field==='isProject'||r.field==='actionable')valid=typeof r.value==='boolean';
+  else if(r.field==='isProject'||r.field==='actionable'||r.field==='focusActive')valid=typeof r.value==='boolean';
   else if(r.field==='scope')valid=state.tasks.some(t=>t.id===r.value)||state.schemaVersion<13&&r.value==='inbox';
   else if(r.field==='estimateMinutes'||r.field==='actualMinutes')valid=typeof r.value==='number'&&Number.isFinite(r.value)&&r.value>=0&&(r.op!=='between'||typeof r.end==='number'&&Number.isFinite(r.end)&&r.end>=r.value);
   else valid=typeof r.value==='string'&&r.value.trim().length>0&&r.value.length<=120;
@@ -158,9 +159,9 @@ export function validateRules(value:unknown,state:JournalState):FilterGroup{
 export function matchesRules(r:FilterRule,t:Task,index:OutlineIndex,now:string):boolean{
  if(r.kind==='group')return r.mode==='all'?r.children.every(c=>matchesRules(c,t,index,now)):r.children.some(c=>matchesRules(c,t,index,now));
  const field=r.field;
- if(isGroup(t)&&['status','availability','plannedDate','dueAt','completedAt','focusDate','estimateMinutes','actualMinutes','responsibility','assignee','completionBy','handedOffAt','actionable'].includes(field))return false;
+ if(isGroup(t)&&['status','availability','plannedDate','dueAt','completedAt','focusDate','focusActive','estimateMinutes','actualMinutes','responsibility','assignee','completionBy','handedOffAt','actionable'].includes(field))return false;
  if(isInformation(t)&&field==='status')return r.op==='is-not';
- if(isInformation(t)&&['plannedDate','dueAt','completedAt','focusDate','status','availability','estimateMinutes','actualMinutes'].includes(field))return false;
+ if(isInformation(t)&&['plannedDate','dueAt','completedAt','focusDate','focusActive','status','availability','estimateMinutes','actualMinutes'].includes(field))return false;
  if(isDateField(field)){
   const value=field==='handedOffAt'?t.ownership?.at:t[field as 'plannedDate'|'dueAt'|'completedAt'|'focusDate'];if(r.op==='set')return !!value;if(r.op==='unset')return !value;if(!value)return false;
   const time=field==='dueAt'?deadlineTime(value):Date.parse(value.length===10?`${value}T00:00:00`:value);
@@ -182,7 +183,7 @@ export function matchesRules(r:FilterRule,t:Task,index:OutlineIndex,now:string):
   return r.op==='contains'?value.includes(text):!value.includes(text);
  }
  if(field==='completionBy'&&t.status!=='done')return false;
- const actual=field==='responsibility'?(t.ownership?t.ownership.followUp?'following':'handed-off':'self'):field==='completionBy'?(t.completionBy??'unknown'):field==='itemType'?(t.itemType??'task'):field==='status'?t.status:field==='availability'?(outlinePath(index,t.id).some(n=>(n.record as Task).availability==='paused')?'paused':'active'):field==='isProject'?!!t.isProject:field==='scope'?branchIds(index,String(r.value)).has(t.id):!t.ownership&&!blockedReason(index,t.id)&&!(t.dependencyPlan?.predecessors.some(e=>(index.nodes.get(e.id)?.record as Task|undefined)?.status!=='done'));
+ const actual=field==='responsibility'?(t.ownership?t.ownership.followUp?'following':'handed-off':'self'):field==='completionBy'?(t.completionBy??'unknown'):field==='itemType'?(t.itemType??'task'):field==='status'?t.status:field==='availability'?(outlinePath(index,t.id).some(n=>(n.record as Task).availability==='paused')?'paused':'active'):field==='focusActive'?isDailyFocus(t,localDate(now)):field==='isProject'?!!t.isProject:field==='scope'?branchIds(index,String(r.value)).has(t.id):!t.ownership&&!blockedReason(index,t.id)&&!(t.dependencyPlan?.predecessors.some(e=>(index.nodes.get(e.id)?.record as Task|undefined)?.status!=='done'));
  const expected=field==='scope'?true:r.value;return r.op==='is'?actual===expected:actual!==expected;
 }
 

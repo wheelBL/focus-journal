@@ -81,7 +81,7 @@ export function generateTaskSuccessors(before:JournalState,after:JournalState,no
   while(parent){const p=after.tasks.find(t=>t.id===parent);if(!p||p.status!=='open'||p.deletedAt||p.archived)parent=p?.parentId??null;else break;}
   const successor:Task={...structuredClone(task),id,parentId:parent,order:task.order??0,status:'open',ownership:null,completionBy:undefined,startedAt:null,completedAt:null,createdAt:now,updatedAt:now,deletedAt:null,focusDate:null,reviewSchedule:null,recurrencePreviousId:task.id,recurrenceNextId:null,plannedDate:shiftOccurrence(task.plannedDate,offset),dueAt:shiftOccurrence(task.dueAt,offset),reminder:task.reminder?{at:shiftOccurrence(task.reminder.at,offset)!,state:'scheduled',snoozedUntil:null}:null};
   // Fixed monthly/yearly anchors remain the original day (Jan 31 → Feb 28 → Mar 31).
-  delete successor.dependencyPlan;after.tasks.push(successor);task.recurrenceNextId=id;
+  delete successor.dependencyPlan;delete successor.focusActive;delete successor.focusStartedOn;after.tasks.push(successor);task.recurrenceNextId=id;
  }
 }
 function cryptoId(id:string,date:string){

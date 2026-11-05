@@ -118,7 +118,7 @@ export async function startLocalApi(options:Options):Promise<RunningLocalApi>{
      if(params.has('query'))f.query=params.get('query')!;
      if(params.has('scopeId'))f.scopeId=params.get('scopeId');
      if(saved&&['status','focus'].some(key=>params.has(key)))fail(400,'invalid_query','使用保存视图时不要同时覆盖状态或重点条件。');
-     if(!saved){const rules=[];const status=params.get('status')??'open';if(!['open','done','cancelled','handed-off','all'].includes(status))fail(400,'invalid_query','status 应为 open、done、cancelled、handed-off 或 all。');if(status!=='all')rules.push(condition('status','is',status));if(params.has('focus')){if(params.get('focus')!=='today')fail(400,'invalid_query','focus 仅支持 today。');rules.push(condition('focusDate','period','today'));}f=withRules(f,group(rules));}
+     if(!saved){const rules=[];const status=params.get('status')??'open';if(!['open','done','cancelled','handed-off','all'].includes(status))fail(400,'invalid_query','status 应为 open、done、cancelled、handed-off 或 all。');if(status!=='all')rules.push(condition('status','is',status));if(params.has('focus')){if(!['current','today'].includes(params.get('focus')!))fail(400,'invalid_query','focus 支持 current 或兼容别名 today。');rules.push(condition('focusActive','is',true));}f=withRules(f,group(rules));}
      try{f=validateFilter(f,s.state);}catch{fail(400,'invalid_filter','范围或查询条件无效。');}data=summarize(s,f,params.get('offset'),params.get('limit'));
     }else if(/^\/v1\/items\/[^/]+$/.test(path)){
      listParams([]);let id:string;try{id=decodeURIComponent(path.slice('/v1/items/'.length));}catch{fail(400,'invalid_id','事项 ID 无效。');}

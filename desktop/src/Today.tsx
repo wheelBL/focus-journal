@@ -1,3 +1,4 @@
+import {isCurrentFocus} from '../core/daily-focus';
 import React,{useMemo,useState} from 'react';
 import {Clock20Regular} from '@fluentui/react-icons';
 import {localDate,sessionMsOnDate,type Session} from '../core/types';
@@ -21,22 +22,23 @@ export function Today(){
  const {state,timers}=data,isToday=date===localDate(data.now);
  const model=useMemo(()=>todayCandidates(workspace.data.state,data.now),[workspace.data.state,Math.floor(Date.parse(data.now)/60000)]);
  const [choosing,setChoosing]=useState(false),[query,setQuery]=useState('');
- const candidates=(query?model.eligible:model.available).filter(t=>t.focusDate!==date&&!timers.some(r=>r.taskId===t.id)&&t.title.toLocaleLowerCase().includes(query.toLocaleLowerCase()));
+ const candidates=(query?model.eligible:model.available).filter(t=>!isCurrentFocus(t,localDate(data.now))&&!timers.some(r=>r.taskId===t.id)&&t.title.toLocaleLowerCase().includes(query.toLocaleLowerCase()));
  const history=useMemo(()=>{const state=workspace.data.state;return [...[...state.notes,...[...state.tasks.filter(t=>isInformation(t)&&!isEvent(t)&&!isGroup(t)&&!t.deletedAt&&!t.archived),...recurringEvents(state.tasks,date,date)].map(t=>({id:t.id,kind:isEvent(t)?'event' as const:'note' as const,text:t.title,taskId:t.id,createdAt:isEvent(t)?t.eventAt!.length===10?`${t.eventAt}T00:00:00`:t.eventAt!:t.createdAt}))].filter(n=>localDate(n.createdAt)===date).map(n=>({id:n.id,at:n.createdAt,note:n,session:null as Session|null})),...state.sessions.filter(s=>s.status==='ended'&&sessionMsOnDate(s,date)>0).map(s=>({id:s.id,at:s.start??`${s.date}T23:59:00`,note:null,session:s}))].sort((a,b)=>Date.parse(a.at)-Date.parse(b.at));},[workspace.data.state,date]);
  const next=isToday?model.next:undefined;
  return <section className="page today-page execution-home">
   <header className="page-header"><div><DateNav/><h1>{isToday?'今天，推进什么？':'这一天的进展'}</h1></div><div className="header-actions">{state.deletedSessions.length>0&&<Button subtle onClick={()=>dialog({type:'deleted-effort'})}>已删除投入 ({state.deletedSessions.length})</Button>}<Button onClick={()=>dialog({type:'manual'})}><Clock20Regular/>补记时间</Button></div></header>
   {isToday&&<>
+   <Button data-operation-entry="today.ai-priorities" onClick={()=>dialog({type:'ai',purpose:'priorities'})}>AI 帮我理清优先级</Button>
    <FocusHint count={timers.filter(t=>!t.paused).length}/>
    <div className="today-execution-grid">
     <section className="today-now" aria-label="当前执行"><h2>{timers.length?'正在推进':next?'接下来':'从一件事开始'}</h2>
      {timers.map(timer=>{const task=state.tasks.find(t=>t.id===timer.taskId);return <div className="today-timer" key={timer.sessionId}>{task?<TaskCard task={task}/>:<UnassignedTimerCard timer={timer}/>}</div>;})}
      {next&&<div className="today-next"><TaskCard task={next}/></div>}
-     {!next&&!timers.length&&<Empty title="选一件事，开始就好" text="从右侧选择今日重点，或先计时，结束后再补充事项。"><Button primary onClick={()=>void run({type:'focus.start-unassigned'}).catch(()=>{})}>先计时，稍后补充事项</Button><Button onClick={()=>setChoosing(true)}>选择今日重点</Button></Empty>}
+     {!next&&!timers.length&&<Empty title="选一件事，开始就好" text="从右侧选择当前重点，或先计时，结束后再补充事项。"><Button primary onClick={()=>void run({type:'focus.start-unassigned'}).catch(()=>{})}>先计时，稍后补充事项</Button><Button onClick={()=>setChoosing(true)}>选择当前重点</Button></Empty>}
     </section>
-    <section className="today-plan" aria-label="安排今日重点"><div className="today-section-heading"><h2>今日重点</h2><Button subtle aria-expanded={choosing} onClick={()=>setChoosing(!choosing)}>{choosing?'收起选择':'选择重点'}</Button></div>
+    <section className="today-plan" aria-label="安排当前重点"><div className="today-section-heading"><h2>当前重点</h2><Button subtle aria-expanded={choosing} onClick={()=>setChoosing(!choosing)}>{choosing?'收起选择':'选择重点'}</Button></div>
      <DailyFocusPanel index={model.index} date={date}/>
-     {choosing&&<div className="today-focus-picker"><input aria-label="搜索要加入重点的事项" placeholder="搜索事项，加入今日重点" value={query} onChange={e=>setQuery(e.target.value)}/>{candidates.slice(0,8).map(task=><div className="today-candidate" key={task.id}><button className="task-link" onClick={()=>dialog({type:'detail',id:task.id})}>{task.title}</button><FocusToggle task={task}/></div>)}{!candidates.length&&<p className="muted">没有符合条件的待做事项。</p>}<Button subtle onClick={()=>navigate('projects')}>去事项中选择{candidates.length>8?`（还有 ${candidates.length-8} 件）`:''}</Button></div>}
+     {choosing&&<div className="today-focus-picker"><input aria-label="搜索要加入重点的事项" placeholder="搜索事项，加入当前重点" value={query} onChange={e=>setQuery(e.target.value)}/>{candidates.slice(0,8).map(task=><div className="today-candidate" key={task.id}><button className="task-link" onClick={()=>dialog({type:'detail',id:task.id})}>{task.title}</button><FocusToggle task={task}/></div>)}{!candidates.length&&<p className="muted">没有符合条件的待做事项。</p>}<Button subtle onClick={()=>navigate('projects')}>去事项中选择{candidates.length>8?`（还有 ${candidates.length-8} 件）`:''}</Button></div>}
      <div className="today-capture"><SemanticCapture data={data} run={run} storageKey={`journal.today-capture.${data.dataPath}`} onSaved={()=>notify('记录已保存')}/></div>
     </section>
    </div>

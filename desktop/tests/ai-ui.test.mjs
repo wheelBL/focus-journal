@@ -163,3 +163,36 @@ test('conversation history and context are separate from the always-reachable co
   await h.input(question,'仍在输入的追问');await h.action(()=>{question.focus();question.setSelectionRange(2,5);});const next=mock.state();next.turns.at(-1).text+='\n补充说明';next.text=next.turns.at(-1).text;await h.action(()=>mock.emit(next));assert.equal(document.activeElement,question);assert.equal(question.value,'仍在输入的追问');assert.equal(question.selectionStart,2);assert.equal(question.selectionEnd,5);
  }finally{await h.close();}
 });
+
+function prioritiesBridge(){
+ const mock=mockBridge();let sequence=0;
+ mock.bridge.context=async(scope,purpose='general')=>{mock.calls.context.push({scope,purpose});return {...structuredClone(preview),label:purpose==='priorities'?'全部未完成任务（本次范围）':'日常整理范围'};};
+ mock.bridge.generate=async input=>{mock.calls.generate.push(input);const old=mock.state(),purpose=input.purpose??'general',same=old.purpose===purpose&&old.scope?.kind===input.scope.kind&&old.scope?.itemId===input.scope.itemId,id=`priorities-${++sequence}`,turn={id,scope:input.scope,purpose,prompt:input.prompt,phase:'done',text:'先确认目标：今天最希望解决什么问题？哪些截止不能调整？',error:null,context:preview,suggestions:[{...suggestion,id:`suggestion-${sequence}`}]},turns=same?[...(old.turns??[]).map(t=>({...t,suggestions:t.suggestions.map(s=>s.state==='pending'?{...s,state:'historical'}:s)})),turn]:[turn];mock.emit({...turn,conversationId:`chat-${purpose}`,turns});return mock.state();};
+ return mock;
+}
+
+test('priorities mode starts with all unfinished tasks and separates conversation and drafts from general mode',async()=>{
+ const mock=prioritiesBridge(),h=await aiDom(mock.bridge);try{
+ await h.render('AiAssistant',{initialPurpose:'priorities',onClose(){},onSettings(){}});assert.equal(h.label('AI 对话模式').value,'priorities');assert.equal(h.label('AI 分析范围').value,'all');assert.equal(mock.calls.context.at(-1).purpose,'priorities');assert.match(h.query('.ai-intro').textContent,/先问清目标和约束.*调整需逐条确认/);assert.match(h.query('.ai-context summary').textContent,/已截断/);assert.match(document.body.textContent,/最近 20 轮/);
+ await h.click(h.button('从目标与约束开始'));await h.click(h.button('生成建议'));assert.equal(mock.calls.generate[0].purpose,'priorities');assert.equal(mock.calls.generate[0].scope.kind,'all');assert.equal(mock.calls.apply.length,0);
+ await h.input(h.label('给 AI 的问题'),'优先级模式未发送的约束');await h.input(h.label('AI 对话模式'),'general');assert.match(h.query('.ai-scope-change').textContent,/模式已改变.*新对话/);assert.equal(document.querySelector('[aria-label^="确认应用"]'),null);assert.equal(h.label('给 AI 的问题').value,'');await h.input(h.label('给 AI 的问题'),'普通模式草稿');await h.input(h.label('AI 对话模式'),'priorities');assert.equal(h.label('给 AI 的问题').value,'优先级模式未发送的约束');await h.input(h.label('AI 对话模式'),'general');assert.equal(h.label('给 AI 的问题').value,'普通模式草稿');await h.click(h.button('生成建议'));assert.equal(document.querySelectorAll('.ai-turn').length,1);assert.equal(mock.state().purpose,'general');assert.equal(mock.calls.apply.length,0);
+ }finally{await h.close();}
+});
+
+test('priority follow-ups stay in scope, apply only confirmed changes and refresh the records preview',async()=>{
+ const mock=prioritiesBridge(),h=await aiDom(mock.bridge);try{
+ await h.render('AiAssistant',{initialPurpose:'priorities',onClose(){},onSettings(){}});await h.input(h.label('AI 分析范围'),'recent');await h.input(h.label('给 AI 的问题'),'我只有两小时，先问我目标');await h.click(h.button('生成建议'));const before=mock.calls.context.length;await h.click(h.label('确认应用 明确事项名称'));assert.equal(mock.calls.apply.length,1);assert.ok(mock.calls.context.length>before);
+ await h.input(h.label('给 AI 的问题'),'目标是交付方案，下一步比较风险');await h.click(h.button('继续对话'));assert.equal(document.querySelectorAll('.ai-turn').length,2);assert.equal(mock.calls.generate.at(-1).purpose,'priorities');assert.equal(mock.calls.generate.at(-1).scope.kind,'recent');assert.match(h.query('.ai-transcript').textContent,/我只有两小时.*目标是交付方案/s);assert.match(h.query('.ai-response-scope').textContent,/优先级澄清.*已截断/);assert.equal(mock.calls.apply.length,1);
+ }finally{await h.close();}
+});
+
+test('Today opens priorities directly without mutating tasks or sending a request',async()=>{
+ const mock=prioritiesBridge(),h=await appDom();window.journalAI=mock.bridge;try{
+ h.add('今日待整理任务',null);const before=h.service.snapshot().state;await h.mount();await h.click(h.button('AI 帮我理清优先级'));assert.equal(h.label('AI 对话模式').value,'priorities');assert.equal(h.label('AI 分析范围').value,'all');assert.equal(mock.calls.generate.length,0);assert.equal(mock.calls.apply.length,0);assert.deepEqual(h.service.snapshot().state.tasks,before.tasks);
+ }finally{delete window.journalAI;await h.close();}
+});
+test('reopening the assistant restores priority mode despite an older general draft',async()=>{
+ const mock=prioritiesBridge(),h=await aiDom(mock.bridge);try{
+ const props={onClose(){},onSettings(){}};await h.render('AiAssistant',props);await h.input(h.label('给 AI 的问题'),'保留普通草稿');await h.input(h.label('AI 对话模式'),'priorities');await h.input(h.label('AI 分析范围'),'recent');await h.input(h.label('给 AI 的问题'),'先澄清目标');await h.click(h.button('生成建议'));await h.input(h.label('给 AI 的问题'),'优先级待补充约束');await h.render(null);await h.render('AiAssistant',props);assert.equal(h.label('AI 对话模式').value,'priorities');assert.equal(h.label('AI 分析范围').value,'recent');assert.equal(h.label('给 AI 的问题').value,'优先级待补充约束');await h.input(h.label('AI 对话模式'),'general');assert.equal(h.label('给 AI 的问题').value,'保留普通草稿');
+ }finally{await h.close();}
+});

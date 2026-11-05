@@ -1,6 +1,6 @@
 import {isInformation,isGroup} from './item-kind';
 import type {JournalState,Project,Task,FilterRule} from './types';
-import {JOURNAL_SCHEMA_VERSION} from './types';
+import {JOURNAL_SCHEMA_VERSION,localDate} from './types';
 
 export type OutlineNode={id:string;kind:'project'|'task';title:string;parentId:string|null;order:number;record:Project|Task};
 export type OutlineStats={tasks:number;done:number;ownMs:number;totalMs:number;childEstimate:number;ownEstimate:number|null};
@@ -49,7 +49,7 @@ export function syncProjectOwnership(state:JournalState){
   const owners=inheritedProjects(state);for(const t of state.tasks)t.projectId=owners.get(t.id)??null;
 }
 // Tasks are canonical items. Projects remains a compatibility projection for old views/exports.
-export function ensureOutlineFields(state:JournalState){
+export function ensureOutlineFields(state:JournalState,migrationDate=localDate()){
   state.activities??=[];state.tags??=[];state.views??=[];state.moves??=[];state.itemReviews??=[];state.deletedSessions??=[];
   const known=new Set(state.tasks.map(t=>t.id));
   state.projects.forEach((p,i)=>{p.parentId??=null;p.order??=i;if(!known.has(p.id))state.tasks.push({id:p.id,projectId:p.id,title:p.name,description:p.description,isProject:true,archived:p.archived,tagIds:[],parentId:p.parentId,order:p.order,outcome:'',nextAction:'',estimateMinutes:null,plannedDate:null,dueAt:null,status:'open',createdAt:p.createdAt,startedAt:null,completedAt:null});});
@@ -68,10 +68,11 @@ export function ensureOutlineFields(state:JournalState){
     };
     for(const view of state.views)if(view.filter.rules)view.filter.rules=migrateView(view.filter.rules) as import('./types').FilterGroup;
   }
+  if(state.schemaVersion<24){const byParent=new Map<string,string[]>(),hidden=new Set<string>();for(const t of state.tasks){if(t.parentId){const children=byParent.get(t.parentId)??[];children.push(t.id);byParent.set(t.parentId,children);}if(t.deletedAt||t.archived)hidden.add(t.id);}const queue=[...hidden];for(let i=0;i<queue.length;i++)for(const id of byParent.get(queue[i])??[])if(!hidden.has(id)){hidden.add(id);queue.push(id);}for(const task of state.tasks)if(task.focusDate===migrationDate&&task.status==='open'&&!task.ownership&&!isInformation(task)&&!hidden.has(task.id))task.focusActive=true,task.focusStartedOn=migrationDate;}
   state.schemaVersion=JOURNAL_SCHEMA_VERSION;
 }
-export function migrateOutline(state:JournalState):JournalState{
-  const next=structuredClone(state);ensureOutlineFields(next);assertOutline(next);syncProjectOwnership(next);return next;
+export function migrateOutline(state:JournalState,migrationDate=localDate()):JournalState{
+  const next=structuredClone(state);ensureOutlineFields(next,migrationDate);assertOutline(next);syncProjectOwnership(next);return next;
 }
 
 export function assertOutline(state:JournalState){
