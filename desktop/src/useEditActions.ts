@@ -33,7 +33,7 @@ export function useEditActions({view,query,dialogOpen,data,busy,run,notify}:{vie
     if(textAction&&api.editText){event.preventDefault();event.stopPropagation();if(!event.repeat)void api.editText(textAction).catch(()=>{});}
     return;
    }
-   if(dialogOpen||document.querySelector('dialog[open],[role="dialog"]'))return;
+   if(dialogOpen||document.querySelector('dialog[open],[role="dialog"]')||(event.target instanceof HTMLElement&&event.target.closest('[data-ai-workspace]')))return;
    const action=shortcutAction(event,bindings,desktopPlatform());if(action!=='undo'&&action!=='redo')return;
    event.preventDefault();event.stopPropagation();if(!event.repeat)edit(action);
   };

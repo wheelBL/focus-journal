@@ -11,7 +11,7 @@ export function isTextEditing(target:EventTarget|null):boolean {
 
 export function editDestination(action:DesktopEditAction,view:string,query:string,dialogOpen:boolean):'text'|'tree'|'history'|'blocked' {
  if(isTextEditing(document.activeElement))return 'text';
- if(dialogOpen||document.querySelector('dialog[open],[role="dialog"],[data-shortcut-recorder]:focus'))return 'blocked';
+ if(dialogOpen||document.querySelector('dialog[open],[role="dialog"],[data-shortcut-recorder]:focus')||document.activeElement?.closest('[data-ai-workspace]'))return 'blocked';
  if(action==='selectAll')return ['projects','inbox'].includes(view)&&!query?'tree':'text';
  return 'history';
 }

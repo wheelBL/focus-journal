@@ -90,8 +90,8 @@ test('AI invalid tool names, multiple tools, half JSON and unsafe commands never
  for(const result of invalid){const h=setup(async()=>result),before=h.journal.exportJson();const state=await h.generate();assert.equal(state.phase,'error');assert.equal(state.suggestions.length,0);assert.equal(h.journal.exportJson(),before);assert.throws(()=>h.assistant.apply({runId:state.id,suggestionId:'1'}));}
 });
 
-test('AI only allows the current completed run and known suggestion IDs',async()=>{
- const h=setup();const first=await h.generate(),second=await h.generate(),before=h.journal.exportJson();assert.notEqual(first.id,second.id);assert.throws(()=>h.assistant.apply({runId:first.id,suggestionId:'1'}));assert.throws(()=>h.assistant.apply({runId:second.id,suggestionId:'missing'}));assert.equal(h.journal.exportJson(),before);
+test('AI keeps previous pending suggestions and rejects unknown IDs',async()=>{
+ const h=setup();const first=await h.generate(),second=await h.generate(),before=h.journal.exportJson();assert.notEqual(first.id,second.id);assert.throws(()=>h.assistant.apply({runId:second.id,suggestionId:'missing'}));assert.equal(h.journal.exportJson(),before);assert.equal(h.assistant.apply({runId:first.id,suggestionId:'1'}).turns[0].suggestions[0].state,'applied');
 });
 
 test('AI journal persistence failure keeps proposal retryable and never claims applied',async()=>{

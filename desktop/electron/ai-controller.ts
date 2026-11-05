@@ -17,7 +17,7 @@ export class AiController {
   this.settings=new AiSettings(file,createElectronAiVault(safeStorage));
   const fetch=(input:Parameters<typeof net.fetch>[0],init?:Parameters<typeof net.fetch>[1])=>net.fetch(input,init);
   this.assistant=new AiAssistantService(journal,()=>this.settings.connection(),(connection,request)=>chatCompletion(connection,request,fetch),changed,record=>usage?.saveAi(record),new AiConversationStore(path.join(path.dirname(file),'ai-conversation.json')));
-  this.assistant.subscribe(state=>{if(state.phase!=='running'){const safe=this.assistant.storageSafeSuggestions();if(safe)usage?.updateSuggestions(state.id,safe);}if(!window.isDestroyed())window.webContents.send('ai:changed',state);});
+  this.assistant.subscribe(state=>{if(state.phase!=='running'){const safe=this.assistant.storageSafeTurns();if(safe)for(const turn of safe)usage?.updateSuggestions(turn.id,turn.suggestions);}if(!window.isDestroyed())window.webContents.send('ai:changed',state);});
   const record=(channel:string,result:OperationResult)=>{try{usage?.record({operation:channel.replace(':','.'),entry:'ai.assistant',result,version:'current'});}catch{/* Usage must not affect AI operations. */}};
   const handle=(channel:string,fn:(...args:any[])=>unknown)=>{
    this.channels.push(channel);ipcMain.handle(channel,(event,...args)=>{
@@ -36,8 +36,11 @@ export class AiController {
   handle('ai:get',()=>this.assistant.get());
   handle('ai:generate',input=>{if(this.testAbort||this.modelsAbort)throw new AiError('busy','连接正在测试或查询，请稍候。');return this.assistant.generate(input);});
   handle('ai:reset',()=>this.assistant.reset());
+  handle('ai:select-conversation',(id:string)=>this.assistant.selectConversation(id));
+  handle('ai:edit-suggestion',input=>{if(!input?.scope)throw Error('请选择参考范围。');return this.assistant.editSuggestion(input);});
+  handle('ai:undo-suggestion',input=>this.assistant.undoSuggestion(input));
   handle('ai:cancel',()=>{this.testAbort?.abort();return this.assistant.cancel();});
-  handle('ai:apply',input=>this.assistant.apply(input));
+  handle('ai:apply',input=>{if(!input?.scope)throw Error('请选择参考范围。');return this.assistant.apply(input);});
   window.on('closed',this.dispose);
  }
  dispose=()=>{if(this.stopped)return;this.stopped=true;this.testAbort?.abort();this.modelsAbort?.abort();this.assistant.dispose();for(const channel of this.channels)ipcMain.removeHandler(channel);this.window.off('closed',this.dispose);};

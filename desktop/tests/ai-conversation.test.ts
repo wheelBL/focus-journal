@@ -10,9 +10,9 @@ test('conversation continues with fresh state, outcome history and safe persiste
  const base=path.resolve('qa-data');mkdirSync(base,{recursive:true});const dir=mkdtempSync(path.join(base,'ai-conversation-'));assert.ok(path.resolve(dir).startsWith(base+path.sep));try{const file=path.join(dir,'history.json'),s=new JournalService(new Store(),clock),id=add(s,'原名'),requests:AiCompletionRequest[]=[];let count=0;
  const complete=async(_c:unknown,r:AiCompletionRequest)=>{requests.push(r);return ++count===1?response([{type:'outline.patch',payload:{id,field:'title',value:'用户确认后的名称'}},{type:'outline.patch',payload:{id,field:'description',value:'尚未确认'}}]):response();};
  const a=new AiAssistantService(s,async()=>connection,complete,()=>{},undefined,new AiConversationStore(file));const first=await a.generate({scope:{kind:'all'},prompt:'讨论第一轮 synthetic-key-do-not-store'});a.apply({runId:first.id,suggestionId:'1'});await a.generate({scope:{kind:'all'},prompt:'继续讨论'});
- assert.equal(requests[1].messages.length,4);assert.match(requests[1].messages[2].content,/已由用户确认并应用/);assert.match(requests[1].messages[2].content,/未应用/);assert.match(requests[1].messages.at(-1)!.content,/用户确认后的名称/);assert.equal(a.get().turns[0].suggestions[1].state,'historical');assert.throws(()=>a.apply({runId:first.id,suggestionId:'2'}));
+ assert.equal(requests[1].messages.length,4);assert.match(requests[1].messages[2].content,/已由用户确认并应用/);assert.match(requests[1].messages[2].content,/未应用/);assert.match(requests[1].messages.at(-1)!.content,/用户确认后的名称/);assert.equal(a.get().turns[0].suggestions[1].state,'pending');
  assert.equal(readFileSync(file,'utf8').includes(connection.apiKey),false);const resumed=new AiAssistantService(s,async()=>connection,complete,()=>{},undefined,new AiConversationStore(file));assert.equal(resumed.get().turns.length,2);assert.equal(resumed.get().turns[0].suggestions[0].state,'applied');assert.equal(resumed.get().turns[0].suggestions[1].state,'historical');assert.throws(()=>resumed.apply({runId:first.id,suggestionId:'2'}));
- await resumed.generate({scope:{kind:'item',itemId:id},prompt:'仅讨论这一项'});assert.equal(requests.at(-1)!.messages.length,2);assert.equal(resumed.get().turns.length,1);resumed.reset();assert.equal(resumed.get().turns.length,0);assert.equal(resumed.get().scope,null);s.shutdown();
+ await resumed.generate({scope:{kind:'item',itemId:id},prompt:'仅讨论这一项'});assert.equal(requests.at(-1)!.messages.length,2);assert.equal(resumed.get().turns.length,3);const previous=resumed.get().conversationId;resumed.reset();assert.ok(resumed.get().conversations?.some(c=>c.id===previous));resumed.selectConversation(previous);assert.equal(resumed.get().turns.length,3);resumed.reset();assert.equal(resumed.get().turns.length,0);assert.equal(resumed.get().scope,null);s.shutdown();
  }finally{rmSync(dir,{recursive:true,force:true});}
 });
 test('review proposals target existing item, preserve cadence and do not pause, complete or create work',async()=>{
@@ -45,7 +45,7 @@ test('an existing-item review request refuses a fabricated inbox task',async()=>
 });
 
 test('conversation and model history are bounded independently',async()=>{
- const s=new JournalService(new Store(),clock);let lastRequest:AiCompletionRequest|undefined;const assistant=new AiAssistantService(s,async()=>connection,async(_c,request)=>{lastRequest=request;return response();});for(let i=0;i<23;i++)await assistant.generate({scope:{kind:'all'},prompt:`轮次 ${i}`});const state=assistant.get();assert.equal(state.turns.length,20);assert.equal(state.turns[0].prompt,'轮次 3');assert.equal(lastRequest?.messages.length,18);assert.equal(lastRequest?.messages[1].content,'轮次 14');s.shutdown();
+ const s=new JournalService(new Store(),clock);let lastRequest:AiCompletionRequest|undefined;const assistant=new AiAssistantService(s,async()=>connection,async(_c,request)=>{lastRequest=request;return response();});for(let i=0;i<23;i++)await assistant.generate({scope:{kind:'all'},prompt:`轮次 ${i}`});const state=assistant.get();assert.equal(state.turns.length,23);assert.equal(state.turns[0].prompt,'轮次 0');assert.equal(lastRequest?.messages.length,18);assert.equal(lastRequest?.messages[1].content,'轮次 14');s.shutdown();
 });
 
 test('review intent does not mistake negation or a review arrangement for creating a separate task',async()=>{
@@ -63,8 +63,8 @@ test('known API secrets never enter error, conversation or saved AI usage',async
 test('conversation reload discards unrecognized data and preserves corrupt files',()=>{
  const base=path.resolve('qa-data');mkdirSync(base,{recursive:true});const dir=mkdtempSync(path.join(base,'ai-invalid-'));assert.ok(path.resolve(dir).startsWith(base+path.sep));try{
   const file=path.join(dir,'history.json'),store=new AiConversationStore(file),turn={id:'turn',scope:{kind:'all' as const,unrelated:'fake-secret'},prompt:'hi',phase:'done' as const,text:'hello',error:null,context:null,suggestions:[],unrelated:'fake-secret'};
-  store.save({id:'id',scope:{kind:'all'},turns:[turn]});assert.equal(readFileSync(file,'utf8').includes('fake-secret'),false);
-  writeFileSync(file,'{broken');const broken=new AiConversationStore(file);assert.throws(()=>broken.load());assert.throws(()=>broken.save({id:'new',scope:null,turns:[]}));assert.equal(readFileSync(file,'utf8'),'{broken');
+  store.save({version:2,currentId:'id',conversations:[{id:'id',scope:{kind:'all'},turns:[turn]}]});assert.equal(readFileSync(file,'utf8').includes('fake-secret'),false);
+  writeFileSync(file,'{broken');const broken=new AiConversationStore(file);assert.throws(()=>broken.load());assert.throws(()=>broken.save({version:2,currentId:'new',conversations:[{id:'new',scope:null,turns:[]}]}));assert.equal(readFileSync(file,'utf8'),'{broken');
  }finally{rmSync(dir,{recursive:true,force:true});}
 });
 
@@ -85,3 +85,37 @@ test('review intent is cleared by explicit cancellation and latest recurrence ov
 });
 
 test('review wording distinguishes task reconsideration from effort reflection and negation',()=>{for(const text of ['回顾投入','回顾本周投入记录','番茄复盘','不要回顾这项任务'])assert.equal(reviewIntent(text,[]).focusReview,false,text);for(const text of ['重新判断这项任务','下周回顾这项任务是否还值得做'])assert.equal(reviewIntent(text,[]).focusReview,true,text);});
+
+
+test('editing a previous suggestion revalidates and undo only targets its own latest history entry',async()=>{
+ const s=new JournalService(new Store(),clock),id=add(s,'原名称');const a=new AiAssistantService(s,async()=>connection,async()=>response([{type:'outline.patch',payload:{id,field:'title',value:'模型名称'}}]));
+ const first=await a.generate({scope:{kind:'all'},prompt:'修改名称'});await a.generate({scope:{kind:'all'},prompt:'继续'});
+ assert.throws(()=>a.editSuggestion({runId:first.id,suggestionId:'1',values:{id:'outside'}}),/无法修改/);
+ const edited=a.editSuggestion({runId:first.id,suggestionId:'1',values:{value:'用户修改'}});assert.equal(edited.turns[0].suggestions[0].after,'用户修改');
+ let applied=a.apply({runId:first.id,suggestionId:'1'});assert.equal(s.snapshot().state.tasks.find(t=>t.id===id)?.title,'用户修改');assert.equal(applied.turns[0].suggestions[0].canUndo,true);
+ s.execute({type:'outline.patch',payload:{id,field:'description',value:'后续人工修改'}});assert.throws(()=>a.undoSuggestion({runId:first.id,suggestionId:'1'}),/最近可撤销/);assert.equal(s.snapshot().state.tasks.find(t=>t.id===id)?.description,'后续人工修改');
+ s.execute({type:'history.undo'});applied=a.get();assert.equal(applied.turns[0].suggestions[0].canUndo,true);a.undoSuggestion({runId:first.id,suggestionId:'1'});assert.equal(s.snapshot().state.tasks.find(t=>t.id===id)?.title,'原名称');assert.equal(a.get().turns[0].suggestions[0].state,'historical');s.shutdown();
+});
+
+test('legacy conversation is backed up byte for byte before archive migration',()=>{
+ const base=path.resolve('qa-data');mkdirSync(base,{recursive:true});const dir=mkdtempSync(path.join(base,'ai-migrate-'));try{const file=path.join(dir,'history.json'),original=JSON.stringify({id:'legacy',scope:{kind:'all'},turns:[{id:'t',scope:{kind:'all'},purpose:'general',prompt:'保留',phase:'done',text:'回答',error:null,context:null,suggestions:[]}]});writeFileSync(file,original);const store=new AiConversationStore(file),loaded=store.load()!;assert.ok(!('version' in loaded));store.save({version:2,currentId:'legacy',conversations:[loaded]});assert.equal(readFileSync(file+'.pre-v2.bak','utf8'),original);assert.equal((store.load() as any).conversations[0].turns[0].prompt,'保留');}finally{rmSync(dir,{recursive:true,force:true});}
+});
+
+
+test('pending suggestions enforce scope, active generation, conflicting decisions and undo state',async()=>{
+ const s=new JournalService(new Store(),clock),id=add(s,'旧名');let count=0,release:((v:any)=>void)|undefined;
+ const a=new AiAssistantService(s,async()=>connection,async()=>{count++;if(count===3)return await new Promise(resolve=>{release=resolve;});return response([{type:'outline.patch',payload:{id,field:'title',value:count===1?'旧建议':'新决定'}},{type:'outline.patch',payload:{id,field:'description',value:'独立说明'}}]);});
+ const first=await a.generate({scope:{kind:'all'},prompt:'第一轮'}),second=await a.generate({scope:{kind:'all'},prompt:'第二轮'});
+ assert.throws(()=>a.apply({runId:first.id,suggestionId:'1',scope:{kind:'item',itemId:id}}),/范围/);
+ const pending=a.generate({scope:{kind:'all'},prompt:'第三轮'});await new Promise(resolve=>setImmediate(resolve));assert.throws(()=>a.apply({runId:first.id,suggestionId:'1'}),/停止/);assert.throws(()=>a.editSuggestion({runId:first.id,suggestionId:'1',values:{value:'x'}}),/停止/);assert.throws(()=>a.undoSuggestion({runId:first.id,suggestionId:'1'}),/停止/);release!(response());await pending;
+ a.apply({runId:second.id,suggestionId:'1'});assert.equal(a.get().turns[0].suggestions[0].state,'historical');assert.equal(a.get().turns[0].suggestions[1].state,'pending');assert.throws(()=>a.apply({runId:first.id,suggestionId:'1'}),/失效/);
+ a.apply({runId:first.id,suggestionId:'2'});assert.equal(s.snapshot().state.tasks.find(t=>t.id===id)?.description,'独立说明');a.undoSuggestion({runId:first.id,suggestionId:'2'});assert.throws(()=>a.apply({runId:first.id,suggestionId:'2'}),/失效/);a.undoSuggestion({runId:second.id,suggestionId:'1'});assert.throws(()=>a.apply({runId:second.id,suggestionId:'1'}),/失效/);
+ await a.generate({scope:{kind:'item',itemId:id},prompt:'改变范围'});assert.throws(()=>a.apply({runId:second.id,suggestionId:'2'}),/范围/);assert.throws(()=>a.editSuggestion({runId:second.id,suggestionId:'2',values:{value:'x'}}),/范围|过期/);a.dispose();assert.throws(()=>a.editSuggestion({runId:second.id,suggestionId:'2',values:{value:'x'}}),/关闭/);s.shutdown();
+});
+
+test('restored historical suggestions survive selecting conversations and later emits',async()=>{
+ const base=path.resolve('qa-data');mkdirSync(base,{recursive:true});const dir=mkdtempSync(path.join(base,'ai-restore-'));try{const file=path.join(dir,'history.json'),s=new JournalService(new Store(),clock),id=add(s,'事项'),make=()=>new AiAssistantService(s,async()=>connection,async()=>response([{type:'outline.patch',payload:{id,field:'title',value:'旧建议'}}]),()=>{},undefined,new AiConversationStore(file));const original=make(),first=await original.generate({scope:{kind:'all'},prompt:'第一会话'});original.reset();await original.generate({scope:{kind:'all'},prompt:'第二会话'});const restored=make(),second=restored.get().conversationId;restored.selectConversation(first.conversationId);assert.equal(restored.get().suggestions[0].state,'historical');restored.selectConversation(second);restored.selectConversation(first.conversationId);restored.reset();restored.selectConversation(first.conversationId);assert.equal(restored.get().turns[0].suggestions[0].after,'旧建议');s.shutdown();}finally{rmSync(dir,{recursive:true,force:true});}
+});
+
+
+test('usage updates retain each run outcome and redact its own prior connection secret',async()=>{const s=new JournalService(new Store(),clock),id=add(s,'任务');let counter=0;const a=new AiAssistantService(s,async()=>({...connection,apiKey:++counter===1?'first-unique-secret':'second-unique-secret'}),async()=>response([{type:'outline.patch',payload:{id,field:'description',value:'first-unique-secret'}}]));const first=await a.generate({scope:{kind:'all'},prompt:'第一轮'});await a.generate({scope:{kind:'all'},prompt:'第二轮'});a.apply({runId:first.id,suggestionId:'1'});const turns=a.storageSafeTurns()!;assert.equal(turns.find(t=>t.id===first.id)?.suggestions[0].state,'applied');assert.equal(JSON.stringify(turns).includes('first-unique-secret'),false);assert.equal(JSON.stringify(turns).includes('second-unique-secret'),false);s.shutdown();});

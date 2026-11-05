@@ -1,9 +1,10 @@
-import {existsSync,readFileSync,statSync} from 'node:fs';
+import {randomUUID} from 'node:crypto';
+import {existsSync,readFileSync,statSync,copyFileSync,constants} from 'node:fs';
 import {atomicWrite} from './sync-storage';
-import {parseConversation,type AiConversation,type AiConversationPersistence} from '../core/ai-conversation';
+import {parseConversation,type AiConversation,type AiConversationArchive,type AiConversationPersistence} from '../core/ai-conversation';
 export class AiConversationStore implements AiConversationPersistence {
- private unreadable=false;
+ private unreadable=false; private legacy=false;
  constructor(private file:string){}
- load(){if(!existsSync(this.file))return null;try{if(statSync(this.file).size>8_000_000)throw Error('too large');return parseConversation(JSON.parse(readFileSync(this.file,'utf8')));}catch{this.unreadable=true;throw Error('本机对话记录无法读取，原文件已保留。');}}
- save(value:AiConversation){if(this.unreadable)throw Error('本机对话记录无法读取，原文件已保留。');const json=JSON.stringify(parseConversation(value));if(Buffer.byteLength(json,'utf8')>8_000_000)throw Error('conversation too large');atomicWrite(this.file,json);}
+ load():AiConversation|AiConversationArchive|null {if(!existsSync(this.file))return null;try{if(statSync(this.file).size>80_000_000)throw Error('too large');const raw=JSON.parse(readFileSync(this.file,'utf8'));if(raw?.version===2){if(!Array.isArray(raw.conversations)||raw.conversations.length>100000||typeof raw.currentId!=='string')throw Error('invalid archive');const conversations=raw.conversations.map(parseConversation);if(new Set(conversations.map((c:AiConversation)=>c.id)).size!==conversations.length||!conversations.some((c:AiConversation)=>c.id===raw.currentId))throw Error('invalid archive');return {version:2,currentId:raw.currentId,conversations};}this.legacy=true;return parseConversation(raw);}catch{this.unreadable=true;throw Error('本机对话记录无法读取，原文件已保留。');}}
+ save(value:AiConversationArchive){if(this.unreadable)throw Error('本机对话记录无法读取，原文件已保留。');if(!Array.isArray(value.conversations)||!value.conversations.some(c=>c.id===value.currentId))throw Error('invalid archive');const conversations=value.conversations.map(c=>{const clean=parseConversation(c);clean.turns.forEach((t,i)=>{const original=c.turns[i];t.phase=original.phase;t.error=original.error;t.suggestions.forEach((suggestion,j)=>{const src=original.suggestions[j];suggestion.state=src.state;if(src.editable){if(typeof src.editable!=='object'||Array.isArray(src.editable)||Object.entries(src.editable).some(([k,v])=>k.length>100||!(v===null||typeof v==='string'&&v.length<=10000||typeof v==='number'&&Number.isFinite(v))))throw Error('invalid editable');suggestion.editable=structuredClone(src.editable);}});});return clean;});const json=JSON.stringify({version:2,currentId:value.currentId,conversations});if(Buffer.byteLength(json,'utf8')>80_000_000)throw Error('conversation too large');if(this.legacy){const base=this.file+'.pre-v2.bak',backup=existsSync(base)?this.file+'.pre-v2-'+randomUUID()+'.bak':base;copyFileSync(this.file,backup,constants.COPYFILE_EXCL);}atomicWrite(this.file,json);this.legacy=false;}
 }

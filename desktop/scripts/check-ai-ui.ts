@@ -7,6 +7,7 @@ import type {Snapshot} from '../core/types';
 
 /** Real preload/controller/UI, one loopback model fixture, and an isolated journal only. */
 export async function checkAiUi({win,js,click,button,key,input,capture,check,settle,until,service}:any){
+ const selectScope=async(kind:string)=>{const index=await js(`[...document.querySelector('[aria-label="AI 分析范围"]').options].findIndex(o=>o.value===${JSON.stringify(kind)})`);if(index<0)throw Error(`AI scope option missing: ${kind}`);await click('[aria-label="AI 分析范围"]');await key('Home');for(let i=0;i<index;i++)await key('Down');await key('Enter');await until(`document.querySelector('[aria-label="AI 分析范围"]').value===${JSON.stringify(kind)}&&!document.querySelector('.ai-scope-toggle')?.textContent.includes('正在读取')`);};
  const start:Snapshot=service.snapshot();
  check(start.demo===true,'AI 原生验证仅使用独立示例工作区');
  const target=start.state.tasks.find(t=>t.id!=='inbox'&&t.status==='open'&&!t.deletedAt&&!t.archived&&t.itemType!=='note'&&t.itemType!=='event'&&!t.isProject);
@@ -24,7 +25,7 @@ export async function checkAiUi({win,js,click,button,key,input,capture,check,set
   let body='';request.setEncoding('utf8');request.on('data',chunk=>{body+=chunk;if(body.length>120_000)request.destroy();});request.on('error',()=>{});
   request.on('end',()=>{try{
    if(request.method!=='POST'||request.url!=='/v1/chat/completions')throw Error('Unexpected mock AI route.');
-   const parsed=JSON.parse(body),kind=!parsed.tools?'test':cancelMode?'cancel':'generate';
+   const parsed=JSON.parse(body),kind=parsed.tools?.[0]?.function?.name==='connection_probe'?'test':cancelMode?'cancel':'generate';
    requests.push({kind,body:parsed,authorized:request.headers.authorization===`Bearer ${fakeKey}`});
    response.writeHead(200,{'Content-Type':'text/event-stream; charset=utf-8','Cache-Control':'no-cache'});response.flushHeaders();held.add(response);
    response.on('close',()=>{held.delete(response);if(kind==='cancel'&&!response.writableEnded)cancelObserved=true;});
@@ -64,41 +65,45 @@ export async function checkAiUi({win,js,click,button,key,input,capture,check,set
   check(saved.baseUrl===baseUrl&&saved.model===model&&typeof saved.encryptedKey==='string'&&saved.encryptedKey.length>0&&!disk.includes(fakeKey),'AI 独立配置仅保存加密密钥，无明文');
   await button('测试已保存连接','#settings-ai');await until(`document.querySelector('#settings-ai .ai-success')?.textContent.includes('连接成功')`);
   const probe=requests.find(request=>request.kind==='test');
-  check(!!probe&&probe.authorized&&probe.body.model===model&&JSON.stringify(probe.body.messages)===JSON.stringify([{role:'user',content:'Reply with OK.'}])&&!probe.body.tools,'AI 连接测试只发送 OK 探针，不发送工作记录');
+  check(!!probe&&probe.authorized&&probe.body.model===model&&JSON.stringify(probe.body.messages)===JSON.stringify([{role:'user',content:'Reply with OK.'}])&&probe.body.tools?.length===1&&probe.body.tools[0].function?.name==='connection_probe','AI 连接测试只发送 OK 和无业务副作用的探针工具，不发送工作记录');
   check(journalContent(service.snapshot())===baseline,'AI 连接配置与测试不改变事项或投入');
   await js(`window.journalAppearance.set({theme:'light',motion:'reduce'})`);await settle();await capture('20-ai-settings-light');
   await click('.top-navigation [aria-label="任务"]');await button('全部事项','.context-nav');await input('[aria-label="在事项树中搜索"]',target.title);
   const selector=`[data-outline-id="${target.id}"]`;await until(`!!document.querySelector(${JSON.stringify(selector)})`);await click(selector+' .tree-title>.editable-value');
   if(!await js(`!!document.querySelector('.task-inspector')`))await button('详情','.outline-tools');
-  await click('.inspector-more-actions > button');await button('AI 帮我梳理','.task-inspector');await until(`document.querySelector('[aria-label="AI 分析范围"]')?.value==='item'&&!!document.querySelector('.ai-context')`);
-  await click('[aria-label="AI 分析范围"]');await key('End');await key('Up');await key('Enter');await until(`document.querySelector('.ai-context summary')?.textContent.includes('最近 7 天')`);
-  await click('[aria-label="AI 分析范围"]');await key('Home');await key('Enter');await until(`document.querySelector('[aria-label="AI 分析范围"]').value==='item'&&document.querySelector('.ai-context')?.textContent.includes(${JSON.stringify(target.title)})`);
-  await click('.ai-context summary');check(await js(`document.querySelector('.ai-context').open&&document.querySelector('.ai-context li')?.textContent.includes(${JSON.stringify(target.title)})`),'AI 原生范围选择与发送清单可展开核对');
+  await click('.inspector-more-actions > button');await button('AI 帮我梳理','.task-inspector');await until(`!!document.querySelector('aside.ai-assistant-panel:not([hidden]) [aria-label="查看参考范围"]')`);await click('[aria-label="查看参考范围"]');await until(`document.querySelector('[aria-label="AI 分析范围"]')?.value==='item'&&!!document.querySelector('.ai-context')`);
+  await selectScope('recent');await until(`document.querySelector('.ai-context')?.textContent.includes('最近 7 天')`);
+  await selectScope('item');await until(`document.querySelector('.ai-context')?.textContent.includes(${JSON.stringify(target.title)})`);
+  check(await js(`document.querySelector('.ai-context li')?.textContent.includes(${JSON.stringify(target.title)})`),'AI 原生范围选择与发送清单可展开核对');await click('[aria-label="关闭参考范围"]');
   await input('[aria-label="给 AI 的问题"]','请整理所选事项，提出一条说明修改供我确认。');
   const beforeGenerate=journalContent(service.snapshot());await button('生成建议','.ai-assistant');
-  await until(`document.querySelector('.ai-response-text')?.textContent.includes('先预览一条说明调整')`);
-  check(await js(`document.querySelector('.ai-response-text').textContent.includes('<img src=x')&&!document.querySelector('.ai-response img')&&document.querySelector('[aria-label="给 AI 的问题"]').readOnly`),'AI 真实 SSE 逐步呈现纯文本，生成时保护问题输入');
+  await until(`document.querySelector('.ai-turn:last-child .ai-response-text')?.textContent.includes('先预览一条说明调整')`);
+  check(await js(`document.querySelector('.ai-turn:last-child .ai-response-text').textContent.includes('<img src=x')&&!document.querySelector('.ai-response img')`),'AI 真实 SSE 逐步呈现纯文本，不执行模型返回的 HTML');
+  const nextDraft='生成时保留的下一句草稿';await input('[aria-label="给 AI 的问题"]',nextDraft);await click('aside.ai-assistant-panel:not([hidden]) [aria-label="关闭 AI 助手"]');await until(`!document.querySelector('aside.ai-assistant-panel:not([hidden])')`);
+  check((await js('window.journalAI.get()')).phase==='running'&&held.size===1,'AI 收起侧栏保留实际网络流继续生成');await click('.sidebar-bottom [aria-label="AI 助手"]');await until(`!!document.querySelector('aside.ai-assistant-panel:not([hidden])')`);
+  check(await js(`document.querySelector('[aria-label="给 AI 的问题"]').value===${JSON.stringify(nextDraft)}&&document.querySelector('.ai-turn:last-child .ai-user-message').textContent.includes('请整理所选事项')`),'生成中可编写下一句并收起重开，已提交请求保持不变');
   check(journalContent(service.snapshot())===beforeGenerate,'AI 流式生成期间不修改工作记录');
   await waitFor(()=>!!releaseSuggestion,'Mock model did not receive the generation request.');(releaseSuggestion as (()=>void)|null)?.();
   await until(`!!document.querySelector('[aria-label="确认应用 修改说明"]')&&!document.querySelector('[aria-label="确认应用 修改说明"]').disabled`);
   const generated=requests.find(request=>request.kind==='generate');
   check(!!generated&&generated.authorized&&generated.body.tools?.[0]?.function?.name==='propose_changes'&&generated.body.messages[1].content.includes(target.id),'AI 范围与建议工具经真实预加载桥接发送至本机兼容服务');
+  check(await js(`document.querySelector('[aria-label="给 AI 的问题"]').value===${JSON.stringify(nextDraft)}`)&&!JSON.stringify(generated?.body.messages??[]).includes(nextDraft),'AI 完成生成不会清除下一句草稿，也不会把它追加到已发请求');await click('#ai-proposals-tab');
   check(journalContent(service.snapshot())===beforeGenerate&&await js(`document.querySelector('.ai-change').textContent.includes('修改前')&&document.querySelector('.ai-change').textContent.includes('修改后')&&!!document.querySelector('.ai-suggestion-reason')`),'AI 建议先展示目标、修改前后与理由，记录仍未改变');
   await capture('21-ai-proposal-light');await js(`window.journalAppearance.set({theme:'dark',motion:'reduce'})`);await settle();await capture('22-ai-proposal-dark');
   const proposal=await js('window.journalAI.get()');await click('[aria-label="确认应用 修改说明"]');await until(`!!document.querySelector('.ai-applied')`);
   check(service.snapshot().state.tasks.find((task:any)=>task.id===target.id)?.description===nextDescription,'AI 逐条确认后才通过原业务命令更新事项');
   const afterApply=journalContent(service.snapshot());await js(`window.journalAI.apply(${JSON.stringify({runId:proposal.id,suggestionId:proposal.suggestions[0].id})})`);
   check(journalContent(service.snapshot())===afterApply&&await js(`!document.querySelector('[aria-label="确认应用 修改说明"]')`),'AI 已应用建议不再呈现确认入口，重复确认不会重复写入');await capture('23-ai-applied-dark');
-  cancelMode=true;await input('[aria-label="给 AI 的问题"]','验证停止生成，保留已经收到的文本。');await button('生成建议','.ai-assistant');await until(`document.querySelector('.ai-response-text')?.textContent.includes('用于停止验证')`);
-  const beforeCancel=journalContent(service.snapshot());await button('停止生成','.ai-assistant');await until(`document.querySelector('.ai-response header')?.textContent.includes('已停止')`);await waitFor(()=>cancelObserved,'Cancelling did not close the pending loopback stream.');
-  check(cancelObserved&&journalContent(service.snapshot())===beforeCancel&&await js(`document.querySelector('.ai-response-text').textContent.includes('用于停止验证')`),'AI 停止操作中断实际网络流，保留文本且不修改记录');await capture('24-ai-cancelled-dark');
-  await click('dialog[aria-label="AI 助手"] [aria-label="关闭"]');await until(`!document.querySelector('dialog[aria-label="AI 助手"]')`);await click('.sidebar-bottom [aria-label="AI 助手"]');await until(`document.querySelector('.ai-response-text')?.textContent.includes('用于停止验证')`);
-  check(await js(`document.querySelector('.ai-response header').textContent.includes('已停止')`),'AI 关闭重开从控制器恢复停止后的结果');await click('dialog[aria-label="AI 助手"] [aria-label="关闭"]');
+  cancelMode=true;await input('[aria-label="给 AI 的问题"]','验证停止生成，保留已经收到的文本。');await button('继续对话','.ai-assistant');await until(`document.querySelector('.ai-turn:last-child .ai-response-text')?.textContent.includes('用于停止验证')`);
+  const beforeCancel=journalContent(service.snapshot());await button('停止生成','.ai-assistant');await until(`document.querySelector('.ai-turn:last-child .ai-response header')?.textContent.includes('已停止')`);await waitFor(()=>cancelObserved,'Cancelling did not close the pending loopback stream.');
+  check(cancelObserved&&journalContent(service.snapshot())===beforeCancel&&await js(`document.querySelector('.ai-turn:last-child .ai-response-text').textContent.includes('用于停止验证')`),'AI 停止操作中断实际网络流，保留文本且不修改记录');await capture('24-ai-cancelled-dark');
+  await click('aside.ai-assistant-panel:not([hidden]) [aria-label="关闭 AI 助手"]');await until(`!document.querySelector('aside.ai-assistant-panel:not([hidden])')`);await click('.sidebar-bottom [aria-label="AI 助手"]');await until(`document.querySelector('.ai-turn:last-child .ai-response-text')?.textContent.includes('用于停止验证')`);
+  check(await js(`document.querySelector('.ai-turn:last-child .ai-response header').textContent.includes('已停止')`),'AI 关闭重开从控制器恢复停止后的结果');await click('aside.ai-assistant-panel:not([hidden]) [aria-label="关闭 AI 助手"]');
   check(serverErrors.length===0&&requests.filter(request=>request.kind==='test').length===1&&requests.filter(request=>request.kind==='generate').length===1&&requests.filter(request=>request.kind==='cancel').length===1,'AI 原生流程只访问预期的三次本机模型请求');
  }finally{
   // The helper owns only this loopback fixture and its temporary QA connection.
   try{await js('window.journalAI.cancel()');}catch{}
-  try{if(await js(`!!document.querySelector('dialog[aria-label="AI 助手"]')`))await click('dialog[aria-label="AI 助手"] [aria-label="关闭"]');}catch{}
+  try{if(await js(`!!document.querySelector('aside.ai-assistant-panel:not([hidden])')`))await click('aside.ai-assistant-panel:not([hidden]) [aria-label="关闭 AI 助手"]');}catch{}
   try{if(settingsWritten)await js('window.journalAI.clearKey()');}catch{}
   for(const response of held)response.destroy();for(const socket of sockets)socket.destroy();
   if(server.listening)await new Promise<void>(resolve=>server.close(()=>resolve()));

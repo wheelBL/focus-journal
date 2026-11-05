@@ -32,34 +32,74 @@ async function aiDom(bridge){
  return {...h,render:(name,props={})=>h.action(()=>root.render(name?React.createElement(components[name],props):null)),close:async()=>{await h.action(()=>root.unmount());delete window.journalAI;await h.close();}};
 }
 
-test('AI assistant previews a bounded scope, streams plain text and applies nothing before explicit confirmation',async()=>{
- const mock=mockBridge(),h=await aiDom(mock.bridge);let finish;try{
-  mock.bridge.generate=input=>{mock.calls.generate.push(input);return new Promise(resolve=>{finish=resolve;});};
-  await h.render('AiAssistant',{itemId:'one',onClose(){},onSettings(){}});assert.equal(h.label('AI 分析范围').value,'item');assert.match(h.query('.ai-context').textContent,/2 个事项.*3 条投入记录/);assert.match(h.query('.ai-limit').textContent,/限量/);assert.match(h.query('.ai-context').textContent,/核对版本/);
-  await h.click(h.button('拆解下一步'));assert.match(h.label('给 AI 的问题').value,/第一步/);await h.click(h.button('生成建议'));await h.key(h.label('给 AI 的问题'),'Enter',{ctrlKey:true});assert.equal(mock.calls.generate.length,1);assert.equal(h.label('给 AI 的问题').readOnly,true);
-  const partial={id:'run-1',phase:'running',text:'第一条建议\n<img src=x onerror=alert(1)>',error:null,context:preview,suggestions:[suggestion]};await h.action(()=>mock.emit(partial));assert.match(h.query('.ai-response-text').textContent,/<img src=x/);assert.equal(h.query('.ai-response').querySelector('img'),null);assert.equal(h.label('确认应用 明确事项名称').disabled,true);assert.equal(mock.calls.apply.length,0);
-  const done={...partial,phase:'done',text:`${partial.text}\n再核对发布说明。`};await h.action(()=>{mock.emit(done);finish(done);});assert.equal(h.label('确认应用 明确事项名称').disabled,false);assert.match(h.query('.ai-change').textContent,/修改前.*整理发布记录.*修改后.*整理本次/s);assert.match(h.query('.ai-suggestion-reason').textContent,/减少查找/);assert.equal(mock.calls.apply.length,0);
-  let reject,calls=0;const real=mock.bridge.apply;mock.bridge.apply=()=>{calls++;return new Promise((_,r)=>{reject=r;});};await h.click(h.label('确认应用 明确事项名称'));await h.click(h.label('确认应用 明确事项名称'));assert.equal(calls,1);assert.equal(h.query('dialog').getAttribute('aria-busy'),'true');assert.match(h.query('.ai-suggestion header').textContent,/正在应用/);
-  await h.action(()=>reject(Error('事项已变化，请重新生成')));assert.match(h.query('.ai-suggestion [role=alert]').textContent,/事项已变化/);assert.equal(h.label('确认应用 明确事项名称').disabled,false);
-  mock.bridge.apply=real;await h.click(h.label('确认应用 明确事项名称'));assert.deepEqual(mock.calls.apply,[{runId:'run-1',suggestionId:'suggestion-1'}]);assert.match(h.query('.ai-applied').textContent,/已应用/);assert.equal(document.querySelector('[aria-label="确认应用 明确事项名称"]'),null);
+function sidebarBridge(){
+ const mock=mockBridge();let sequence=0;const chats=new Map();const summaries=()=>[...chats.values()].map(chat=>({id:chat.conversationId,scope:chat.scope,title:chat.turns[0]?.prompt??'新对话',updatedAt:'2026-11-05T08:00:00Z'}));
+ const emit=next=>{chats.set(next.conversationId,structuredClone(next));mock.emit({...next,conversations:summaries()});};
+ const initial={...empty,conversationId:'chat-1',scope:{kind:'today'},purpose:'general',turns:[]};emit(initial);
+ mock.bridge.reset=async()=>{const next={...initial,conversationId:`chat-${chats.size+1}`};emit(next);return mock.state();};
+ mock.bridge.selectConversation=async id=>{emit(chats.get(id));return mock.state();};
+ mock.bridge.generate=async input=>{mock.calls.generate.push(input);const old=mock.state(),id=`run-${++sequence}`,suggestions=[{...suggestion,id:`proposal-${sequence}`,runId:id,targetId:'one',editable:{value:'新的事项名称'},editableLabels:{value:'名称'}}],turn={id,purpose:'general',scope:input.scope,prompt:input.prompt,phase:'done',text:'**保留记录**\n\n1. 核对依赖\n2. 再确认安排\n\n<img src=x onerror=alert(1)>',error:null,context:preview,suggestions};emit({...old,...turn,turns:[...old.turns,turn]});return mock.state();};
+ mock.bridge.apply=async input=>{mock.calls.apply.push(input);const old=mock.state();emit({...old,turns:old.turns.map(turn=>turn.id===input.runId?{...turn,suggestions:turn.suggestions.map(s=>s.id===input.suggestionId?{...s,state:'applied',canUndo:true}:s)}:turn)});return mock.state();};
+ mock.calls.edit=[];mock.bridge.editSuggestion=async input=>{mock.calls.edit.push(input);const old=mock.state();emit({...old,turns:old.turns.map(turn=>turn.id===input.runId?{...turn,suggestions:turn.suggestions.map(s=>s.id===input.suggestionId?{...s,editable:input.values,after:input.values.value}:s)}:turn)});return mock.state();};
+ mock.calls.undo=[];mock.bridge.undoSuggestion=async input=>{mock.calls.undo.push(input);const old=mock.state();emit({...old,turns:old.turns.map(turn=>turn.id===input.runId?{...turn,suggestions:turn.suggestions.map(s=>s.id===input.suggestionId?{...s,state:'historical',canUndo:false,error:'已撤销'}:s)}:turn)});return mock.state();};
+ return {...mock,emit,summary:summaries};
+}
+const props={onClose(){},onSettings(){}};
+async function scopeMenu(h,kind){if(!document.querySelector('[aria-label="AI 分析范围"]'))await h.click(h.label('查看参考范围'));if(kind)await h.input(h.label('AI 分析范围'),kind);}
+const proposals=h=>h.click(h.query('#ai-proposals-tab'));
+
+test('sidebar separates proposals, renders safe basic Markdown and applies only explicit confirmation',async()=>{
+ const mock=sidebarBridge(),h=await aiDom(mock.bridge);try{
+ await h.render('AiAssistant',{...props,itemId:'one'});assert.equal(document.querySelector('[aria-label="AI 对话模式"]'),null);await scopeMenu(h);assert.equal(h.label('AI 分析范围').value,'item');assert.match(h.query('.ai-context').textContent,/2 个事项.*3 条投入记录/);await h.click(h.label('关闭参考范围'));
+ await h.click(h.button('拆解下一步'));await h.click(h.button('生成建议'));assert.equal(h.label('给 AI 的问题').value,'');assert.equal(h.query('.ai-response-text strong').textContent,'保留记录');assert.equal(document.querySelectorAll('.ai-response-text ol li').length,2);assert.equal(document.querySelector('.ai-response-text img'),null);assert.match(h.query('.ai-response-text').textContent,/<img src=x/);assert.equal(mock.calls.apply.length,0);assert.equal(h.query('#ai-proposals-panel').hidden,true);
+ await proposals(h);assert.match(h.query('.ai-change').textContent,/修改前.*修改后/s);await h.click(h.label('确认应用 明确事项名称'));assert.deepEqual(mock.calls.apply,[{runId:'run-1',suggestionId:'proposal-1',scope:{kind:'item',itemId:'one'}}]);assert.match(h.query('.ai-applied-summary').textContent,/已更新/);assert.equal(h.query('.ai-suggestion').querySelector('.ai-change'),null);await h.click(h.label('撤销 明确事项名称'));assert.equal(mock.calls.undo.length,1);assert.match(h.query('.ai-suggestion').textContent,/已撤销/);
  }finally{await h.close();}
 });
 
-test('AI generation errors keep the prompt, cancellation keeps partial output and reopening reads controller results',async()=>{
- const mock=mockBridge(),h=await aiDom(mock.bridge);let closed=0;const props={onClose:()=>{closed++;},onSettings(){}};try{
-  await h.render('AiAssistant',props);await h.input(h.label('AI 分析范围'),'recent');assert.equal(mock.calls.context.at(-1).kind,'recent');await h.input(h.label('给 AI 的问题'),'帮我总结本周推进');
-  mock.bridge.generate=async()=>{throw Error('服务暂不可用');};await h.click(h.button('生成建议'));assert.match(h.query('.ai-error').textContent,/服务暂不可用/);assert.equal(h.label('给 AI 的问题').value,'帮我总结本周推进');assert.ok(h.button('重试生成'));
-  mock.bridge.generate=async()=>{const next={id:'run-2',phase:'running',text:'已经完成了版本验证',error:null,context:preview,suggestions:[]};mock.emit(next);return next;};await h.click(h.button('重试生成'));await h.click(h.button('停止生成'));assert.equal(mock.calls.cancel,1);assert.match(h.query('.ai-response-text').textContent,/版本验证/);assert.match(h.query('.ai-response header').textContent,/已停止/);
-  await h.click(h.button('重试生成'));await h.click(h.label('关闭'));assert.equal(closed,1);assert.equal(mock.calls.cancel,2);await h.render(null);await h.render('AiAssistant',props);assert.match(h.query('.ai-response-text').textContent,/版本验证/);assert.match(h.query('.ai-response header').textContent,/已停止/);
+test('generating allows next draft and closing or expanding never cancels the request',async()=>{
+ const mock=sidebarBridge(),h=await aiDom(mock.bridge);let finish,closed=0,expanded=false;const options={...props,onClose:()=>closed++,onExpandChange:value=>expanded=value};try{
+ mock.bridge.generate=input=>{mock.calls.generate.push(input);return new Promise(resolve=>finish=resolve);};await h.render('AiAssistant',options);await h.input(h.label('给 AI 的问题'),'先分析');await h.click(h.button('生成建议'));assert.equal(h.label('给 AI 的问题').value,'');assert.equal(h.label('给 AI 的问题').readOnly,false);await h.input(h.label('给 AI 的问题'),'下一句尚未发送');await h.click(h.label('展开助手'));assert.equal(expanded,true);await h.click(h.label('关闭 AI 助手'));assert.equal(closed,1);assert.equal(mock.calls.cancel,0);await h.render('AiAssistant',{...options,open:false});assert.equal(h.query('.ai-assistant-panel').hidden,true);
+ const old=mock.state(),turn={id:'run-late',purpose:'general',scope:{kind:'today'},prompt:'先分析',phase:'done',text:'后台生成完成',error:null,context:preview,suggestions:[]};await h.action(()=>{const next={...old,...turn,turns:[turn]};mock.emit(next);finish(next);});await h.render('AiAssistant',options);assert.match(h.query('.ai-response-text').textContent,/后台生成完成/);assert.equal(h.label('给 AI 的问题').value,'下一句尚未发送');
  }finally{await h.close();}
 });
 
-test('AI assistant offers configuration and handles a failed scope preview without sending records',async()=>{
- const mock=mockBridge();mock.setStatus({hasKey:false,configured:false});const h=await aiDom(mock.bridge);let settings=0;try{
-  mock.bridge.context=async()=>{throw Error('事项范围暂不可用');};await h.render('AiAssistant',{onClose(){},onSettings:()=>{settings++;}});assert.ok(h.button('打开 AI 设置'));assert.equal(h.button('生成建议').disabled,true);assert.match(h.query('.ai-error').textContent,/事项范围/);assert.ok(h.button('重新读取范围'));await h.click(h.button('打开 AI 设置'));assert.equal(settings,1);assert.equal(mock.calls.generate.length,0);
+test('scope remains explicit while browsing and old scope proposals cannot be applied',async()=>{
+ const mock=sidebarBridge(),h=await aiDom(mock.bridge);let opened;try{
+ await h.render('AiAssistant',{...props,onOpenItem:id=>opened=id});await h.input(h.label('给 AI 的问题'),'今日事项');await h.click(h.button('生成建议'));await scopeMenu(h);await h.click(h.button('整理发布记录',h.query('.ai-context')));assert.equal(opened,'one');assert.equal(document.querySelector('[aria-label="AI 分析范围"]'),null);assert.equal(mock.calls.context.at(-1).kind,'today');await scopeMenu(h,'recent');await h.click(h.label('关闭参考范围'));await proposals(h);assert.equal(h.label('确认应用 明确事项名称').disabled,true);await h.click(h.label('确认应用 明确事项名称'));assert.equal(mock.calls.apply.length,0);await scopeMenu(h,'today');await h.click(h.label('关闭参考范围'));assert.equal(h.label('确认应用 明确事项名称').disabled,false);
  }finally{await h.close();}
 });
 
+test('pending proposals survive follow-ups and edits are validated before explicit apply',async()=>{
+ const mock=sidebarBridge(),h=await aiDom(mock.bridge);try{
+ await h.render('AiAssistant',props);await h.input(h.label('给 AI 的问题'),'先整理');await h.click(h.button('生成建议'));await h.input(h.label('给 AI 的问题'),'再拆解');await h.click(h.button('继续对话'));assert.equal(document.querySelectorAll('.ai-turn').length,2);await proposals(h);assert.equal(document.querySelectorAll('[aria-label="确认应用 明确事项名称"]').length,2);const card=h.query('[data-suggestion-id="proposal-1"]');await h.click(h.button('编辑建议',card));await h.input(h.label('编辑 明确事项名称 名称',card),'自行修改的名称');assert.equal(h.label('确认应用 明确事项名称',card).disabled,true);await h.click(h.button('保存建议',card));assert.deepEqual(mock.calls.edit,[{runId:'run-1',suggestionId:'proposal-1',values:{value:'自行修改的名称'},scope:{kind:'today'}}]);assert.equal(mock.calls.apply.length,0);assert.match(h.query('.ai-change',card).textContent,/自行修改的名称/);await h.click(h.label('确认应用 明确事项名称',card));assert.equal(mock.calls.apply[0].runId,'run-1');
+ }finally{await h.close();}
+});
+
+test('history switching restores each conversation draft atomically even when change events arrive before the promise',async()=>{
+ const mock=sidebarBridge(),h=await aiDom(mock.bridge);let resolve;try{
+ await h.render('AiAssistant',props);await h.input(h.label('给 AI 的问题'),'对话一');await h.click(h.button('生成建议'));await h.input(h.label('给 AI 的问题'),'一的未发送草稿');await h.click(h.label('新对话'));await h.input(h.label('给 AI 的问题'),'对话二');await h.click(h.button('生成建议'));await h.input(h.label('给 AI 的问题'),'二的未发送草稿');const select=mock.bridge.selectConversation;mock.bridge.selectConversation=async id=>{const result=await select(id);return new Promise(r=>resolve=()=>r(result));};await h.click(h.label('历史对话'));await h.click(h.query('[data-conversation-id="chat-1"]'));assert.equal(h.label('给 AI 的问题').value,'二的未发送草稿');await h.action(()=>resolve());assert.equal(h.label('给 AI 的问题').value,'一的未发送草稿');mock.bridge.selectConversation=select;await h.click(h.label('历史对话'));await h.click(h.query('[data-conversation-id="chat-2"]'));assert.equal(h.label('给 AI 的问题').value,'二的未发送草稿');
+ }finally{await h.close();}
+});
+
+test('IME shortcuts are contained and Escape closes one assistant layer at a time',async()=>{
+ const mock=sidebarBridge(),h=await aiDom(mock.bridge);let closed=0,escaped=0;const listener=()=>escaped++;try{
+ window.addEventListener('keydown',listener);await h.render('AiAssistant',{...props,onClose:()=>closed++});const input=h.label('给 AI 的问题');await h.input(input,'输入中');await h.key(input,'Enter',{ctrlKey:true,isComposing:true});await h.key(input,'Enter',{ctrlKey:true,keyCode:229});assert.equal(mock.calls.generate.length,0);await h.click(h.label('查看参考范围'));await h.key(input,'Escape');assert.equal(document.querySelector('.ai-context'),null);assert.equal(closed,0);await proposals(h);await h.key(input,'Escape');assert.equal(h.query('#ai-chat-tab').getAttribute('aria-selected'),'true');assert.equal(closed,0);await h.key(input,'Escape',{isComposing:true});assert.equal(closed,0);await h.key(input,'Escape');assert.equal(closed,1);assert.equal(escaped,0);await h.key(input,'Enter',{ctrlKey:true});assert.equal(mock.calls.generate.length,1);
+ }finally{window.removeEventListener('keydown',listener);await h.close();}
+});
+
+test('contextual entry changes scope explicitly, ordinary reopening preserves it and refreshes saved connection status',async()=>{
+ const mock=sidebarBridge(),h=await aiDom(mock.bridge);try{
+ mock.setStatus({configured:false});await h.render('AiAssistant',{...props,requestSequence:1});assert.ok(h.button('打开 AI 设置'));mock.setStatus({configured:true});await h.render('AiAssistant',{...props,open:false,requestSequence:1});await h.render('AiAssistant',{...props,open:true,itemId:'two',requestSequence:2});await scopeMenu(h);assert.equal(h.label('AI 分析范围').value,'item');assert.deepEqual(mock.calls.context.at(-1),{kind:'item',itemId:'two'});await h.click(h.label('关闭参考范围'));await h.render('AiAssistant',{...props,requestSequence:3});assert.deepEqual(mock.calls.context.at(-1),{kind:'item',itemId:'two'});await h.input(h.label('给 AI 的问题'),'已经连接');assert.equal(h.button('生成建议').disabled,false);await h.render('AiAssistant',{...props,initialPurpose:'priorities',requestSequence:4});await scopeMenu(h);assert.equal(h.label('AI 分析范围').value,'unfinished');assert.equal(document.querySelector('[aria-label="AI 对话模式"]'),null);
+ }finally{await h.close();}
+});
+
+test('repair conflicts and cancellation keep responses and restore the original request only when no newer draft exists',async()=>{
+ const mock=sidebarBridge(),h=await aiDom(mock.bridge);try{
+ mock.bridge.generate=async input=>{mock.calls.generate.push(input);const old=mock.state(),turn={id:'repair',purpose:'general',scope:input.scope,prompt:input.prompt,phase:'error',text:'',error:'截止不能早于前置事项',repair:{attempt:2,maxAttempts:2,message:'正在调整'},context:preview,suggestions:[suggestion]},result={...old,...turn,turns:[turn]};mock.emit(result);return result;};await h.render('AiAssistant',props);await h.input(h.label('给 AI 的问题'),'调整日期');await h.click(h.button('生成建议'));assert.equal(h.label('给 AI 的问题').value,'调整日期');assert.match(h.query('.ai-response .ai-error').textContent,/前置事项/);assert.equal(document.querySelector('[aria-label^="确认应用"]'),null);assert.ok(h.button('继续对话'));
+ }finally{await h.close();}
+});
+
+function modelsBridge(){const mock=mockBridge();mock.calls.models=[];mock.calls.cancelModels=0;mock.bridge.listModels=async input=>{mock.calls.models.push(input);return {baseUrl:input.baseUrl,models:['alpha-chat','beta-tools','gamma'],partial:false};};mock.bridge.cancelModels=async()=>{mock.calls.cancelModels++;};return mock;}
 test('AI settings never refill or cache keys, preserve failed inputs and test only the saved connection',async()=>{
  const mock=mockBridge(),h=await aiDom(mock.bridge);try{
   await h.render('AiSettings');const key=h.label('AI API 密钥');assert.equal(key.type,'password');assert.equal(key.value,'');assert.match(document.body.textContent,/已保存密钥/);
@@ -70,134 +110,6 @@ test('AI settings never refill or cache keys, preserve failed inputs and test on
   await h.click(h.button('移除密钥'));assert.equal(mock.calls.remove,1);assert.match(h.query('.ai-key-state').textContent,/尚未保存/);assert.equal(key.value,'');assert.equal(window.localStorage.length,0);
  }finally{await h.close();}
 });
-
-test('AI surfaces explain desktop availability when the scoped bridge is absent',async()=>{
- const h=await aiDom(undefined);try{
-  await h.render('AiAssistant',{onClose(){},onSettings(){}});assert.match(h.query('.ai-unavailable').textContent,/正式桌面版/);assert.equal(document.querySelector('[aria-label="给 AI 的问题"]'),null);await h.render('AiSettings');assert.match(h.query('.ai-unavailable').textContent,/正式桌面版/);assert.equal(document.querySelector('input[type=password]'),null);
- }finally{await h.close();}
-});
-
-test('AI questions and scope survive closing and suggestions append without discarding authored text',async()=>{
- const mock=mockBridge(),h=await aiDom(mock.bridge),props={onClose(){},onSettings(){}};try{
-  await h.render('AiAssistant',props);await h.input(h.label('给 AI 的问题'),'我自己的问题：先分析依赖');await h.input(h.label('AI 分析范围'),'recent');await h.click(h.button('拆解下一步'));
-  const prompt=h.label('给 AI 的问题').value;assert.match(prompt,/^我自己的问题：先分析依赖\n\n/);assert.match(prompt,/第一步/);assert.equal(mock.calls.generate.length,0);
-  await h.click(h.label('关闭'));await h.render(null);await h.render('AiAssistant',props);assert.equal(h.label('给 AI 的问题').value,prompt);assert.equal(h.label('AI 分析范围').value,'recent');
-  await h.render(null);await h.render('AiAssistant',{...props,itemId:'different-item'});assert.equal(h.label('给 AI 的问题').value,'');assert.equal(h.label('AI 分析范围').value,'item');
-  const saved=JSON.parse(window.localStorage.getItem('journal.ai-question-drafts.v1'));assert.ok(saved.some(([,draft])=>draft.prompt===prompt&&draft.scope.kind==='recent'));assert.ok(saved.length<=24);assert.ok(saved.every(([,draft])=>Object.keys(draft).sort().join(',')==='prompt,scope'));
- }finally{await h.close();}
-});
-
-test('AI suggestions never truncate a question that is already at the input limit',async()=>{
- const mock=mockBridge(),h=await aiDom(mock.bridge);try{
-  await h.render('AiAssistant',{onClose(){},onSettings(){}});const text='记'.repeat(4000);await h.input(h.label('给 AI 的问题'),text);await h.click(h.button('整理事项'));
-  assert.equal(h.label('给 AI 的问题').value,text);assert.match(h.query('.ai-error').textContent,/4000.*已有内容已保留/);assert.equal(mock.calls.generate.length,0);
- }finally{await h.close();}
-});
-
-test('all items are sent only after explicitly choosing that scope',async()=>{
- const mock=mockBridge(),h=await aiDom(mock.bridge);try{
-  await h.render('AiAssistant',{onClose(){},onSettings(){}});assert.equal(h.label('AI 分析范围').value,'today');
-  await h.input(h.label('AI 分析范围'),'all');assert.equal(mock.calls.context.at(-1).kind,'all');await h.input(h.label('给 AI 的问题'),'整理所有事项');await h.click(h.button('生成建议'));
-  assert.equal(mock.calls.generate.at(-1).scope.kind,'all');
- }finally{await h.close();}
-});
-
-function conversationBridge(initial){
- const mock=mockBridge();let sequence=0;
- if(initial)mock.emit(initial);
- mock.bridge.generate=async input=>{mock.calls.generate.push(input);const old=mock.state(),same=old.scope?.kind===input.scope.kind&&old.scope?.itemId===input.scope.itemId,turns=same?(old.turns??[]).map(turn=>({...turn,suggestions:turn.suggestions.map(s=>s.state==='pending'?{...s,state:'historical'}:s)})):[],id=`turn-${++sequence}`,suggestions=sequence===1?[{...suggestion},{...suggestion,id:'old-pending',label:'此前未确认'}]:[{...suggestion,id:`new-${sequence}`,label:'安排事项审视'}],turn={id,scope:input.scope,prompt:input.prompt,phase:'done',text:`回答：${input.prompt}`,error:null,context:preview,suggestions};
-  mock.emit({...turn,conversationId:same?old.conversationId:`conversation-${sequence}`,turns:[...turns,turn]});return mock.state();};
- mock.bridge.apply=async input=>{mock.calls.apply.push(input);const old=mock.state(),suggestions=old.suggestions.map(s=>s.id===input.suggestionId?{...s,state:'applied'}:s);mock.emit({...old,suggestions,turns:old.turns.map(turn=>turn.id===old.id?{...turn,suggestions}:turn)});return mock.state();};
- mock.bridge.cancel=async()=>{mock.calls.cancel++;const old=mock.state();mock.emit({...old,phase:'cancelled',turns:(old.turns??[]).map(turn=>turn.id===old.id?{...turn,phase:'cancelled'}:turn)});return mock.state();};
- mock.bridge.reset=async()=>{mock.calls.reset=(mock.calls.reset??0)+1;mock.emit({...empty,conversationId:'new-conversation',scope:null,turns:[]});return mock.state();};
- return mock;
-}
-
-test('follow-up keeps ordered requests and answers, clears sent text, and makes superseded pending proposals read-only',async()=>{
- const mock=conversationBridge(),h=await aiDom(mock.bridge);try{
-  await h.render('AiAssistant',{onClose(){},onSettings(){}});await h.input(h.label('给 AI 的问题'),'先分析逾期事项');await h.click(h.button('生成建议'));assert.equal(h.label('给 AI 的问题').value,'');assert.match(h.query('.ai-user-message').textContent,/先分析逾期事项/);await h.click(h.label('确认应用 明确事项名称'));
-  await h.input(h.label('给 AI 的问题'),'保留原事项，改为安排审视');await h.click(h.button('继续对话'));assert.equal(mock.calls.generate.length,2);assert.deepEqual(mock.calls.generate[1],{scope:{kind:'today'},prompt:'保留原事项，改为安排审视'});assert.equal(document.querySelectorAll('.ai-turn').length,2);assert.match([...document.querySelectorAll('.ai-user-message')].map(el=>el.textContent).join('|'),/先分析逾期事项.*保留原事项，改为安排审视/);assert.match(h.query('.ai-applied').textContent,/已应用/);assert.match(h.query('.ai-historical').textContent,/历史建议/);assert.equal(document.querySelector('[aria-label="确认应用 此前未确认"]'),null);assert.ok(h.label('确认应用 安排事项审视'));assert.equal(h.label('给 AI 的问题').value,'');assert.match(h.label('给 AI 的问题').placeholder,/继续补充/);
- }finally{await h.close();}
-});
-
-test('scope changes explain the new conversation and prevent applying a prior scope proposal',async()=>{
- const mock=conversationBridge(),h=await aiDom(mock.bridge);try{
-  await h.render('AiAssistant',{onClose(){},onSettings(){}});await h.input(h.label('给 AI 的问题'),'今日事项');await h.click(h.button('生成建议'));assert.ok(h.label('确认应用 明确事项名称'));await h.input(h.label('AI 分析范围'),'recent');assert.match(h.query('.ai-scope-change').textContent,/开始新对话.*不发送上一范围/);assert.equal(document.querySelector('[aria-label="确认应用 明确事项名称"]'),null);assert.equal(mock.calls.apply.length,0);
-  await h.click(h.button('安排审视'));assert.match(h.label('给 AI 的问题').value,/个人计划.*外部承诺.*移除旧截止.*设置回顾日/);assert.match(h.label('给 AI 的问题').value,/保留任务与已有投入.*不要另建回顾任务/);await h.click(h.button('生成建议'));assert.equal(mock.calls.generate.at(-1).scope.kind,'recent');assert.equal(document.querySelectorAll('.ai-turn').length,1);assert.doesNotMatch(h.query('.ai-transcript').textContent,/回答：今日事项/);assert.match(h.query('.ai-conversation-notice').textContent,/上一范围的对话不会发送/);
- }finally{await h.close();}
-});
-
-test('reopening with a new bridge restores backend conversation and bounded authored draft without executable historical plans',async()=>{
- const mock=conversationBridge(),h=await aiDom(mock.bridge),props={onClose(){},onSettings(){}};try{
-  await h.render('AiAssistant',props);await h.input(h.label('给 AI 的问题'),'分析当前记录');await h.click(h.button('生成建议'));await h.input(h.label('给 AI 的问题'),'尚未发送的补充');const saved=mock.state();await h.render(null);
-  const restarted={...saved,suggestions:saved.suggestions.map(s=>({...s,state:'historical'})),turns:saved.turns.map(turn=>({...turn,suggestions:turn.suggestions.map(s=>({...s,state:'historical'}))})),historyError:'历史文件暂时不可写，本轮仅保留在内存'};const replacement=conversationBridge(restarted);window.journalAI=replacement.bridge;await h.render('AiAssistant',props);assert.equal(h.label('给 AI 的问题').value,'尚未发送的补充');assert.match(h.query('.ai-transcript').textContent,/分析当前记录/);assert.equal(document.querySelector('[aria-label^="确认应用"]'),null);assert.match(h.query('.ai-error').textContent,/仅保留在内存/);assert.ok(h.button('继续对话'));
- }finally{await h.close();}
-});
-
-test('reset failures retain the draft, and a stopped old response cannot overwrite a new conversation',async()=>{
- const mock=conversationBridge(),h=await aiDom(mock.bridge);let finish;try{
-  await h.render('AiAssistant',{onClose(){},onSettings(){}});await h.input(h.label('给 AI 的问题'),'不能丢失的问题');const reset=mock.bridge.reset;mock.bridge.reset=async()=>{throw Error('无法开始新对话');};await h.click(h.button('新对话'));assert.equal(h.label('给 AI 的问题').value,'不能丢失的问题');assert.match(h.query('.ai-error').textContent,/无法开始新对话/);mock.bridge.reset=reset;
-  const old={id:'slow',conversationId:'slow-chat',scope:{kind:'today'},phase:'running',text:'部分内容',error:null,context:preview,suggestions:[],turns:[{id:'slow',scope:{kind:'today'},prompt:'不能丢失的问题',phase:'running',text:'部分内容',error:null,context:preview,suggestions:[]}]};mock.bridge.generate=input=>{mock.calls.generate.push(input);mock.emit(old);return new Promise(resolve=>{finish=resolve;});};
-  await h.click(h.button('生成建议'));assert.equal(h.button('新对话').disabled,true);await h.click(h.button('停止生成'));assert.match(h.query('.ai-transcript').textContent,/部分内容/);await h.click(h.button('新对话'));assert.equal(document.querySelectorAll('.ai-turn').length,0);assert.equal(h.label('给 AI 的问题').value,'');await h.input(h.label('给 AI 的问题'),'新对话草稿');await h.action(()=>finish({...old,phase:'done',text:'迟到的回答'}));assert.equal(document.querySelectorAll('.ai-turn').length,0);assert.equal(h.label('给 AI 的问题').value,'新对话草稿');
- }finally{await h.close();}
-});
-
-test('the assistant links to the existing item-review workspace without creating a task',async()=>{
- const mock=conversationBridge(),h=await appDom();try{
-  window.journalAI=mock.bridge;await h.mount();await h.click(h.label('AI 助手'));await h.click(h.button('打开事项审视'));assert.equal(document.querySelector('dialog[open]'),null);assert.equal(window.sessionStorage.getItem('review-tab'),'items');assert.equal(h.query('[data-review-tab="items"]').getAttribute('aria-selected'),'true');assert.equal(h.service.snapshot().state.tasks.length,1);assert.equal(mock.calls.generate.length,0);
- }finally{await h.close();}
-});
-
-test('closing waits for stop and retains the conversation and question if cancellation fails',async()=>{
- const running={id:'closing',conversationId:'closing-chat',scope:{kind:'today'},phase:'running',text:'已收到的部分内容',error:null,context:preview,suggestions:[],turns:[{id:'closing',scope:{kind:'today'},prompt:'需要保留的问题',phase:'running',text:'已收到的部分内容',error:null,context:preview,suggestions:[]}]},mock=conversationBridge(running),h=await aiDom(mock.bridge);let closed=0,reject;try{
-  await h.render('AiAssistant',{onClose(){closed++;},onSettings(){}});const cancel=mock.bridge.cancel;mock.bridge.cancel=()=>new Promise((_,no)=>{reject=no;});await h.click(h.label('关闭'));assert.equal(closed,0);await h.action(()=>reject(Error('停止请求暂未完成')));assert.equal(closed,0);assert.match(h.query('.ai-error').textContent,/停止请求暂未完成/);assert.match(h.query('.ai-transcript').textContent,/需要保留的问题.*已收到的部分内容/s);
-  mock.bridge.cancel=cancel;await h.click(h.label('关闭'));assert.equal(closed,1);assert.equal(mock.state().phase,'cancelled');
- }finally{await h.close();}
-});
-
-test('conversation history and context are separate from the always-reachable composer, preserving authored focus during updates',async()=>{
- const mock=conversationBridge(),h=await aiDom(mock.bridge);try{
-  await h.render('AiAssistant',{onClose(){},onSettings(){}});await h.input(h.label('给 AI 的问题'),'第一问');await h.click(h.button('生成建议'));await h.input(h.label('给 AI 的问题'),'第二问');await h.click(h.button('继续对话'));
-  const pane=h.label('AI 对话记录'),composer=h.query('.ai-compose'),question=h.label('给 AI 的问题'),options=h.query('.ai-compose-context');
-  assert.equal(pane.parentElement,composer.parentElement);assert.equal(pane.contains(question),false);assert.equal(pane.tabIndex,0);assert.equal(options.contains(question),false);assert.equal(options.contains(h.query('.ai-compose-actions')),false);assert.equal(composer.contains(question),true);assert.equal(composer.contains(h.query('.ai-compose-actions')),true);
-  await h.input(question,'仍在输入的追问');await h.action(()=>{question.focus();question.setSelectionRange(2,5);});const next=mock.state();next.turns.at(-1).text+='\n补充说明';next.text=next.turns.at(-1).text;await h.action(()=>mock.emit(next));assert.equal(document.activeElement,question);assert.equal(question.value,'仍在输入的追问');assert.equal(question.selectionStart,2);assert.equal(question.selectionEnd,5);
- }finally{await h.close();}
-});
-
-function prioritiesBridge(){
- const mock=mockBridge();let sequence=0;
- mock.bridge.context=async(scope,purpose='general')=>{mock.calls.context.push({scope,purpose});return {...structuredClone(preview),label:purpose==='priorities'?'全部未完成任务（本次范围）':'日常整理范围'};};
- mock.bridge.generate=async input=>{mock.calls.generate.push(input);const old=mock.state(),purpose=input.purpose??'general',same=old.purpose===purpose&&old.scope?.kind===input.scope.kind&&old.scope?.itemId===input.scope.itemId,id=`priorities-${++sequence}`,turn={id,scope:input.scope,purpose,prompt:input.prompt,phase:'done',text:'先确认目标：今天最希望解决什么问题？哪些截止不能调整？',error:null,context:preview,suggestions:[{...suggestion,id:`suggestion-${sequence}`}]},turns=same?[...(old.turns??[]).map(t=>({...t,suggestions:t.suggestions.map(s=>s.state==='pending'?{...s,state:'historical'}:s)})),turn]:[turn];mock.emit({...turn,conversationId:`chat-${purpose}`,turns});return mock.state();};
- return mock;
-}
-
-test('priorities mode starts with all unfinished tasks and separates conversation and drafts from general mode',async()=>{
- const mock=prioritiesBridge(),h=await aiDom(mock.bridge);try{
- await h.render('AiAssistant',{initialPurpose:'priorities',onClose(){},onSettings(){}});assert.equal(h.label('AI 对话模式').value,'priorities');assert.equal(h.label('AI 分析范围').value,'all');assert.equal(mock.calls.context.at(-1).purpose,'priorities');assert.match(h.query('.ai-intro').textContent,/先问清目标和约束.*调整需逐条确认/);assert.match(h.query('.ai-context summary').textContent,/已截断/);assert.match(document.body.textContent,/最近 20 轮/);
- await h.click(h.button('从目标与约束开始'));await h.click(h.button('生成建议'));assert.equal(mock.calls.generate[0].purpose,'priorities');assert.equal(mock.calls.generate[0].scope.kind,'all');assert.equal(mock.calls.apply.length,0);
- await h.input(h.label('给 AI 的问题'),'优先级模式未发送的约束');await h.input(h.label('AI 对话模式'),'general');assert.match(h.query('.ai-scope-change').textContent,/模式已改变.*新对话/);assert.equal(document.querySelector('[aria-label^="确认应用"]'),null);assert.equal(h.label('给 AI 的问题').value,'');await h.input(h.label('给 AI 的问题'),'普通模式草稿');await h.input(h.label('AI 对话模式'),'priorities');assert.equal(h.label('给 AI 的问题').value,'优先级模式未发送的约束');await h.input(h.label('AI 对话模式'),'general');assert.equal(h.label('给 AI 的问题').value,'普通模式草稿');await h.click(h.button('生成建议'));assert.equal(document.querySelectorAll('.ai-turn').length,1);assert.equal(mock.state().purpose,'general');assert.equal(mock.calls.apply.length,0);
- }finally{await h.close();}
-});
-
-test('priority follow-ups stay in scope, apply only confirmed changes and refresh the records preview',async()=>{
- const mock=prioritiesBridge(),h=await aiDom(mock.bridge);try{
- await h.render('AiAssistant',{initialPurpose:'priorities',onClose(){},onSettings(){}});await h.input(h.label('AI 分析范围'),'recent');await h.input(h.label('给 AI 的问题'),'我只有两小时，先问我目标');await h.click(h.button('生成建议'));const before=mock.calls.context.length;await h.click(h.label('确认应用 明确事项名称'));assert.equal(mock.calls.apply.length,1);assert.ok(mock.calls.context.length>before);
- await h.input(h.label('给 AI 的问题'),'目标是交付方案，下一步比较风险');await h.click(h.button('继续对话'));assert.equal(document.querySelectorAll('.ai-turn').length,2);assert.equal(mock.calls.generate.at(-1).purpose,'priorities');assert.equal(mock.calls.generate.at(-1).scope.kind,'recent');assert.match(h.query('.ai-transcript').textContent,/我只有两小时.*目标是交付方案/s);assert.match(h.query('.ai-response-scope').textContent,/优先级澄清.*已截断/);assert.equal(mock.calls.apply.length,1);
- }finally{await h.close();}
-});
-
-test('Today opens priorities directly without mutating tasks or sending a request',async()=>{
- const mock=prioritiesBridge(),h=await appDom();window.journalAI=mock.bridge;try{
- h.add('今日待整理任务',null);const before=h.service.snapshot().state;await h.mount();await h.click(h.button('AI 帮我理清优先级'));assert.equal(h.label('AI 对话模式').value,'priorities');assert.equal(h.label('AI 分析范围').value,'all');assert.equal(mock.calls.generate.length,0);assert.equal(mock.calls.apply.length,0);assert.deepEqual(h.service.snapshot().state.tasks,before.tasks);
- }finally{delete window.journalAI;await h.close();}
-});
-test('reopening the assistant restores priority mode despite an older general draft',async()=>{
- const mock=prioritiesBridge(),h=await aiDom(mock.bridge);try{
- const props={onClose(){},onSettings(){}};await h.render('AiAssistant',props);await h.input(h.label('给 AI 的问题'),'保留普通草稿');await h.input(h.label('AI 对话模式'),'priorities');await h.input(h.label('AI 分析范围'),'recent');await h.input(h.label('给 AI 的问题'),'先澄清目标');await h.click(h.button('生成建议'));await h.input(h.label('给 AI 的问题'),'优先级待补充约束');await h.render(null);await h.render('AiAssistant',props);assert.equal(h.label('AI 对话模式').value,'priorities');assert.equal(h.label('AI 分析范围').value,'recent');assert.equal(h.label('给 AI 的问题').value,'优先级待补充约束');await h.input(h.label('AI 对话模式'),'general');assert.equal(h.label('给 AI 的问题').value,'保留普通草稿');
- }finally{await h.close();}
-});
-
-function modelsBridge(){const mock=mockBridge();mock.calls.models=[];mock.calls.cancelModels=0;mock.bridge.listModels=async input=>{mock.calls.models.push(input);return {baseUrl:input.baseUrl,models:['alpha-chat','beta-tools','gamma'],partial:false};};mock.bridge.cancelModels=async()=>{mock.calls.cancelModels++;};return mock;}
 
 test('model discovery works before model setup and selection stays a draft until save',async()=>{
  const mock=modelsBridge();mock.setStatus({model:'',hasKey:false,configured:false});const h=await aiDom(mock.bridge);try{
@@ -226,22 +138,21 @@ test('model discovery remains disabled until connection settings load and unmoun
  }finally{await h.close();}
 });
 
-test('schedule repair stays a running turn without confirmable proposals and succeeds within the same conversation',async()=>{
- const mock=conversationBridge(),h=await aiDom(mock.bridge);let finish;try{
- mock.bridge.generate=input=>{mock.calls.generate.push(input);return new Promise(resolve=>{finish=resolve;});};await h.render('AiAssistant',{onClose(){},onSettings(){}});await h.input(h.label('给 AI 的问题'),'调整截止安排并检查父级约束');await h.click(h.button('生成建议'));
- const turn={id:'repair-run',scope:{kind:'today'},purpose:'general',prompt:'调整截止安排并检查父级约束',phase:'running',text:'正在检查安排。',error:'不应作为终局显示的中间冲突',repair:{attempt:1,maxAttempts:2,message:'发现安排冲突，正在调整建议。'},context:preview,suggestions:[suggestion]};await h.action(()=>mock.emit({...turn,conversationId:'repair-chat',turns:[turn]}));assert.match(h.query('.ai-response header').textContent,/正在调整建议（1\/2）/);assert.match(h.query('.ai-response').textContent,/发现安排冲突/);assert.equal(h.query('.ai-response').querySelector('.ai-error'),null);assert.equal(document.querySelector('[aria-label^="确认应用"]'),null);assert.equal(h.label('给 AI 的问题').value,'调整截止安排并检查父级约束');assert.ok(h.button('停止生成'));
- const done={...turn,phase:'done',error:null,text:'已重新安排可确认的截止建议。'};await h.action(()=>{const result={...done,conversationId:'repair-chat',turns:[done]};mock.emit(result);finish(result);});assert.match(h.query('.ai-response').textContent,/已调整建议，请核对/);assert.doesNotMatch(h.query('.ai-response').textContent,/发现安排冲突，正在调整/);assert.equal(h.label('确认应用 明确事项名称').disabled,false);assert.equal(mock.calls.apply.length,0);assert.equal(document.querySelectorAll('.ai-turn').length,1);await h.action(()=>mock.emit({...done,suggestions:[],turns:[{...done,suggestions:[]}]}));assert.match(h.query('.ai-response').textContent,/已重新分析，请查看下方说明/);assert.doesNotMatch(h.query('.ai-response').textContent,/请核对修改后逐条确认/);
+
+test('date editors preserve local precision, submit only changed fields and retain the atomic review safeguard',async()=>{
+ const mock=sidebarBridge(),h=await aiDom(mock.bridge);try{
+ const base=mock.state(),proposal={...suggestion,runId:'date-run',editable:{date:'2026-11-06',dueAt:'2026-11-09','review.nextDate':'2026-11-10',at:'2026-11-08T09:20:35.000Z'},editableLabels:{date:'计划开始',dueAt:'截止时间','review.nextDate':'下次审视日期',at:'提醒时间'}},turn={id:'date-run',purpose:'general',scope:{kind:'today'},prompt:'修改安排',phase:'done',text:'请检查日期',error:null,context:preview,suggestions:[proposal]};mock.emit({...base,...turn,turns:[turn]});await h.render('AiAssistant',props);await proposals(h);await h.click(h.button('编辑建议'));assert.equal(h.label('编辑 明确事项名称 计划开始').type,'date');assert.equal(h.label('编辑 明确事项名称 下次审视日期').type,'date');assert.equal(h.label('编辑 明确事项名称 提醒时间').type,'datetime-local');assert.equal(h.label('编辑 明确事项名称 截止时间').type,'date');assert.match(h.query('.ai-proposal-editor').textContent,/该日零点前/);await h.input(h.label('编辑 明确事项名称 下次审视日期'),'2026-11-12');await h.input(h.label('编辑 明确事项名称 截止时间'),'');await h.click(h.button('保存建议'));assert.deepEqual(mock.calls.edit[0].values,{dueAt:null,'review.nextDate':'2026-11-12'});assert.equal(mock.calls.apply.length,0);
  }finally{await h.close();}
 });
 
-test('repair exhaustion retains field conflicts and draft, and permits another conversational request',async()=>{
- const mock=conversationBridge(),h=await aiDom(mock.bridge);try{
- mock.bridge.generate=async input=>{mock.calls.generate.push(input);const turn={id:'repair-failed',scope:input.scope,purpose:'general',prompt:input.prompt,phase:'error',text:'',error:'「交付方案」截止时间不能早于前置事项「确认需求」。',repair:{attempt:2,maxAttempts:2,message:'发现安排冲突，正在调整建议。'},context:preview,suggestions:[suggestion]},state={...turn,conversationId:'repair-chat',turns:[turn]};mock.emit(state);return state;};await h.render('AiAssistant',{onClose(){},onSettings(){}});await h.input(h.label('给 AI 的问题'),'先调整交付截止');await h.click(h.button('生成建议'));assert.match(h.query('.ai-response .ai-error').textContent,/交付方案.*截止时间.*确认需求/);assert.match(h.query('.ai-response').textContent,/补充目标或约束后继续对话/);assert.equal(h.label('给 AI 的问题').value,'先调整交付截止');assert.equal(document.querySelector('[aria-label^="确认应用"]'),null);await h.input(h.label('给 AI 的问题'),'请保留截止，先调整前置范围');await h.click(h.button('继续对话'));assert.equal(mock.calls.generate.length,2);assert.equal(mock.calls.generate[1].prompt,'请保留截止，先调整前置范围');assert.equal(mock.calls.apply.length,0);
+test('reading position survives task navigation, collapsed panel, tab changes and conversation history',async()=>{
+ const mock=sidebarBridge(),h=await aiDom(mock.bridge);try{
+ await h.render('AiAssistant',props);await h.input(h.label('给 AI 的问题'),'对话一');await h.click(h.button('生成建议'));const pane=h.query('.ai-transcript');Object.defineProperty(pane,'scrollHeight',{configurable:true,value:1000});Object.defineProperty(pane,'clientHeight',{configurable:true,value:200});pane.scrollTop=130;await h.action(()=>pane.dispatchEvent(new Event('scroll',{bubbles:true})));await proposals(h);await h.click(h.query('#ai-chat-tab'));assert.equal(pane.scrollTop,130);await h.render('AiAssistant',{...props,open:false});await h.render('AiAssistant',props);assert.equal(pane.scrollTop,130);await h.click(h.label('新对话'));await h.input(h.label('给 AI 的问题'),'对话二');await h.click(h.button('生成建议'));pane.scrollTop=310;await h.action(()=>pane.dispatchEvent(new Event('scroll',{bubbles:true})));await h.click(h.label('历史对话'));await h.click(h.query('[data-conversation-id="chat-1"]'));assert.equal(pane.scrollTop,130);await h.click(h.button('回到最新'));assert.equal(pane.scrollTop,1000);
  }finally{await h.close();}
 });
 
-test('stopping a repair keeps the authored question and no invalid proposal becomes confirmable',async()=>{
- const mock=conversationBridge(),h=await aiDom(mock.bridge);try{
- mock.bridge.generate=async input=>{const turn={id:'repair-stopped',scope:input.scope,purpose:'general',prompt:input.prompt,phase:'running',text:'已收到一部分安排说明。',error:null,repair:{attempt:1,maxAttempts:2,message:'发现安排冲突，正在调整建议。'},context:preview,suggestions:[suggestion]},state={...turn,conversationId:'repair-chat',turns:[turn]};mock.emit(state);return state;};await h.render('AiAssistant',{onClose(){},onSettings(){}});await h.input(h.label('给 AI 的问题'),'保留此问题继续调整');await h.click(h.button('生成建议'));await h.click(h.button('停止生成'));assert.equal(mock.calls.cancel,1);assert.equal(h.label('给 AI 的问题').value,'保留此问题继续调整');assert.match(h.query('.ai-response').textContent,/建议调整已停止.*已收到一部分/s);assert.equal(document.querySelector('[aria-label^="确认应用"]'),null);
+test('stopping a running correction keeps partial output without replacing a newly written draft',async()=>{
+ const mock=sidebarBridge(),h=await aiDom(mock.bridge);let finish;try{
+ mock.bridge.generate=input=>{mock.calls.generate.push(input);const old=mock.state(),turn={id:'repair-live',purpose:'general',scope:input.scope,prompt:input.prompt,phase:'running',text:'已经收到的说明',error:'中间校验错误不应显示',repair:{attempt:1,maxAttempts:2,message:'发现安排冲突，正在调整建议。'},context:preview,suggestions:[suggestion]};mock.emit({...old,...turn,turns:[turn]});return new Promise(resolve=>finish=resolve);};mock.bridge.cancel=async()=>{mock.calls.cancel++;const old=mock.state(),next={...old,phase:'cancelled',turns:old.turns.map(turn=>({...turn,phase:'cancelled',error:null}))};mock.emit(next);return next;};await h.render('AiAssistant',props);await h.input(h.label('给 AI 的问题'),'检查安排');await h.click(h.button('生成建议'));assert.match(h.query('.ai-repair-state').textContent,/发现安排冲突/);assert.equal(document.querySelector('.ai-response .ai-error'),null);assert.equal(document.querySelector('[aria-label^="确认应用"]'),null);await h.input(h.label('给 AI 的问题'),'下一轮先保留截止');await h.click(h.button('停止生成'));assert.equal(mock.calls.cancel,1);assert.equal(h.label('给 AI 的问题').value,'下一轮先保留截止');assert.match(h.query('.ai-response').textContent,/建议调整已停止.*已经收到/s);await h.action(()=>finish({...mock.state(),phase:'done'}));assert.match(h.query('.ai-response header').textContent,/已停止/);
  }finally{await h.close();}
 });

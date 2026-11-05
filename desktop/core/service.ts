@@ -43,6 +43,9 @@ export class JournalService {
   private checkpointAt: number;
   private history:HistoryEntry[]=[];
   private redoHistory:HistoryEntry[]=[];
+  private aiUndoTokens=new WeakMap<HistoryEntry,string>();
+  aiUndoToken():string|null {const entry=this.history.at(-1);if(!entry)return null;let token=this.aiUndoTokens.get(entry);if(!token){token=randomUUID();this.aiUndoTokens.set(entry,token);}return token;}
+  undoAi(token:string):Snapshot {if(!token||this.aiUndoToken()!==token)throw Error('此建议不再是最近可撤销的操作。');return this.execute({type:'history.undo'});}
   constructor(private store: JournalStore,private clock: WorkClock=realClock,public demo=false,private appVersion='development') {
     const loaded=store.load();this.state=migrateOutline(loaded,localDate(clock.now()));validateDependencyGraph(this.state);
     if(JSON.stringify(loaded)!==JSON.stringify(this.state))store.save(this.state);

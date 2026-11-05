@@ -22,21 +22,21 @@ export class AiPlanValidationError extends Error {constructor(message:string,pub
 export interface AiPlanEntry {view:AiSuggestion;command:Command;expected:Map<string,string>;scopeIds:Set<string>;effect:string|null}
 
 export function buildAiContext(snapshot:Snapshot,scope:AiScope,options:{purpose?:AiPurpose;focusReview?:boolean;allowRecurrenceChange?:boolean;allowReviewCreation?:boolean;focusText?:string;fixedReviewWeekday?:boolean;requestedReviewInterval?:import('./types').ReviewSchedule['interval']|null}={}):AiContext {
- if(!scope||!['item','today','recent','all'].includes(scope.kind))throw Error('请选择有效的 AI 参考范围。');
- const state=snapshot.state,index=outlineIndex(state),today=localDate(snapshot.now),start=scope.kind==='all'?'0001-01-01':scope.kind==='today'?today:shiftDate(today,-6);
+ if(!scope||!['item','today','recent','all','unfinished'].includes(scope.kind))throw Error('请选择有效的 AI 参考范围。');
+ const state=snapshot.state,index=outlineIndex(state),today=localDate(snapshot.now),start=(scope.kind==='all'||scope.kind==='unfinished')?'0001-01-01':scope.kind==='today'?today:shiftDate(today,-6);
  const hidden=new Set<string>();
  for(const node of index.ordered)if((node.record as Task).deletedAt||node.record.archived||node.parentId&&hidden.has(node.parentId))hidden.add(node.id);
  let candidates:Task[];
  if(scope.kind==='item'){
   if(typeof scope.itemId!=='string'||!index.nodes.has(scope.itemId)||hidden.has(scope.itemId))throw Error('请选择仍在清单中的事项。');
   const ids=branchIds(index,scope.itemId);candidates=index.ordered.filter(n=>ids.has(n.id)&&!hidden.has(n.id)).map(n=>n.record as Task);
- }else if(scope.kind==='all'){
+ }else if(scope.kind==='all'||scope.kind==='unfinished'){
   candidates=index.ordered.filter(n=>!hidden.has(n.id)).map(n=>n.record as Task);
  }else{
   const recorded=new Set(state.sessions.filter(s=>s.taskId!==null&&(s.date>=start&&s.date<=today||s.segments.some(seg=>localDate(seg.start)<=today&&localDate(seg.end)>=start))).map(s=>s.taskId));
   candidates=state.tasks.filter(t=>!hidden.has(t.id)&&(recorded.has(t.id)||t.eventAt&&localDate(t.eventAt)>=start&&localDate(t.eventAt)<=today||isCurrentFocus(t,today)||t.reviewSchedule?.enabled&&!!t.reviewSchedule.nextDate&&t.reviewSchedule.nextDate<=today||t.plannedDate&&t.plannedDate>=start&&t.plannedDate<=today||t.completedAt&&localDate(t.completedAt)>=start&&localDate(t.completedAt)<=today||t.dueAt&&localDate(deadlineTime(t.dueAt))<=today&&(localDate(deadlineTime(t.dueAt))>=start||scope.kind==='today'&&t.status==='open')));
  }
- const purpose=options.purpose??'general';if(!['general','priorities'].includes(purpose))throw Error('请选择有效的对话用途。');
+ const purpose=scope.kind==='unfinished'?'priorities':options.purpose??'general';if(!['general','priorities'].includes(purpose))throw Error('请选择有效的对话用途。');
  const scopeIds=new Set(candidates.map(t=>t.id));
  if(purpose==='priorities')candidates=candidates.filter(t=>isTask(t)&&t.status==='open');
  if(options.focusReview&&purpose!=='priorities'){const request=(options.focusText??'').normalize('NFKC').toLocaleLowerCase(),score=(t:Task)=>{const title=t.title.trim().normalize('NFKC').toLocaleLowerCase();return (title.length>=2&&request.includes(title)?2:0)+Number(!!t.reviewSchedule?.enabled&&!!t.reviewSchedule.nextDate&&t.reviewSchedule.nextDate<=today);};candidates=candidates.slice().sort((a,b)=>score(b)-score(a));}
@@ -47,7 +47,7 @@ export function buildAiContext(snapshot:Snapshot,scope:AiScope,options:{purpose?
  const statuses=deriveDependencyStatuses(state);
  const itemData=tasks.map(t=>({id:t.id,parentId:t.parentId,title:t.title,...purpose==='priorities'?{parentPath:outlinePath(index,t.id).slice(0,-1).filter(n=>scopeIds.has(n.id)).map(n=>n.title)}:{},dependency:t.dependencyPlan?{mode:t.dependencyPlan.mode,predecessors:t.dependencyPlan.predecessors.filter(p=>initialIds.has(p.id)).map(p=>({id:p.id,offset:p.offset})),...purpose==='priorities'?{contextPredecessors:t.dependencyPlan.predecessors.filter(p=>!initialIds.has(p.id)&&scopeIds.has(p.id)).map(p=>{const predecessor=index.nodes.get(p.id)?.record as Task|undefined;return {title:predecessor?.title??'未知',status:predecessor?.status??null};})}:{},hiddenPredecessors:t.dependencyPlan.predecessors.filter(p=>!initialIds.has(p.id)&&(purpose!=='priorities'||!scopeIds.has(p.id))).length,waiting:statuses.get(t.id)?.waiting??false}:null,type:t.itemType??'task',status:isInformation(t)?null:t.status,completionBy:t.status==='done'?(t.completionBy??'unknown'):null,ownership:t.ownership?{assignee:t.ownership.assignee,followUp:t.ownership.followUp,at:t.ownership.at,note:t.ownership.note,followUpAt:t.ownership.reminder?.at??null}:null,description:(t.description??'').slice(0,800),isProject:!!t.isProject,plannedDate:t.plannedDate,dueAt:t.dueAt,focusDate:t.focusDate??null,currentFocus:isCurrentFocus(t,today),reviewSchedule:t.reviewSchedule??null,estimateMinutes:t.estimateMinutes,spentMinutes:Math.round((index.stats.get(t.id)?.ownMs??0)/6000)/10,remainingEstimateMinutes:isInformation(t)?null:estimateProgress(state,t.id).remaining,eventAt:t.eventAt??null,eventEnd:t.eventEnd??null,remindAt:t.reminder?.at??null,tags:(t.tagIds??[]).map(id=>tagNames.get(id)).filter(Boolean)}));
  let effort=records.slice(-100).map(s=>({taskId:s.taskId,date:s.date,minutes:Math.round(periodEffort([s],start,today).cumulativeMs/6000)/10,status:s.status,summary:s.summary.slice(0,500)}));
- const label=scope.kind==='item'?'「'+index.nodes.get(scope.itemId!)!.title+'」及子项':scope.kind==='today'?'今日事项与投入':scope.kind==='all'?'全部事项与投入':'最近 7 天事项与投入';
+ const label=scope.kind==='item'?'「'+index.nodes.get(scope.itemId!)!.title+'」及子项':scope.kind==='today'?'今日事项与投入':scope.kind==='all'?'全部事项与投入':scope.kind==='unfinished'?'全部未完成任务':'最近 7 天事项与投入';
  const serialize=()=>JSON.stringify({now:snapshot.now,timezone:Intl.DateTimeFormat().resolvedOptions().timeZone,range:{start,end:today},scope:label,purpose,...purpose==='priorities'?{coverage:{eligibleTasks:candidates.length,includedTasks:itemData.length}}:{},truncated,items:itemData,effort});
  let content=serialize();
  while(content.length>65000&&(effort.length||itemData.length>1)){truncated=true;if(effort.length)effort.shift();else itemData.pop();content=serialize();}

@@ -1,0 +1,25 @@
+.journal-style .application.workbench.ai-is-open .shell{grid-template-columns:var(--nav-width,220px) minmax(0,1fr) minmax(380px,min(var(--ai-panel-width,480px),44vw))}
+.ai-workspace-slot{min-width:0;min-height:0;position:relative;overflow:hidden;background:var(--surface);border-left:1px solid var(--line)}
+.ai-workspace-slot[hidden],.ai-workspace-frame[hidden],.ai-related-pane[hidden],.ai-related-page[hidden],.workspace-origin[hidden]{display:none!important}
+.workspace-origin{min-height:0;height:100%;position:relative}
+.ai-workspace-frame{height:100%;min-width:0;min-height:0;position:relative}
+.ai-workspace-resizer{position:absolute;top:0;bottom:0;left:0;width:6px;cursor:col-resize;z-index:4;touch-action:none}
+.ai-workspace-resizer:hover,.ai-workspace-resizer:focus-visible{background:var(--accent-soft);outline:1px solid var(--accent);outline-offset:-1px}
+.ai-related-pane,.ai-related-page{height:100%;min-height:0;display:flex;flex-direction:column;background:var(--surface)}
+.ai-related-toolbar{display:flex;align-items:center;gap:12px;padding:10px 18px;border-bottom:1px solid var(--line);flex:none}
+.ai-related-toolbar small{color:var(--muted);font-size:11px}
+.ai-related-page{flex:1}.ai-related-page>.related-detail{flex:1;min-height:0;border:0}
+.ai-related-pane .task-inspector{width:100%;max-width:none;border:0}
+.journal-style .application.workbench.ai-is-expanded .shell{grid-template-columns:var(--nav-width,220px) minmax(0,1fr)}
+.application.ai-is-expanded .shell>.main{display:none}
+.application.ai-is-expanded .ai-workspace-resizer{display:none}
+.ai-nav-running{width:6px;height:6px;background:var(--accent);border-radius:50%;margin-left:auto}
+.application.ai-is-open .timer-dock{right:calc(min(var(--ai-panel-width,480px),44vw) + 12px);left:auto;transform:none;max-width:calc(100% - var(--nav-width,220px) - min(var(--ai-panel-width,480px),44vw) - 24px)}
+@media(max-width:1100px){
+ .journal-style .application.workbench.ai-is-open .shell{grid-template-columns:var(--nav-width,190px) minmax(0,1fr)}
+ .application.ai-is-open:not(.ai-is-detail) .shell>.main{display:none}
+ .application.ai-is-open.ai-is-detail .ai-workspace-slot{display:none}
+ .application.ai-is-open .ai-workspace-resizer{display:none}
+ .application.ai-is-open .timer-dock{right:12px;max-width:calc(100% - var(--nav-width,190px) - 24px)}
+}
+@media(max-width:740px){.journal-style .application.workbench.ai-is-open .shell,.journal-style .application.workbench.ai-is-expanded .shell{grid-template-columns:minmax(0,1fr)}.ai-related-toolbar{padding-inline:12px}.ai-related-toolbar small{display:none}}
