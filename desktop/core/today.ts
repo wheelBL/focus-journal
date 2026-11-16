@@ -1,4 +1,4 @@
-import {isDailyFocus} from './daily-focus';
+import {isCurrentFocus} from './daily-focus';
 import {isInformation} from './item-kind';
 import {blockedReason} from './item-state';
 import {itemSorter} from './item-order';
@@ -8,14 +8,35 @@ import {localDate,sessionMsOnDate,type JournalState,type Session,type Task} from
 
 export function todayCandidates(state:JournalState,now:string){
  const index=outlineIndex(state),date=localDate(now);
- const eligible=itemSorter(index,'smart',now,false)(index.ordered).map(n=>n.record as Task).filter(t=>!t.ownership&&!blockedReason(index,t.id)&&!isInformation(t));
- const active=new Set(state.sessions.filter(s=>s.status!=='ended').map(s=>s.taskId));
- const leaves=eligible.filter(t=>!active.has(t.id)&&!(index.children.get(t.id)??[]).some(n=>!(n.record as Task).deletedAt&&!(n.record as Task).archived));
- const worked=new Set(state.sessions.map(s=>s.taskId));
- const available=leaves.filter(t=>(!t.plannedDate||t.plannedDate<=date||isDailyFocus(t,date))&&!t.dependencyPlan?.predecessors.some(e=>(index.nodes.get(e.id)?.record as Task|undefined)?.status!=='done'));
- const selected=eligible.find(t=>t.id===state.settings.selectedTaskId&&!active.has(t.id));
- const next=selected??(!active.size?(available.find(t=>isDailyFocus(t,date))??available.find(t=>t.plannedDate===date||isDeadlineOverdue(t.dueAt,now))??available.find(t=>worked.has(t.id))??available.find(t=>!t.isProject)):undefined);
- return {index,eligible,available,next};
+ const eligible=itemSorter(index,'smart',now,false)(index.ordered)
+  .map(node=>node.record as Task)
+  .filter(task=>!task.ownership&&!isInformation(task)&&!blockedReason(index,task.id));
+ const activeTasks=new Set(state.sessions.filter(session=>session.status!=='ended').map(session=>session.taskId));
+ const executable=eligible.filter(task=>!activeTasks.has(task.id)
+  &&(!task.plannedDate||task.plannedDate<=date)
+  &&!task.dependencyPlan?.predecessors.some(edge=>(index.nodes.get(edge.id)?.record as Task|undefined)?.status!=='done'));
+ const available=executable.filter(task=>!(index.children.get(task.id)??[]).some(({record})=>!(record as Task).deletedAt&&!record.archived));
+ const result=(next?:Task,nextReason?:string)=>({index,eligible,available,next,nextReason});
+
+ if(activeTasks.size)return result();
+ const focus=executable.find(task=>isCurrentFocus(task,date));
+ if(focus)return result(focus,'当前重点');
+ const scheduled=available.find(task=>task.plannedDate===date||isDeadlineOverdue(task.dueAt,now));
+ if(scheduled)return result(scheduled,isDeadlineOverdue(scheduled.dueAt,now)?'截止已过':'今天计划');
+
+ const availableById=new Map(available.map(task=>[task.id,task]));
+ let recentTask:Task|undefined,lastWorkAt=-Infinity;
+ for(const session of state.sessions){
+  if(!session.taskId||session.durationMs<=0)continue;
+  const task=availableById.get(session.taskId);
+  if(!task)continue;
+  const lastSegment=session.segments.findLast(segment=>segment.durationMs>0);
+  const workAt=Date.parse(lastSegment?.end??session.end??session.start??`${session.date}T00:00:00`);
+  if(workAt>lastWorkAt){recentTask=task;lastWorkAt=workAt;}
+ }
+ if(recentTask)return result(recentTask,'继续之前的事项');
+ const leaf=available.find(task=>!task.isProject);
+ return leaf?result(leaf,'可开始的事项'):result();
 }
 
 export interface DayProgress {task:Task|null;minutesMs:number;completed:boolean;lastSession:Session|null;summary:string;summaryAt?:string;summaryOrder?:number;lastSessionOrder?:number;firstOrder?:number}

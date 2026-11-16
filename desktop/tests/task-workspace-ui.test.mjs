@@ -1,6 +1,75 @@
 import {test} from 'node:test';
 import assert from 'node:assert/strict';
 import {appDom} from './app-dom.mjs';
+import {emptyFilter} from '../core/filters.ts';
+
+test('saved task views precede secondary views and a long group tree',async()=>{
+ const h=await appDom(),{add,service,mount,click,label,query,button}=h;
+ try{
+  const weekly=add('本周安排',null),other=add('随手记录',null);
+  service.execute({type:'view.save',payload:{name:'本周任务',filter:{...emptyFilter(),query:'本周'}}});
+  for(let i=0;i<32;i++)service.execute({type:'outline.create',payload:{title:`分组 ${i}`,kind:'group',parentId:null}});
+  await mount();
+  await click(label('任务'));
+  const views=label('事项视图'),groups=query('.shared-content-groups');
+  assert.ok(views.compareDocumentPosition(groups)&window.Node.DOCUMENT_POSITION_FOLLOWING);
+  assert.deepEqual([...views.querySelectorAll('button span')].map(span=>span.textContent),['当前重点','全部任务','可执行','未定开始','本周任务','已完成','已交接','待他人跟进']);
+  await click(button('本周任务',views));
+  assert.equal(button('本周任务',views).getAttribute('aria-pressed'),'true');
+  assert.ok(query(`[data-outline-id="${weekly}"]`));
+  assert.equal(document.querySelector(`[data-outline-id="${other}"]`),null);
+ }finally{await h.close();}
+});
+
+test('collapsing shared groups preserves scope, expanded branches and group drafts across modules',async()=>{
+ const h=await appDom(),{add,service,mount,click,input,label,query,button,action}=h;
+ const group=(title,parentId=null)=>service.execute({type:'outline.create',payload:{title,kind:'group',parentId}}).state.tasks.at(-1).id;
+ const branch=group('保留折叠分支'),child=group('隐藏子分组',branch),parent=group('工作分组'),scope=group('当前分组',parent);
+ const inside=add('组内待办',scope),outside=add('外部待办',null);
+ const groups=()=>label('共享分组'),groupRow=id=>document.querySelector(`[data-content-group="${id}"]`);
+ try{
+  await mount();
+  await click(label('任务'));
+  await click(label('折叠分组 保留折叠分支',groups()));
+  await click(button('当前分组',groups()));
+  await click(label('折叠分组列表'));
+  assert.equal(label('展开分组列表').getAttribute('aria-expanded'),'false');
+  assert.equal(groups().closest('.shared-group-body').hidden,true);
+  assert.match(query('.group-scope-summary').textContent,/工作分组 \/ 当前分组/);
+  assert.ok(query(`[data-outline-id="${inside}"]`));
+  assert.equal(document.querySelector(`[data-outline-id="${outside}"]`),null);
+  for(const page of ['笔记','提醒']){
+   await click(label(page));
+   assert.equal(groups().closest('.shared-group-body').hidden,true);
+   assert.match(query('.group-scope-summary').textContent,/工作分组 \/ 当前分组/);
+  }
+  await click(button('全部分组',query('.group-scope-summary')));
+  await click(label('任务'));
+  assert.ok(query(`[data-outline-id="${outside}"]`));
+  assert.equal(query('.shared-group-body').hidden,true);
+  await click(label('新增分组'));
+  assert.equal(label('折叠分组列表').getAttribute('aria-expanded'),'true');
+  assert.equal(groupRow(child),null);
+  assert.equal(label('展开分组 保留折叠分支',groups()).getAttribute('aria-expanded'),'false');
+  assert.equal(label('折叠分组 工作分组',groups()).getAttribute('aria-expanded'),'true');
+  assert.equal(document.activeElement,label('新分组名称'));
+  await input(label('新分组名称'),'保留的新分组');
+  const composingEnter=new KeyboardEvent('keydown',{key:'Enter',isComposing:true,bubbles:true,cancelable:true});
+  await action(()=>label('新分组名称').dispatchEvent(composingEnter));
+  assert.equal(composingEnter.defaultPrevented,true);
+  assert.equal(service.snapshot().state.tasks.some(task=>task.title==='保留的新分组'),false);
+  await click(label('折叠分组列表'));
+  await click(label('笔记'));
+  assert.equal(query('.shared-group-body').hidden,true);
+  await click(label('新增分组'));
+  assert.equal(label('新分组名称').value,'保留的新分组');
+  await click(button('保存',query('form[aria-label="新增分组"]')));
+  const created=service.snapshot().state.tasks.find(task=>task.title==='保留的新分组');
+  assert.equal(created.itemType,'group');
+  assert.equal(created.parentId,null);
+  assert.equal(button('保留的新分组',groups()).getAttribute('aria-pressed'),'true');
+ }finally{await h.close();}
+});
 
 test('task workspace projects legacy mixed branches and previews related notes without losing work',async()=>{
  const h=await appDom(),{add,get,service,mount,click,key,input,label,query,button,action}=h;

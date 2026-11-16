@@ -45,7 +45,9 @@ module.exports=async({main,run,until,check,wait,output,groupId,childId})=>{
  check(await run(main,`document.documentElement.scrollWidth<=innerWidth&&document.querySelector('.content-detail-pane').getBoundingClientRect().right<=innerWidth`),'New content columns fit native window');
  await nav('收件箱');await until(()=>run(main,`!!document.querySelector('[aria-label="整理当前内容"]')`),'Inbox editor missing');
  await run(main,`[...document.querySelectorAll('.inbox-page .content-note-row')].find(e=>e.textContent.includes('发布验证：待整理笔记')).click()`);
- await input('收件箱条目正文','已明确归属，不需要跳到别的页面。');await input('归属分组',groupId);await button('保存并下一条');
+ await input('收件箱条目正文','已明确归属，不需要跳到别的页面。');await input('归属分组',groupId);
+ const remaining=await run(main,`document.querySelectorAll('.inbox-page .content-note-row').length`);
+ await button(remaining===1?'保存并结束整理':'保存并下一条');
  await until(async()=> (await snap()).state.tasks.some(t=>t.title==='发布验证：待整理笔记'&&t.parentId===groupId),'Inbox save and next did not organize');
  check(await run(main,`!!document.querySelector('.inbox-page')&&!document.querySelector('[aria-label="共享分组"]')&&!document.querySelector('.inbox-page .content-list-pane').textContent.includes('发布验证：待整理笔记')`),'Inbox organizes atomically, advances in place, and ignores content scope');
  await screenshot('content-inbox-dark');

@@ -34,8 +34,9 @@ module.exports=async({main,run,until,check,wait,output})=>{
  await run(main,`document.querySelector('.top-navigation [aria-label="收件箱"]').click()`);
  await until(()=>run(main,`!!document.querySelector('.inbox-page')`),'Inbox missing');
  await run(main,`[...document.querySelectorAll('.inbox-page .content-note-row')].find(b=>b.textContent.includes('发布验证：待澄清事件')).click()`);
- await until(()=>run(main,`[...document.querySelectorAll('button')].some(b=>b.textContent.trim()==='保存并移出收件箱')`),'Direct event processing action missing');
- await click(main,'保存并移出收件箱');
+ const organizeLabel=inboxCount(before)===0?'保存并结束整理':'保存并移出收件箱';
+ await until(()=>run(main,`document.querySelector('.inbox-editor button[type="submit"]')?.textContent.trim()===${JSON.stringify(organizeLabel)}`),'Direct event processing action missing');
+ await click(main,organizeLabel);
  await until(async()=>((await item('发布验证：待澄清事件'))?.parentId===null),'Event not organized');
  const organized=await item('发布验证：待澄清事件');
  check(organized.id===pending.id&&organized.itemType==='event'&&organized.eventAt===pending.eventAt&&inboxCount(await snapshot())===inboxCount(before),'Organizing event preserves identity/date and removes its Inbox reminder count');

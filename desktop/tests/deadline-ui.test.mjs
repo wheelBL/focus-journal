@@ -52,7 +52,8 @@ test('deadline precision works across tree, inspector, Today planning and task c
    await click(button('清除筛选'));
   });
   await t.test('Today planning preserves exact timestamps until explicitly switching precision',async()=>{
-   await click(label('今日'));await click(button('原有精确时间'));await click(button('2026-10-26 00:00'));const dialog=query('dialog');
+   await click(label('今日'));await click(button('选择重点'));await click(label('加入当前重点 原有精确时间',query('.today-focus-picker')));
+   const card=query('.today-next');assert.equal(query('.task-title',card).textContent,'原有精确时间');await click(button('2026-10-26 00:00',card));const dialog=query('dialog');
    assert.equal(label('截止时间方式',dialog).value,'datetime-local');assert.equal(label('截止时间',dialog).value,'2026-10-26T00:00');
    await input(label('截止时间方式',dialog),'date');await input(label('截止时间',dialog),'2026-10-23');await click(button('保存计划',dialog));assert.equal(get(exactId).dueAt,'2026-10-23');assert.ok(button('2026-10-23 前'));
   });

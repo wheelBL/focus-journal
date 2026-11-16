@@ -39,6 +39,66 @@ test('outline menu portals out of clipped panes, clamps to the viewport and keep
  }finally{window.HTMLElement.prototype.getBoundingClientRect=original;window.HTMLElement.prototype.scrollIntoView=originalScroll;await h.close();}
 });
 
+test('item menu leads with editing and execution while retaining type and timer guards',async()=>{
+ const h=await appDom();try{
+  const group=addKind(h,'共享目录',null,'group'),parent=h.add('任务父级',group),id=h.add('准备开始',parent);
+  const note=addKind(h,'审视中的笔记',parent,'note');
+  const menu=()=>h.query('[role="menu"]');
+  const actions=()=>[...menu().querySelectorAll('button')].map(button=>button.firstChild.textContent.trim());
+  const focused=()=>document.activeElement.firstChild.textContent.trim();
+  await h.mount();
+  await h.click(h.label('任务'));
+  await h.context(row(id));
+  assert.deepEqual(actions().slice(0,6),['重命名','加入当前重点','开始计时','完成事项','新增同级事项','新增子事项']);
+  assert.ok(actions().indexOf('重复安排…')>actions().indexOf('新增同级分组'));
+  assert.ok(actions().indexOf('移入回收站')>actions().indexOf('暂停事项'));
+  assert.equal(focused(),'重命名');
+  await h.key(document.activeElement,'ArrowDown');
+  assert.equal(focused(),'加入当前重点');
+  await h.key(document.activeElement,'ArrowDown');
+  assert.equal(focused(),'开始计时');
+  await h.key(document.activeElement,'ArrowUp');
+  assert.equal(focused(),'加入当前重点');
+  await h.key(document.activeElement,'Escape');
+  assert.equal(document.activeElement,row(id));
+
+  await h.context(row(group));
+  for(const action of ['加入当前重点','开始计时','完成事项','暂停事项','交接给他人…'])assert.equal(actions().includes(action),false);
+  assert.ok(h.button('转为事项',menu()));
+  await h.key(document.activeElement,'Escape');
+  await h.command({type:'item.change',payload:{id:parent,action:'pause'}});
+  await h.context(row(id));
+  const blocked=h.button('开始计时',menu());
+  assert.equal(blocked.disabled,true);
+  assert.match(blocked.title,/父级.*暂停/);
+  await h.key(document.activeElement,'ArrowDown');
+  await h.key(document.activeElement,'ArrowDown');
+  assert.equal(focused(),'完成事项');
+  await h.key(document.activeElement,'Escape');
+  assert.equal(h.service.snapshot().timers.length,0);
+
+  await h.command({type:'item.change',payload:{id:parent,action:'resume'}});
+  await h.context(row(id));
+  await h.click(h.button('开始计时',menu()));
+  const timer=h.service.snapshot().timers[0];
+  assert.equal(timer.taskId,id);
+  await h.command({type:'focus.pause',payload:{sessionId:timer.sessionId}});
+  await h.context(row(id));
+  await h.click(h.button('恢复计时',menu()));
+  assert.equal(h.service.snapshot().timers[0].sessionId,timer.sessionId);
+  assert.equal(h.service.snapshot().timers[0].paused,false);
+  await h.context(row(id));
+  assert.equal(h.button('此项正在计时',menu()).disabled,true);
+  await h.key(document.activeElement,'Escape');
+
+  await h.command({type:'item-review.configure',payload:{id:parent,enabled:true,nextDate:'2026-10-19',interval:{unit:'weeks',count:1}}});
+  await h.click(h.label('回顾'));
+  await h.context(row(note));
+  for(const action of ['加入当前重点','开始计时','切换计时到此项','完成事项','暂停事项'])assert.equal(actions().includes(action),false);
+  assert.ok(h.button('转为事项',menu()));
+ }finally{await h.close();}
+});
+
 test('Inbox is a dedicated view with pending organization count and return to tasks',async()=>{
  const h=await appDom();try{
   const task=h.add('待整理事项'),note=addKind(h,'待整理笔记','inbox','note'),child=h.add('保留嵌套',task),outside=h.add('范围外事项',null);
@@ -66,6 +126,6 @@ test('native Inbox request takes priority over stale locate and never recreates 
 
 test('organizing an Inbox item into a group preserves its identity and makes it visible in that task scope',async()=>{
  const h=await appDom();try{
-  const item=h.add('收件箱内容'),group=addKind(h,'另一个范围',null,'group');await h.mount();await h.click(h.label('收件箱'));assert.equal(h.label('收件箱条目名称').value,'收件箱内容');await h.input(h.label('归属分组'),group);await h.click(h.button('保存并下一条'));assert.equal(h.get(item).parentId,group);assert.match(h.query('.inbox-page').textContent,/没有待澄清内容/);await h.click(h.label('任务'));assert.ok(row(item));
+  const item=h.add('收件箱内容'),group=addKind(h,'另一个范围',null,'group');await h.mount();await h.click(h.label('收件箱'));assert.equal(h.label('收件箱条目名称').value,'收件箱内容');await h.input(h.label('归属分组'),group);await h.click(h.button('保存并结束整理'));assert.equal(h.get(item).parentId,group);assert.match(h.query('.inbox-page').textContent,/没有待澄清内容/);await h.click(h.label('任务'));assert.ok(row(item));
  }finally{await h.close();}
 });

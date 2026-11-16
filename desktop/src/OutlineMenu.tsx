@@ -7,7 +7,7 @@ import {localDate} from '../core/types';
 import {useDailyFocus} from './FocusToggle';
 import React,{useEffect,useLayoutEffect,useRef} from 'react';
 import {createPortal} from 'react-dom';
-import {isEvent,isInformation,isGroup,isReminder,type ItemType} from '../core/item-kind';
+import {isEvent,isInformation,isReminder,type ItemType} from '../core/item-kind';
 import {blockedReason} from '../core/item-state';
 import type {OutlineIndex,OutlineNode} from '../core/outline';
 import type {Task} from '../core/types';
@@ -18,7 +18,15 @@ export type OutlineMenuState={id:string|null;x:number;y:number};
 export function OutlineMenu({menu,index,close,create,rename,patch,stateAction,undo,restoreFocus,scopeId}:{scopeId?:string|null;menu:OutlineMenuState;index:OutlineIndex;close:()=>void;create:(parentId:string|null,afterId?:string|null,type?:ItemType)=>void;rename:(id:string)=>void;patch:(node:OutlineNode,field:string,value:unknown)=>Promise<unknown>;stateAction:(id:string,action:'done'|'reopen'|'pause'|'resume'|'cancel'|'delete'|'restore')=>Promise<unknown>;undo:()=>Promise<unknown>;restoreFocus:()=>void}){
  const toggleFocus=useDailyFocus();
  const shortcuts=useShortcuts(),hint=(action:ShortcutAction)=>shortcuts[action]?<kbd>{formatShortcut(shortcuts[action],desktopPlatform()).replace(/ \+ /g,' ')}</kbd>:null;
- const {data,run,dialog,busy}=useJournal(),ref=useRef<HTMLDivElement>(null),node=menu.id?index.nodes.get(menu.id):undefined,task=node?.record as Task|undefined,note=isInformation(task);
+ const {data,run,dialog,busy}=useJournal(),ref=useRef<HTMLDivElement>(null),node=menu.id?index.nodes.get(menu.id):undefined;
+ const task=node?.record as Task|undefined,information=isInformation(task),open=task?.status==='open'&&!task.deletedAt;
+ const insideScope=!!node&&node.id===scopeId,childDisabled=!!task&&!open;
+ const siblingParent=insideScope?node.id:node?.parentId??null,siblingAnchor=insideScope?null:node?.id;
+ const timer=task&&data.timers.find(timer=>timer.taskId===task.id);
+ const otherRunning=task&&data.timers.some(timer=>timer.taskId!==task.id&&!timer.paused);
+ const alreadyTiming=!!timer&&!timer.paused&&!otherRunning;
+ const timerLabel=otherRunning?'切换计时到此项':timer?.paused?'恢复计时':alreadyTiming?'此项正在计时':'开始计时';
+ const timerBlocked=task&&open&&!information?blockedReason(index,task.id):null;
  const createFromMenu=(parentId:string|null,afterId?:string|null,type?:ItemType)=>withOperationEntry('items.context',()=>create(parentId,afterId,type));
  const finish=(work:()=>unknown)=>{
   restoreFocus();const anchor=document.activeElement;let moved=false;
@@ -35,12 +43,44 @@ export function OutlineMenu({menu,index,close,create,rename,patch,stateAction,un
   if(['ArrowDown','ArrowUp','Home','End'].includes(e.key)){e.preventDefault();const buttons=[...e.currentTarget.querySelectorAll<HTMLButtonElement>('button:not(:disabled)')],i=buttons.indexOf(document.activeElement as HTMLButtonElement),at=e.key==='Home'?0:e.key==='End'?buttons.length-1:(i+(e.key==='ArrowDown'?1:-1)+buttons.length)%buttons.length;buttons[at]?.focus({preventScroll:true});buttons[at]?.scrollIntoView({block:'nearest'});}
   if(e.key==='Escape'){e.stopPropagation();close();restoreFocus();}
  }}>
-  {node?<><button role="menuitem" onClick={()=>createFromMenu(node.id===scopeId?node.id:node.parentId,node.id===scopeId?null:node.id)}>{node.id===scopeId?'新增范围内事项':'新增同级事项'} {hint('create-sibling')}</button><button role="menuitem" disabled={!!task&&(task.status!=='open'||!!task.deletedAt)} onClick={()=>createFromMenu(node.id)}>新增子事项 {hint('create-child')}</button><button role="menuitem" onClick={()=>createFromMenu(node.id===scopeId?node.id:node.parentId,node.id===scopeId?null:node.id,'note')}>{node.id===scopeId?'新增范围内笔记':'新增同级笔记'}</button><button role="menuitem" disabled={!!task&&(task.status!=='open'||!!task.deletedAt)} onClick={()=>createFromMenu(node.id,null,'note')}>新增子笔记</button><button role="menuitem" onClick={()=>createFromMenu(node.id===scopeId?node.id:node.parentId,node.id===scopeId?null:node.id,'event')}>新增同级事件</button><button role="menuitem" onClick={()=>createFromMenu(node.id,null,'group')}>新增子分组</button><button role="menuitem" onClick={()=>createFromMenu(node.parentId,node.id,'group')}>新增同级分组</button>
-   {task&&<><hr/>{!note&&['open','handed-off'].includes(task.status)&&!task.deletedAt&&<button role="menuitem" onClick={()=>finish(()=>dialog({type:'handoff',id:task.id}))}>{task.ownership?'调整交接 / 重新接手…':'交接给他人…'}</button>}{!note&&task.status==='done'&&<button role="menuitem" onClick={()=>finish(()=>dialog({type:'completion',id:task.id}))}>调整完成归属</button>}{(!note||isEvent(task))&&<button role="menuitem" onClick={()=>finish(()=>dialog({type:'repeat',id:task.id}))}>重复安排…</button>}<button role="menuitem" onClick={()=>finish(()=>rename(node.id))}>重命名 {hint('rename')}</button>{isReminder(task)&&<button role="menuitem" disabled={busy||!!task.deletedAt} onClick={()=>finish(()=>dialog({type:'remind',id:task.id}))}>调整提醒…</button>}{note?<button role="menuitem" disabled={busy||!!task.deletedAt} onClick={()=>finish(()=>patch(node,'itemType','task'))}>转为事项</button>:<>
-    {task.status==='open'&&!task.deletedAt&&<button role="menuitem" onClick={()=>finish(()=>dialog({type:'reminder-convert',id:task.id}))}>转为纯提醒…</button>}<button role="menuitem" title="原始估计和已结束的提醒、审视安排保留为历史；转回事项时恢复。" onClick={()=>finish(()=>patch(node,'itemType','group'))}>转为分组…</button><button role="menuitem" onClick={()=>finish(()=>dialog({type:'schedule',id:node.id}))}>定期审视…</button><button role="menuitemcheckbox" aria-checked={!!task.isProject} onClick={()=>finish(()=>patch(node,'isProject',!task.isProject))}>{task.isProject?'取消项目标记':'标记为项目'}</button>
-    {task.status==='handed-off'&&!task.deletedAt&&<button role="menuitem" onClick={()=>finish(()=>stateAction(node.id,'done'))}>记录他人完成…</button>}<button role="menuitem" onClick={()=>finish(()=>stateAction(node.id,task.status==='open'?'done':'reopen'))}>{task.status==='open'?'完成事项':task.status==='handed-off'?'重新接手':'重新打开'}</button>
-    {task.status==='open'&&!task.deletedAt&&<><button role="menuitem" disabled={!!blockedReason(index,task.id)} onClick={()=>finish(()=>run({type:'focus.switch',payload:{taskId:task.id,skipEstimate:true}}))}>切换计时到此项</button><button role="menuitem" onClick={()=>finish(()=>toggleFocus(task))}>{isCurrentFocus(task,localDate(data.now))?'移出当前重点':'加入当前重点'}</button><button role="menuitem" onClick={()=>finish(()=>stateAction(node.id,task.availability==='paused'?'resume':'pause'))}>{task.availability==='paused'?'恢复事项':'暂停事项'}</button><button role="menuitem" onClick={()=>finish(()=>stateAction(node.id,'cancel'))}>取消事项</button></>}
-   </>}<button role="menuitem" onClick={()=>finish(()=>stateAction(node.id,task.deletedAt?'restore':'delete'))}>{task.deletedAt?'恢复整支':'移入回收站'}</button></>}
+  {node?<>
+   {task&&<>
+    <button role="menuitem" onClick={()=>finish(()=>rename(node.id))}>重命名 {hint('rename')}</button>
+    {!information&&<>
+     {open&&<>
+      <button role="menuitem" disabled={busy} onClick={()=>finish(()=>toggleFocus(task))}>{isCurrentFocus(task,localDate(data.now))?'移出当前重点':'加入当前重点'}</button>
+      <button role="menuitem" disabled={busy||!!timerBlocked||alreadyTiming} title={timerBlocked??undefined} onClick={()=>finish(()=>run({type:'focus.switch',payload:{taskId:task.id,skipEstimate:true}}))}>{timerLabel}</button>
+     </>}
+     <button role="menuitem" disabled={busy||!!task.deletedAt} onClick={()=>finish(()=>stateAction(node.id,task.status==='open'?'done':'reopen'))}>{task.status==='open'?'完成事项':task.status==='handed-off'?'重新接手':'重新打开'}</button>
+     {task.status==='handed-off'&&!task.deletedAt&&<button role="menuitem" disabled={busy} onClick={()=>finish(()=>stateAction(node.id,'done'))}>记录他人完成…</button>}
+    </>}
+    <hr/>
+   </>}
+   <button role="menuitem" disabled={insideScope&&childDisabled} onClick={()=>createFromMenu(siblingParent,siblingAnchor)}>{insideScope?'新增范围内事项':'新增同级事项'} {hint('create-sibling')}</button>
+   <button role="menuitem" disabled={childDisabled} onClick={()=>createFromMenu(node.id)}>新增子事项 {hint('create-child')}</button>
+   <hr/>
+   <button role="menuitem" disabled={insideScope&&childDisabled} onClick={()=>createFromMenu(siblingParent,siblingAnchor,'note')}>{insideScope?'新增范围内笔记':'新增同级笔记'}</button>
+   <button role="menuitem" disabled={childDisabled} onClick={()=>createFromMenu(node.id,null,'note')}>新增子笔记</button>
+   <button role="menuitem" disabled={insideScope&&childDisabled} onClick={()=>createFromMenu(siblingParent,siblingAnchor,'event')}>{insideScope?'新增范围内事件':'新增同级事件'}</button>
+   <button role="menuitem" disabled={childDisabled} onClick={()=>createFromMenu(node.id,null,'group')}>新增子分组</button>
+   <button role="menuitem" onClick={()=>createFromMenu(node.parentId,node.id,'group')}>新增同级分组</button>
+   {task&&<>
+    <hr/>
+    {(!information||isEvent(task))&&<button role="menuitem" onClick={()=>finish(()=>dialog({type:'repeat',id:task.id}))}>重复安排…</button>}
+    {isReminder(task)&&<button role="menuitem" disabled={busy||!!task.deletedAt} onClick={()=>finish(()=>dialog({type:'remind',id:task.id}))}>调整提醒…</button>}
+    {information?<button role="menuitem" disabled={busy||!!task.deletedAt} onClick={()=>finish(()=>patch(node,'itemType','task'))}>转为事项</button>:<>
+     <button role="menuitem" onClick={()=>finish(()=>dialog({type:'schedule',id:node.id}))}>定期审视…</button>
+     {open&&<button role="menuitem" onClick={()=>finish(()=>dialog({type:'reminder-convert',id:task.id}))}>转为纯提醒…</button>}
+     <button role="menuitem" title="原始估计和已结束的提醒、审视安排保留为历史；转回事项时恢复。" onClick={()=>finish(()=>patch(node,'itemType','group'))}>转为分组…</button>
+     <button role="menuitemcheckbox" aria-checked={!!task.isProject} onClick={()=>finish(()=>patch(node,'isProject',!task.isProject))}>{task.isProject?'取消项目标记':'标记为项目'}</button>
+     {['open','handed-off'].includes(task.status)&&!task.deletedAt&&<button role="menuitem" onClick={()=>finish(()=>dialog({type:'handoff',id:task.id}))}>{task.ownership?'调整交接 / 重新接手…':'交接给他人…'}</button>}
+     {task.status==='done'&&<button role="menuitem" onClick={()=>finish(()=>dialog({type:'completion',id:task.id}))}>调整完成归属</button>}
+     {open&&<button role="menuitem" disabled={busy} onClick={()=>finish(()=>stateAction(node.id,task.availability==='paused'?'resume':'pause'))}>{task.availability==='paused'?'恢复事项':'暂停事项'}</button>}
+    </>}
+    <hr/>
+    {!information&&open&&<button role="menuitem" disabled={busy} onClick={()=>finish(()=>stateAction(node.id,'cancel'))}>取消事项</button>}
+    <button role="menuitem" disabled={busy} onClick={()=>finish(()=>stateAction(node.id,task.deletedAt?'restore':'delete'))}>{task.deletedAt?'恢复整支':'移入回收站'}</button>
+   </>}
   </>:<><button role="menuitem" onClick={()=>createFromMenu(scopeId??null)}>{scopeId?'新增范围内事项':'新增最外层事项'}</button><button role="menuitem" onClick={()=>createFromMenu(scopeId??null,null,'note')}>{scopeId?'新增范围内笔记':'新增最外层笔记'}</button><button role="menuitem" onClick={()=>createFromMenu(scopeId??null,null,'group')}>{scopeId?'新增范围内分组':'新增最外层分组'}</button></>}
   <hr/><button role="menuitem" disabled={!data.undoLabel||busy} onClick={()=>finish(undo)}>撤销{data.undoLabel?`：${data.undoLabel}`:''} {hint('undo')}</button><button role="menuitem" disabled={!data.redoLabel||busy} onClick={()=>finish(()=>run({type:'history.redo'}))}>重做{data.redoLabel?`：${data.redoLabel}`:''} {hint('redo')}</button>
  </div></div>,document.body);

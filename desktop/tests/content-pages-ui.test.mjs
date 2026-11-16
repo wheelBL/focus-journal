@@ -43,13 +43,50 @@ test('reminders aggregate original sources once, acknowledge without task comple
 test('inbox organization is atomic, failures keep the selected draft, skip keeps contents and save chooses the next item',async()=>{
  const h=await harness(),{group,add,input,click,label,button,query}=h,a=group('产品'),b=group('平台',a),g=group('三级分组',b),first=add('捕获一'),second=add('捕获二','inbox','note','保留说明');let fail=true;
  h.intercept(command=>{if(command.type==='inbox.organize'&&fail){fail=false;throw Error('模拟保存失败');}});
- try{await h.mount('Inbox');await input(label('收件箱条目名称'),'整理后的标题');await input(label('收件箱条目正文'),'完整说明');await input(label('整理内容类型'),'note');await input(label('搜索完整分组路径'),'产品 / 平台 / 三级');await input(label('归属分组'),g);await click(button('保存并下一条'));assert.match(query('[role="alert"]').textContent,/模拟保存失败/);assert.equal(label('收件箱条目名称').value,'整理后的标题');assert.equal(h.get(first).parentId,'inbox');assert.equal(h.get(first).itemType,'task');await click(button('保存并下一条'));assert.equal(h.get(first).parentId,g);assert.equal(h.get(first).title,'整理后的标题');assert.equal(h.get(first).description,'完整说明');assert.equal(h.get(first).itemType,'note');assert.equal(label('收件箱条目名称').value,'捕获二');await click(button('跳过，下一条'));assert.equal(h.get(second).parentId,'inbox');await click(button('保存并下一条'));assert.equal(h.get(second).parentId,null);assert.match(label('收件箱内容').textContent,/没有待澄清内容/);assert.equal(h.service.snapshot().state.tasks.filter(t=>t.id==='inbox').length,1);}finally{await h.close();}
+ try{
+  await h.mount('Inbox');assert.equal(query('.inbox-editor h2').textContent,'整理第 1 / 2 条');
+  await input(label('收件箱条目名称'),'整理后的标题');await input(label('收件箱条目正文'),'完整说明');await input(label('整理内容类型'),'note');await input(label('搜索完整分组路径'),'产品 / 平台 / 三级');await input(label('归属分组'),g);
+  await click(button('保存并下一条'));assert.match(query('[role="alert"]').textContent,/模拟保存失败/);assert.equal(label('收件箱条目名称').value,'整理后的标题');assert.equal(h.get(first).parentId,'inbox');assert.equal(h.get(first).itemType,'task');
+  await click(button('跳过，下一条'));assert.equal(label('收件箱条目名称').value,'捕获二');assert.equal(query('.inbox-editor h2').textContent,'整理第 2 / 2 条');assert.equal(h.get(second).parentId,'inbox');
+  await click(button('跳过，下一条'));assert.equal(label('收件箱条目名称').value,'整理后的标题');await click(button('保存并下一条'));
+  assert.equal(h.get(first).parentId,g);assert.equal(h.get(first).title,'整理后的标题');assert.equal(h.get(first).description,'完整说明');assert.equal(h.get(first).itemType,'note');assert.equal(label('收件箱条目名称').value,'捕获二');
+  assert.equal(query('.inbox-editor h2').textContent,'整理第 1 / 1 条');const skip=button('跳过，下一条');assert.equal(skip.disabled,true);assert.match(skip.title,/保留草稿稍后继续/);
+  await click(button('保存并结束整理'));assert.equal(h.get(second).parentId,null);assert.match(label('收件箱内容').textContent,/没有待澄清内容/);assert.equal(h.service.snapshot().state.tasks.filter(t=>t.id==='inbox').length,1);
+ }finally{await h.close();}
 });
 
 test('inbox reminder save guards duplicate writes and keeps the submitted fields until the atomic result',async()=>{
  const h=await harness(),{add,input,click,label,button,action}=h,id=add('到时取件');let release,entered=false;
  h.intercept(command=>{if(command.type==='inbox.organize'){entered=true;return new Promise(resolve=>{release=resolve;});}});
- try{await h.mount('Inbox');await input(label('整理内容类型'),'reminder');await input(label('提醒时间'),'2026-11-03T11:00');await click(button('保存并下一条'));assert.ok(entered);assert.equal(h.get(id).parentId,'inbox');assert.equal(label('收件箱条目名称').matches(':disabled'),true);assert.equal(button('跳过，下一条').disabled,true);await action(()=>button('正在保存…').click());assert.equal(h.commands.filter(c=>c.type==='inbox.organize').length,1);await action(()=>release());assert.equal(h.get(id).itemType,'reminder');assert.equal(h.get(id).parentId,null);assert.equal(h.get(id).status,'open');assert.match(document.body.textContent,/没有待澄清内容/);}finally{await h.close();}
+ try{await h.mount('Inbox');await input(label('整理内容类型'),'reminder');await input(label('提醒时间'),'2026-11-03T11:00');await click(button('保存并结束整理'));assert.ok(entered);assert.equal(h.get(id).parentId,'inbox');assert.equal(label('收件箱条目名称').matches(':disabled'),true);assert.equal(button('跳过，下一条').disabled,true);await action(()=>button('正在保存…').click());assert.equal(h.commands.filter(c=>c.type==='inbox.organize').length,1);await action(()=>release());assert.equal(h.get(id).itemType,'reminder');assert.equal(h.get(id).parentId,null);assert.equal(h.get(id).status,'open');assert.match(document.body.textContent,/没有待澄清内容/);}finally{await h.close();}
+});
+
+test('Inbox only submits on a fresh save chord, preserving composition, newlines and Escape drafts',async()=>{
+ const h=await harness(),first=h.add('先整理'),second=h.add('随后整理');
+ const press=async(target,key,options)=>{
+  const event=new KeyboardEvent('keydown',{key,bubbles:true,cancelable:true,...options});
+  await h.action(()=>target.dispatchEvent(event));return event.defaultPrevented;
+ };
+ const saves=()=>h.commands.filter(command=>command.type==='inbox.organize');
+ try{
+  await h.mount('Inbox');const title=h.label('收件箱条目名称'),body=h.label('收件箱条目正文');
+  assert.equal(h.query('.inbox-editor-fields').contains(h.button('保存并下一条')),false);
+  assert.equal(h.query('.inbox-editor-footer').contains(h.button('保存并下一条')),true);
+  await h.input(body,'仍在输入\n保留下一行');await h.action(()=>body.focus());
+  assert.equal(await press(title,'Enter',{isComposing:true}),true);
+  assert.equal(await press(body,'Enter',{ctrlKey:true,keyCode:229}),true);
+  assert.equal(await press(body,'Process',{ctrlKey:true,keyCode:229}),true);
+  assert.equal(await press(body,'Enter',{ctrlKey:true,repeat:true}),true);
+  assert.equal(await press(title,'Enter',{repeat:true}),true);
+  assert.equal(await press(body,'Enter',{repeat:true}),false);
+  assert.equal(await press(body,'Enter',{}),false);assert.equal(saves().length,0);
+  await press(body,'Escape',{});assert.equal(h.label('收件箱条目正文').value,'仍在输入\n保留下一行');assert.equal(saves().length,0);
+  assert.equal(await press(body,'Enter',{ctrlKey:true}),true);
+  assert.equal(saves().length,1);assert.equal(h.get(first).description,'仍在输入\n保留下一行');assert.equal(h.label('收件箱条目名称').value,'随后整理');
+  assert.equal(await press(h.label('收件箱条目正文'),'Enter',{ctrlKey:true,repeat:true}),true);assert.equal(h.get(second).parentId,'inbox');assert.equal(saves().length,1);
+  window.journalPlatform='darwin';await h.refresh();
+  assert.equal(await press(h.label('收件箱条目正文'),'Enter',{metaKey:true}),true);assert.equal(saves().length,2);assert.equal(h.get(second).parentId,null);
+ }finally{await h.close();}
 });
 
 test('explicit content locate previews a filtered note without clearing its query',async()=>{

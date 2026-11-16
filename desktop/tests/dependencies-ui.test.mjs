@@ -24,11 +24,12 @@ test('batch chain previews adjustable order and commits once; invalid selection 
 
 test('failure keeps dependency draft and related navigation returns to edit; waiting permits start',async()=>{
  const h=await appDom();try{
- const a=h.add('前置可返回',null,{dueAt:'2026-11-03'}),b=h.add('编辑草稿',null,{dueAt:'2026-11-04'});
+ const a=h.add('前置可返回',null,{dueAt:'2026-11-03'}),b=h.add('编辑草稿',null,{dueAt:'2026-11-04',estimateMinutes:25});
  await h.mount();await h.click(h.label('任务'));await h.click(row(h,b));await h.click(h.button('添加前置任务'));await h.input(h.label('搜索前置任务'),'前置可返回');await h.click(h.query('.dependency-options button'));
  const original=window.journal.command;window.journal.command=async c=>{if(c.type==='dependency.set')throw Error('模拟保存失败');return original(c);};await h.click(h.button('保存依赖'));assert.match(h.query('.dependency-editor').textContent,/模拟保存失败/);assert.equal(h.label('搜索前置任务').value,'前置可返回');assert.equal(h.get(b).dependencyPlan,undefined);
  await h.click(h.button('前置可返回',h.query('.dependency-editor')));await h.click(h.button('← 返回原内容'));assert.equal(h.label('搜索前置任务').value,'前置可返回');window.journal.command=original;await h.click(h.button('保存依赖'));
- await h.command({type:'focus.start',payload:{taskId:b,skipEstimate:true}});assert.ok(h.service.snapshot().timers.some(t=>t.taskId===b));
+ assert.equal(h.get(b).dependencyPlan.predecessors[0].id,a);
+ await h.click(h.label('开始编辑草稿',row(h,b)));assert.ok(h.service.snapshot().timers.some(t=>t.taskId===b));assert.match(h.query('.toast').textContent,/前置/);
  }finally{await h.close();}
 });
 test('stale moved tasks invalidate the exact preview scope',async()=>{

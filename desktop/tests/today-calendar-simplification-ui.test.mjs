@@ -29,6 +29,17 @@ test('deleted effort is discoverable on Today and Calendar only when recovery is
  }finally{await h.close();}
 });
 
+test('Today shows the complete group and task parent path on suggestions and timers',async()=>{
+ const h=await appDom();try{
+  const group=h.service.execute({type:'outline.create',payload:{title:'产品设计',kind:'group',parentId:null}}).state.tasks.at(-1).id;
+  const parent=h.add('交互优化',group),id=h.add('完善任务导航',parent);
+  await h.mount();const path=h.query('.today-next .project-crumb');
+  assert.equal(path.title,'产品设计 / 交互优化');assert.equal(path.textContent,'产品设计 / 交互优化 /');
+  await h.command({type:'focus.start',payload:{taskId:id,skipEstimate:true}});
+  assert.equal(h.query('.today-timer .project-crumb').title,'产品设计 / 交互优化');
+ }finally{await h.close();}
+});
+
 test('Today omits identical time totals but keeps distinct overlap and untimed totals explained',async()=>{
  const h=await appDom();try{
   const first=h.add('第一件工作'),second=h.add('并行工作');effort(h,first,'09:00','09:30');

@@ -79,11 +79,33 @@ test('default hides finished work but preserves information; explicit completed 
  const f=filterOutline(state,emptyFilter(),h.service.snapshot().now);assert.equal(f.matches.has(a),false);assert.ok(f.matches.has(b));assert.ok(f.matches.has(n));
  const completed=filterOutline(state,{...emptyFilter(),completed:'today'},h.service.snapshot().now);assert.ok(completed.matches.has(a));assert.equal(completed.matches.has(b),false);
 });
-test('Today chooses actionable leaf work, keeps explicit selection, and excludes future/closed tasks',()=>{
+test('Today chooses actionable leaf work independently of browsing and honors explicit current focus',()=>{
  const h=setup(),parent=h.add('父项目'),child=h.add('可执行子项',parent),future=h.add('未来事项');h.service.execute({type:'task.plan',payload:{id:future,date:'2026-10-30'}});
- const initial=h.service.snapshot().state;initial.settings.selectedTaskId=null;let model=todayCandidates(initial,h.service.snapshot().now);assert.equal(model.available.some(t=>t.id===parent||t.id===future),false);assert.equal(model.next!.id,child);
- h.service.execute({type:'task.select',payload:{id:parent}});assert.equal(todayCandidates(h.service.snapshot().state,h.service.snapshot().now).next!.id,parent);
+ const model=()=>{const {state,now}=h.service.snapshot();return todayCandidates(state,now);};
+ assert.equal(model().available.some(t=>t.id===parent||t.id===future),false);assert.equal(model().next?.id,child);assert.equal(model().nextReason,'可开始的事项');
+ h.service.execute({type:'task.select',payload:{id:parent}});assert.equal(model().next?.id,child);
+ h.service.execute({type:'task.select',payload:{id:future}});assert.equal(model().next?.id,child);
+ h.service.execute({type:'item.focus',payload:{id:future}});assert.equal(model().next?.id,child);
+ h.service.execute({type:'task.plan',payload:{id:child,date:'2026-10-21'}});assert.equal(model().nextReason,'今天计划');
+ h.service.execute({type:'item.focus',payload:{id:parent}});assert.equal(model().next?.id,parent);assert.equal(model().nextReason,'当前重点');
  h.service.execute({type:'task.status',payload:{id:child,status:'done'}});assert.equal(todayCandidates(h.service.snapshot().state,h.service.snapshot().now).available.some(t=>t.id===child),false);
+});
+test('Today uses actual work recency, favors scheduled work, and omits suggestions for running or paused timers',()=>{
+ const h=setup(),older=h.add('较早投入'),recent=h.add('较新投入'),overdue=h.add('逾期事项');
+ const model=()=>{const {state,now}=h.service.snapshot();return todayCandidates(state,now);};
+ h.manual(recent,'20:40','20:41');h.manual(older,'20:30','20:31');
+ assert.equal(model().next?.id,recent);assert.equal(model().nextReason,'继续之前的事项');
+ h.service.execute({type:'focus.start',payload:{taskId:older}});h.clock.time+=60000;
+ h.service.execute({type:'focus.pause',payload:{taskId:older}});h.clock.time+=60000;
+ h.service.execute({type:'focus.start',payload:{taskId:recent}});h.clock.time+=60000;
+ h.service.execute({type:'focus.stop',payload:{taskId:recent}});h.clock.time+=60000;
+ h.service.execute({type:'focus.stop',payload:{taskId:older}});
+ assert.equal(model().next?.id,recent,'closing an older paused timer does not count as newer work');
+ h.service.execute({type:'outline.patch',payload:{id:overdue,field:'dueAt',value:'2026-10-20'}});
+ assert.equal(model().next?.id,overdue);assert.equal(model().nextReason,'截止已过');
+ h.service.execute({type:'focus.start',payload:{taskId:older}});assert.equal(model().next,undefined);
+ h.service.execute({type:'focus.pause',payload:{taskId:older}});assert.equal(model().next,undefined);
+ assert.equal(todayCandidates(emptyState(),h.service.snapshot().now).next,undefined);
 });
 test('progress groups sessions by item, includes completion without time, and retains the latest written summary',()=>{
  const h=setup(),a=h.add('多次推进'),b=h.add('无计时完成');h.manual(a,'20:30','20:31');h.clock.time+=60000;h.manual(a,'20:40','21:17');h.service.execute({type:'session.summary',payload:{id:h.service.snapshot().state.sessions[1].id,summary:'最新推进'}});

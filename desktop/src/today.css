@@ -5,9 +5,12 @@
 .today-execution-grid h2,.today-progress h2,.today-history h2{font-size:16px;margin:0 0 12px}
 .today-section-heading{display:flex;gap:12px;align-items:center;justify-content:space-between;flex-wrap:wrap;margin-bottom:8px}.today-section-heading h2{margin:0}.today-section-heading>span{font-size:12px}
 .today-now .task-card{padding:0}.today-now .task-title{font-size:18px}.today-now .project-crumb{font-size:12px}
+.today-task-title{display:flex;align-items:baseline;flex-wrap:wrap;gap:0 5px;min-width:0}
+.today-task-title .project-crumb{max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.today-task-title .task-title{min-width:0;overflow-wrap:anywhere}
 .today-now .task-plan{margin-left:0;padding:12px 14px}.today-now .task-plan dl{font-size:12px;grid-template-columns:70px 1fr;row-gap:6px;margin-bottom:12px}
 .today-now .focus-area{margin-left:0;padding:14px;grid-template-columns:minmax(0,1fr) auto}.today-now .big-timer{font-size:44px}
-.today-now .task-title-row{margin-bottom:10px}.today-next:not(:first-of-type){margin-top:16px;border-top:1px solid var(--line);padding-top:12px}
+.today-now .task-title-row{margin-bottom:10px}.today-now>.today-section-heading{justify-content:flex-start;gap:4px 10px;margin-bottom:12px}.today-next-reason{color:var(--muted)}
 .today-timer+.today-timer{border-top:1px solid var(--line);margin-top:14px;padding-top:14px}
 .today-plan .daily-focus-summary{margin:8px 0}.today-plan .daily-focus-name{min-width:0}.today-plan .daily-focus-row{min-width:0}.today-plan .daily-focus-name span{overflow-wrap:anywhere}
 .today-focus-picker{margin-top:12px;border-top:1px solid var(--line);padding-top:12px}.today-focus-picker>input{width:100%;font-size:12px}

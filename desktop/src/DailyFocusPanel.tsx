@@ -1,26 +1,29 @@
-import React from 'react';
+import React,{useMemo} from 'react';
 import {Play20Filled} from '@fluentui/react-icons';
 import {dailyFocusItems} from '../core/daily-focus';
 import {itemSorter} from '../core/item-order';
+import {itemPresentations} from '../core/item-presentation';
 import {blockedReason} from '../core/item-state';
 import type {OutlineIndex} from '../core/outline';
 import {FocusToggle} from './FocusToggle';
-import {Button,useJournal} from './ui';
+import {Button,useWorkspaceJournal} from './ui';
 
 /** One persistent daily queue, independent of the timeline's selected/active cards. */
 export function DailyFocusPanel({index,date}:{index:OutlineIndex;date:string}){
- const {data,run,busy,dialog}=useJournal(),items=dailyFocusItems(index,date);
+ const {data,run,busy,dialog}=useWorkspaceJournal();
+ const items=useMemo(()=>dailyFocusItems(index,date),[index,date]);
  const open=items.filter(t=>t.status==='open');
- const ordered=itemSorter(index,'smart',data.now,false)(open.map(t=>index.nodes.get(t.id)!));
+ const ordered=useMemo(()=>itemSorter(index,'smart',data.now,false)(items.map(t=>index.nodes.get(t.id)!)),[index,data.now,items]);
+ const presentations=useMemo(()=>items.length?itemPresentations(index,data.timers,data.now):null,[index,data.now,data.timers,items]);
  const quiet=(p:Promise<unknown>)=>void p.catch(()=>{});
  return <section className="today-focus-list" aria-label="当前重点清单">
   <header className="daily-focus-summary"><strong>{items.length?`当前 ${items.length} 件重点`:'选择近期要推进的事项'}</strong>{open.length>0&&<span>{open.length} 件待推进</span>}</header>
   {ordered.map(node=>{
    const task=node.record as typeof open[number],timer=data.timers.find(t=>t.taskId===task.id),blocked=blockedReason(index,task.id);
-   const status=timer?timer.paused?'计时已暂停':'正在计时':blocked?'事项已暂停／不可执行':data.state.settings.selectedTaskId===task.id?'接下来':'待启动';
+   const status=presentations!.get(task.id)!;
    return <div className="daily-focus-row" data-focus-id={task.id} key={task.id}>
     <FocusToggle task={task} compact/>
-    <button className="daily-focus-name" onClick={()=>dialog({type:'detail',id:task.id})}><span>{task.title}</span><small title={blocked??undefined}>{status}</small></button>
+    <button className="daily-focus-name" onClick={()=>dialog({type:'detail',id:task.id})}><span>{task.title}</span><small title={blocked??status.reason}>{status.label}</small></button>
     {timer&&!timer.paused?<span className="daily-focus-running" role="status">专注中</span>:<Button subtle disabled={busy||!!blocked} title={blocked??undefined} aria-label={`${timer?'恢复计时':'开始计时'} ${task.title}`} onClick={()=>quiet(run(timer?{type:'focus.resume',payload:{sessionId:timer.sessionId}}:{type:'focus.start',payload:{taskId:task.id,skipEstimate:true}}))}><Play20Filled/>{timer?'恢复':'开始'}</Button>}
    </div>;
   })}

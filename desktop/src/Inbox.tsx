@@ -3,6 +3,7 @@ import type {JournalState,Recurrence,Snapshot,Task} from '../core/types';
 import {inboxItems} from '../core/inbox-review';
 import {itemTypeLabels,type ItemType} from '../core/item-kind';
 import {reminderTime} from '../core/item-reminders';
+import {shortcutFromEvent} from '../core/shortcuts';
 import {Button,Empty,Field,localDateTimeInput,useWorkspaceJournal} from './ui';
 import {WorkspaceContext} from './WorkspaceContext';
 import {ItemStateDialog} from './ItemActions';
@@ -11,6 +12,7 @@ import {ContentParentPicker} from './ContentParentPicker';
 import {useContentMemory} from './content-page-state';
 import {readLocal,writeLocal} from './workspace-state';
 import {ReminderRuleFields,normalizeReminderRule} from './ReminderScheduleEditor';
+import {desktopPlatform,shortcutLabel} from './platform';
 import './content-pages.css';
 
 const itemType=(task:Task):ItemType=>task.itemType??'task';
@@ -21,10 +23,38 @@ type InboxView={selected:string|null;scrollTop:number;creating:boolean;deletedNo
 const captureOrder=(a:Task,b:Task)=>Date.parse(a.createdAt)-Date.parse(b.createdAt)||(a.order??0)-(b.order??0);
 const orderedInbox=(state:JournalState)=>inboxItems(state).sort(captureOrder);
 
+function useInboxFormKeys(save:()=>Promise<void>,escape:()=>void){
+ const composing=useRef(false);
+ return {
+  onCompositionStart:()=>{composing.current=true;},
+  onCompositionEnd:()=>{composing.current=false;},
+  onSubmit:(event:React.FormEvent<HTMLFormElement>)=>{event.preventDefault();if(!composing.current)void save();},
+  onKeyDown:(event:React.KeyboardEvent<HTMLFormElement>)=>{
+   event.stopPropagation();
+   const native=event.nativeEvent;
+   const enter=event.key==='Enter'||event.code==='Enter'||event.code==='NumpadEnter';
+   if(composing.current||native.isComposing||native.keyCode===229){
+    if(enter||event.key==='Process'&&(event.ctrlKey||event.metaKey))event.preventDefault();
+    return;
+   }
+   const shortcut=shortcutFromEvent(native,desktopPlatform());
+   if(enter&&event.repeat&&(shortcut==='Primary+Enter'||event.target instanceof HTMLElement&&event.target.matches('input,button'))){
+    event.preventDefault();
+    return;
+   }
+   if(shortcut==='Primary+Enter'){
+    event.preventDefault();
+    event.currentTarget.requestSubmit();
+   }else if(shortcut==='Escape'&&!event.repeat)escape();
+  },
+ };
+}
+
 export function Inbox(){
  const {data,run,busy}=useWorkspaceJournal(),key=`journal.inbox.${data.dataPath}`,[view,setView]=useContentMemory<InboxView>(key,{selected:null,scrollTop:0,creating:false}),scroll=useRef<HTMLDivElement>(null),page=useRef<HTMLElement>(null);
  const creating=view.creating,setCreating=(value:boolean)=>{selectionVersion.current++;setView(current=>({...current,creating:value}));};
  const items=orderedInbox(data.state),selected=items.find(t=>t.id===view.selected)??items[0],inbox=data.state.tasks.find(t=>t.id==='inbox');
+ const position=selected?items.indexOf(selected)+1:0;
  const deleted=view.deletedNotice??null,setDeleted=(notice:DeletedNotice|null)=>setView(current=>({...current,deletedNotice:notice}));
  const [deleting,setDeleting]=useState<DeleteRequest|null>(null),[restoring,setRestoring]=useState(false),[restoreError,setRestoreError]=useState(''),[focusRequest,setFocusRequest]=useState<{version:number;deleteButton:boolean}|null>(null);
  const deletion=useRef<DeleteRequest|null>(null),selectionVersion=useRef(0),restorePending=useRef(false),mounted=useRef(true),latest=useRef({data,view});latest.current={data,view};
@@ -54,20 +84,47 @@ export function Inbox(){
   catch(e){if(mounted.current)setRestoreError((e as Error).message);}finally{restorePending.current=false;if(mounted.current)setRestoring(false);}
  };
  const restoreAvailable=deleted&&data.state.tasks.some(t=>t.id===deleted.id&&t.deletedAt===deleted.deletedAt);
- return <><section ref={page} className="page content-page inbox-page"><WorkspaceContext><h2 className="context-heading">收件箱</h2><p className="context-help">独立整理捕获内容</p></WorkspaceContext><header className="page-header"><div><h1>收件箱</h1><div className="content-scope"><span>{items.length?`${items.length} 条待澄清`:'没有待澄清内容'}</span><InboxReviewControl/></div></div><Button primary disabled={!inbox||!!inbox.deletedAt||inbox.archived||inbox.status!=='open'} onClick={()=>setCreating(true)}>记录到收件箱</Button></header>{restoreAvailable&&<div className="inbox-delete-notice" role="status"><span>“{deleted.title}”已移入回收站，历史投入与层级已保留。</span><Button type="button" subtle data-operation-entry="inbox.restore" disabled={busy||restoring} onClick={()=>void restore()}>{restoring?'正在恢复…':'恢复刚删除的内容'}</Button>{restoreError&&<span role="alert" className="form-error">{restoreError}</span>}</div>}<div className="content-workspace"><section className="content-list-pane" aria-label="收件箱内容"><div className="content-list-caption">按捕获顺序 · 跳过不会标记已整理</div><div ref={scroll} className="content-list-scroll" onScroll={e=>setView(current=>({...current,scrollTop:e.currentTarget.scrollTop}))}>{items.map(task=><button className={`content-note-row ${selected?.id===task.id?'selected':''}`} key={task.id} aria-pressed={selected?.id===task.id} onClick={()=>select(task.id)}><strong>{task.title}</strong><span>{task.description?.replace(/\s+/g,' ').slice(0,100)||'尚无正文'}</span><small>{itemTypeLabels[itemType(task)]} · {localDateTimeInput(task.createdAt).replace('T',' ')}</small></button>)}{!items.length&&<Empty title={inbox?'没有待澄清内容':'当前没有收件箱'} text={inbox?'已明确的内容保存后即可结束；需要稍后澄清的内容可以放到这里。':'原收件箱节点不可用。请在任务中恢复原节点；这里不会自动创建替代节点。'}/>}</div></section><aside className="content-detail-pane" aria-label="整理当前内容">{creating?<InboxCapture onClose={()=>setCreating(false)} onSaved={id=>{setView(current=>({...current,selected:current.creating?id:current.selected,creating:false}));}}/>:selected?<InboxEditor key={selected.id} task={selected} deleting={!!deleting} onDelete={()=>requestDelete(selected.id)} onSkip={()=>next(selected.id)} onSaved={()=>saved(selected.id)}/>:<Empty title="没有待澄清内容" text="已明确的内容无需留在收件箱，分组可以稍后选择。"/>}</aside></div></section>{deleting&&<ItemStateDialog id={deleting.id} action="delete" entry="inbox.delete" unavailableReason={!items.some(t=>t.id===deleting.id)?'这条内容已离开收件箱，请返回查看当前内容。':undefined} onClose={closeDelete} onSaved={deletedItem}/>}</>;
+ return <><section ref={page} className="page content-page inbox-page"><WorkspaceContext><h2 className="context-heading">收件箱</h2><p className="context-help">独立整理捕获内容</p></WorkspaceContext><header className="page-header"><div><h1>收件箱</h1><div className="content-scope"><span>{items.length?`${items.length} 条待澄清`:'没有待澄清内容'}</span><InboxReviewControl/></div></div><Button primary disabled={!inbox||!!inbox.deletedAt||inbox.archived||inbox.status!=='open'} onClick={()=>setCreating(true)}>记录到收件箱</Button></header>{restoreAvailable&&<div className="inbox-delete-notice" role="status"><span>“{deleted.title}”已移入回收站，历史投入与层级已保留。</span><Button type="button" subtle data-operation-entry="inbox.restore" disabled={busy||restoring} onClick={()=>void restore()}>{restoring?'正在恢复…':'恢复刚删除的内容'}</Button>{restoreError&&<span role="alert" className="form-error">{restoreError}</span>}</div>}<div className="content-workspace"><section className="content-list-pane" aria-label="收件箱内容"><div className="content-list-caption">按捕获顺序 · 跳过不会标记已整理</div><div ref={scroll} className="content-list-scroll" onScroll={e=>setView(current=>({...current,scrollTop:e.currentTarget.scrollTop}))}>{items.map(task=><button className={`content-note-row ${selected?.id===task.id?'selected':''}`} key={task.id} aria-pressed={selected?.id===task.id} onClick={()=>select(task.id)}><strong>{task.title}</strong><span>{task.description?.replace(/\s+/g,' ').slice(0,100)||'尚无正文'}</span><small>{itemTypeLabels[itemType(task)]} · {localDateTimeInput(task.createdAt).replace('T',' ')}</small></button>)}{!items.length&&<Empty title={inbox?'没有待澄清内容':'当前没有收件箱'} text={inbox?'已明确的内容保存后即可结束；需要稍后澄清的内容可以放到这里。':'原收件箱节点不可用。请在任务中恢复原节点；这里不会自动创建替代节点。'}/>}</div></section>
+  <aside className={`content-detail-pane${selected&&!creating?' inbox-editor-pane':''}`} aria-label="整理当前内容">
+   {creating?<InboxCapture onClose={()=>setCreating(false)} onSaved={id=>{setView(current=>({...current,selected:current.creating?id:current.selected,creating:false}));}}/>
+    :selected?<InboxEditor key={selected.id} task={selected} position={position} total={items.length} deleting={!!deleting} onDelete={()=>requestDelete(selected.id)} onSkip={()=>next(selected.id)} onSaved={()=>saved(selected.id)}/>
+    :<Empty title="没有待澄清内容" text="已明确的内容无需留在收件箱，分组可以稍后选择。"/>}
+  </aside></div></section>{deleting&&<ItemStateDialog id={deleting.id} action="delete" entry="inbox.delete" unavailableReason={!items.some(t=>t.id===deleting.id)?'这条内容已离开收件箱，请返回查看当前内容。':undefined} onClose={closeDelete} onSaved={deletedItem}/>}</>;
 }
-function InboxEditor({task,onSkip,onSaved,onDelete,deleting}:{task:Task;onSkip:()=>void;onSaved:()=>void;onDelete:()=>void;deleting:boolean}){
+function InboxEditor({task,position,total,onSkip,onSaved,onDelete,deleting}:{task:Task;position:number;total:number;onSkip:()=>void;onSaved:()=>void;onDelete:()=>void;deleting:boolean}){
  const {data,run,busy}=useWorkspaceJournal(),key=`journal.inbox-draft.${data.dataPath}.${task.id}`;
  const [draft,setDraft]=useContentMemory(key,{title:task.title,description:task.description??'',itemType:itemType(task),parentId:null as string|null,at:localDateTimeInput(reminderTime(task)),rule:task.recurrence??null as Recurrence|null}),[saving,setSaving]=useState(false),[error,setError]=useState(''),pending=useRef(false),mounted=useRef(true);
  useEffect(()=>{mounted.current=true;return()=>{mounted.current=false;};},[]);
- const save=async()=>{if(pending.current||busy)return;pending.current=true;setSaving(true);setError('');try{if(draft.itemType==='reminder'&&!draft.at)throw Error('提醒需要具体时间。');const payload={id:task.id,title:draft.title,description:draft.description,itemType:draft.itemType,parentId:draft.parentId,...draft.itemType==='reminder'?{at:new Date(draft.at).toISOString(),rule:normalizeReminderRule(draft.rule,draft.at,reminderTime(task))}:{}};await run({type:'inbox.organize',payload});try{window.localStorage.removeItem(key);}catch{}if(mounted.current)onSaved();}catch(e){if(mounted.current)setError((e as Error).message);}finally{pending.current=false;if(mounted.current)setSaving(false);}};
- const originalType=itemType(task),changedType=originalType!==draft.itemType;
- return <form className="content-new-form inbox-editor" aria-label="整理收件箱条目" aria-busy={saving} onSubmit={e=>{e.preventDefault();void save();}} onKeyDown={e=>{e.stopPropagation();if((e.ctrlKey||e.metaKey)&&e.key==='Enter'){e.preventDefault();void save();}if(e.key==='Escape'&&!pending.current)(document.activeElement as HTMLElement)?.blur();}}><h2>整理这条内容</h2><fieldset disabled={saving}><Field label="名称"><input aria-label="收件箱条目名称" required maxLength={120} value={draft.title} onChange={e=>setDraft({...draft,title:e.target.value})}/></Field><Field label="正文"><textarea aria-label="收件箱条目正文" rows={6} maxLength={2000} value={draft.description} onChange={e=>setDraft({...draft,description:e.target.value})}/></Field><Field label="内容类型"><select aria-label="整理内容类型" value={draft.itemType} onChange={e=>setDraft({...draft,itemType:e.target.value as typeof draft.itemType,rule:e.target.value==='reminder'&&draft.rule?.mode==='completion'?{...draft.rule,mode:'calendar'}:draft.rule})}><option value="task">任务</option><option value="note">笔记</option><option value="reminder">提醒</option>{!['task','note','reminder'].includes(originalType)&&<option value={originalType}>{itemTypeLabels[originalType]}（保留原类型）</option>}</select></Field>{changedType&&<p className="content-retained">将由{itemTypeLabels[originalType]}转为{itemTypeLabels[draft.itemType]}，保留身份与子项。已有执行安排、投入或关联可能需要先处理；不支持的转换会保留输入并说明原因。</p>}{draft.itemType==='event'&&<p className="content-retained">事件已记录到日历/时间线，分组可选。保存会保留当前编辑，并将这条内容移出收件箱。</p>}<ContentParentPicker state={data.state} value={draft.parentId} excludeInbox onChange={parentId=>setDraft({...draft,parentId})}/>{draft.itemType==='reminder'&&<><Field label="提醒时间"><input aria-label="提醒时间" type="datetime-local" required value={draft.at} onChange={e=>setDraft({...draft,at:e.target.value})}/></Field><ReminderRuleFields at={draft.at} value={draft.rule} onChange={rule=>setDraft({...draft,rule})}/></>}{error&&<p role="alert" className="form-error">{error}</p>}<div className="content-save-bar"><small role="status">{saving?'正在保存并整理…':'草稿已保留 · Ctrl / ⌘ Enter 保存并下一条'}</small><div className="actions"><Button type="button" className="inbox-delete-button" aria-label="删除当前收件箱条目" data-operation-entry="inbox.delete" disabled={busy||saving||deleting} onClick={onDelete}>删除…</Button><Button type="button" subtle disabled={saving} onClick={onSkip}>跳过，下一条</Button><Button primary type="submit" disabled={busy||saving||!draft.title.trim()}>{saving?'正在保存…':draft.itemType==='event'?'保存并移出收件箱':'保存并下一条'}</Button></div></div></fieldset></form>;
+ const save=async()=>{if(pending.current||busy||!draft.title.trim())return;pending.current=true;setSaving(true);setError('');try{if(draft.itemType==='reminder'&&!draft.at)throw Error('提醒需要具体时间。');const payload={id:task.id,title:draft.title,description:draft.description,itemType:draft.itemType,parentId:draft.parentId,...draft.itemType==='reminder'?{at:new Date(draft.at).toISOString(),rule:normalizeReminderRule(draft.rule,draft.at,reminderTime(task))}:{}};await run({type:'inbox.organize',payload});try{window.localStorage.removeItem(key);}catch{}if(mounted.current)onSaved();}catch(e){if(mounted.current)setError((e as Error).message);}finally{pending.current=false;if(mounted.current)setSaving(false);}};
+ const formKeys=useInboxFormKeys(save,()=>{if(!pending.current)(document.activeElement as HTMLElement)?.blur();});
+ const originalType=itemType(task),changedType=originalType!==draft.itemType,single=total===1;
+ const saveLabel=single?'保存并结束整理':draft.itemType==='event'?'保存并移出收件箱':'保存并下一条';
+ return <form className="content-new-form inbox-editor" aria-label="整理收件箱条目" aria-busy={saving} {...formKeys}>
+  <h2>整理第 {position} / {total} 条</h2>
+  <div className="inbox-editor-fields"><fieldset disabled={saving}>
+   <Field label="名称"><input aria-label="收件箱条目名称" required maxLength={120} value={draft.title} onChange={e=>setDraft({...draft,title:e.target.value})}/></Field>
+   <Field label="正文"><textarea aria-label="收件箱条目正文" rows={6} maxLength={2000} value={draft.description} onChange={e=>setDraft({...draft,description:e.target.value})}/></Field>
+   <Field label="内容类型"><select aria-label="整理内容类型" value={draft.itemType} onChange={e=>setDraft({...draft,itemType:e.target.value as typeof draft.itemType,rule:e.target.value==='reminder'&&draft.rule?.mode==='completion'?{...draft.rule,mode:'calendar'}:draft.rule})}><option value="task">任务</option><option value="note">笔记</option><option value="reminder">提醒</option>{!['task','note','reminder'].includes(originalType)&&<option value={originalType}>{itemTypeLabels[originalType]}（保留原类型）</option>}</select></Field>
+   {changedType&&<p className="content-retained">将由{itemTypeLabels[originalType]}转为{itemTypeLabels[draft.itemType]}，保留身份与子项。已有执行安排、投入或关联可能需要先处理；不支持的转换会保留输入并说明原因。</p>}
+   {draft.itemType==='event'&&<p className="content-retained">事件已记录到日历/时间线，分组可选。保存会保留当前编辑，并将这条内容移出收件箱。</p>}
+   <ContentParentPicker state={data.state} value={draft.parentId} excludeInbox onChange={parentId=>setDraft({...draft,parentId})}/>
+   {draft.itemType==='reminder'&&<><Field label="提醒时间"><input aria-label="提醒时间" type="datetime-local" required value={draft.at} onChange={e=>setDraft({...draft,at:e.target.value})}/></Field><ReminderRuleFields at={draft.at} value={draft.rule} onChange={rule=>setDraft({...draft,rule})}/></>}
+  </fieldset></div>
+  <footer className="inbox-editor-footer">
+   {error&&<p role="alert" className="form-error">{error}</p>}
+   <div className="content-save-bar"><small role="status">{saving?'正在保存并整理…':shortcutLabel('Ctrl+Enter 保存')}</small><div className="actions">
+    <Button type="button" className="inbox-delete-button" aria-label="删除当前收件箱条目" data-operation-entry="inbox.delete" disabled={busy||saving||deleting} onClick={onDelete}>删除…</Button>
+    <Button type="button" subtle disabled={saving||single} title={single?'只有一条待整理内容，可保留草稿稍后继续':undefined} onClick={onSkip}>跳过，下一条</Button>
+    <Button primary type="submit" disabled={busy||saving||!draft.title.trim()}>{saving?'正在保存…':saveLabel}</Button>
+   </div></div>
+  </footer>
+ </form>;
 }
 function InboxCapture({onClose,onSaved}:{onClose:()=>void;onSaved:(id:string)=>void}){
  const {data,run,busy}=useWorkspaceJournal(),[draft,setDraft]=useContentMemory(`journal.inbox-capture.${data.dataPath}`,{title:'',description:'',itemType:'task' as 'task'|'note'}),[saving,setSaving]=useState(false),[error,setError]=useState(''),pending=useRef(false),mounted=useRef(true);
  useEffect(()=>{mounted.current=true;return()=>{mounted.current=false;};},[]);
- const save=async()=>{if(pending.current||busy)return;pending.current=true;setSaving(true);setError('');try{const ids=new Set(data.state.tasks.map(t=>t.id)),result=await run({type:'capture.create',payload:{destination:'inbox',draft:{...draft,parentQuery:null,tagNames:[],plannedDate:null,dueAt:null,estimateMinutes:null,remindAt:null,eventAt:null,eventEnd:null}}}),added=result.state.tasks.find(t=>!ids.has(t.id));let unchanged=false;setDraft(previous=>{unchanged=JSON.stringify(previous)===JSON.stringify(draft);return unchanged?{title:'',description:'',itemType:'task'}:previous;});if(unchanged&&added)onSaved(added.id);}catch(e){if(mounted.current)setError((e as Error).message);}finally{pending.current=false;if(mounted.current)setSaving(false);}};
- return <form className="content-new-form" aria-label="记录到收件箱" aria-busy={saving} onSubmit={e=>{e.preventDefault();void save();}} onKeyDown={e=>{if((e.ctrlKey||e.metaKey)&&e.key==='Enter'){e.preventDefault();void save();}if(e.key==='Escape'&&!pending.current)onClose();}}><h2>记录到收件箱</h2><fieldset disabled={saving}><p className="muted">保存到已有收件箱，稍后澄清；不需要强制分组。</p><Field label="名称"><input autoFocus required maxLength={120} aria-label="捕获内容名称" value={draft.title} onChange={e=>setDraft({...draft,title:e.target.value})}/></Field><Field label="正文"><textarea aria-label="捕获内容正文" maxLength={2000} rows={6} value={draft.description} onChange={e=>setDraft({...draft,description:e.target.value})}/></Field><Field label="内容类型"><select aria-label="捕获内容类型" value={draft.itemType} onChange={e=>setDraft({...draft,itemType:e.target.value as 'task'|'note'})}><option value="task">任务</option><option value="note">笔记</option></select></Field>{error&&<p role="alert" className="form-error">{error}</p>}<div className="actions"><Button type="submit" primary disabled={busy||saving||!draft.title.trim()}>{saving?'正在保存…':'保存到收件箱'}</Button><Button type="button" subtle disabled={saving} onClick={onClose}>返回整理</Button></div></fieldset></form>;
+ const save=async()=>{if(pending.current||busy||!draft.title.trim())return;pending.current=true;setSaving(true);setError('');try{const ids=new Set(data.state.tasks.map(t=>t.id)),result=await run({type:'capture.create',payload:{destination:'inbox',draft:{...draft,parentQuery:null,tagNames:[],plannedDate:null,dueAt:null,estimateMinutes:null,remindAt:null,eventAt:null,eventEnd:null}}}),added=result.state.tasks.find(t=>!ids.has(t.id));let unchanged=false;setDraft(previous=>{unchanged=JSON.stringify(previous)===JSON.stringify(draft);return unchanged?{title:'',description:'',itemType:'task'}:previous;});if(unchanged&&added)onSaved(added.id);}catch(e){if(mounted.current)setError((e as Error).message);}finally{pending.current=false;if(mounted.current)setSaving(false);}};
+ const formKeys=useInboxFormKeys(save,()=>{if(!pending.current)onClose();});
+ return <form className="content-new-form" aria-label="记录到收件箱" aria-busy={saving} {...formKeys}><h2>记录到收件箱</h2><fieldset disabled={saving}><p className="muted">保存到已有收件箱，稍后澄清；不需要强制分组。</p><Field label="名称"><input autoFocus required maxLength={120} aria-label="捕获内容名称" value={draft.title} onChange={e=>setDraft({...draft,title:e.target.value})}/></Field><Field label="正文"><textarea aria-label="捕获内容正文" maxLength={2000} rows={6} value={draft.description} onChange={e=>setDraft({...draft,description:e.target.value})}/></Field><Field label="内容类型"><select aria-label="捕获内容类型" value={draft.itemType} onChange={e=>setDraft({...draft,itemType:e.target.value as 'task'|'note'})}><option value="task">任务</option><option value="note">笔记</option></select></Field>{error&&<p role="alert" className="form-error">{error}</p>}<div className="actions"><Button type="submit" primary disabled={busy||saving||!draft.title.trim()}>{saving?'正在保存…':'保存到收件箱'}</Button><Button type="button" subtle disabled={saving} onClick={onClose}>返回整理</Button></div></fieldset></form>;
 }
 export default Inbox;

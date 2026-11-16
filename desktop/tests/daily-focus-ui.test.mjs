@@ -37,11 +37,16 @@ test('context focus keeps explicit manual order, and saved focus filters survive
 
 test('selected and running focus never disappear from Today; direct start/resume and completed progress use the same item',async()=>{
  const h=await appDom();try{
-  const id=h.add('今天最重要的事',null);h.service.execute({type:'item.focus',payload:{id,date:'2026-10-19'}});h.service.execute({type:'task.select',payload:{id}});
+  const id=h.add('今天最重要的事',null),browsed=h.add('刚刚查看的任务',null);
+  h.service.execute({type:'item.focus',payload:{id,date:'2026-10-19'}});h.service.execute({type:'task.select',payload:{id:browsed}});
+  h.service.execute({type:'session.manual',payload:{taskId:id,date:'2026-10-18',minutes:8}});
   await h.mount();const panel=()=>h.label('当前重点清单'),focus=()=>h.query(`[data-focus-id="${id}"]`,panel());
-  assert.match(focus().textContent,/今天最重要的事/);assert.match(panel().textContent,/当前 1 件重点/);assert.ok(h.query('.task-card.daily-focus-card'));
+  assert.match(focus().textContent,/今天最重要的事.*进行中/);assert.match(panel().textContent,/当前 1 件重点/);
+  assert.equal(h.query('.today-now h2').textContent,'建议接下来');assert.equal(h.query('.today-next-reason').textContent,'当前重点');assert.match(h.query('.today-next').textContent,/今天最重要的事/);
   await h.click(h.label('开始计时 今天最重要的事',panel()));assert.equal(h.service.snapshot().timers[0].taskId,id);assert.match(focus().textContent,/专注中/);
+  assert.equal(document.querySelector('.today-next'),null);assert.match(h.query('.today-timer').textContent,/今天最重要的事/);
   assert.equal(panel().textContent.includes('先选几件'),false);await h.command({type:'focus.pause',payload:{taskId:id}});
+  assert.equal(document.querySelector('.today-next'),null);assert.match(focus().textContent,/计时暂停/);
   await h.click(h.label('恢复计时 今天最重要的事',panel()));assert.equal(h.service.snapshot().timers[0].paused,false);assert.match(focus().textContent,/正在计时/);
   await h.command({type:'focus.stop',payload:{taskId:id,complete:true}});
   assert.match(panel().textContent,/未完成一直保留/);assert.notEqual(h.get(id).focusActive,true);assert.equal(document.querySelector(`[data-focus-id="${id}"]`),null);
@@ -52,7 +57,7 @@ test('paused focus remains visible with disabled timing, while clock-only midnig
  const h=await appDom();try{
   const id=h.add('暂停的重点',null);h.service.execute({type:'item.focus',payload:{id,date:'2026-10-19'}});h.service.execute({type:'item.change',payload:{id,action:'pause'}});
   window.journal.clock=async()=>h.service.clockSnapshot();
-  await h.mount();const panel=h.label('当前重点清单');assert.match(panel.textContent,/事项已暂停/);assert.equal(h.label('开始计时 暂停的重点',panel).disabled,true);
+  await h.mount();const panel=h.label('当前重点清单');assert.equal(h.query('.daily-focus-name small',panel).textContent,'已暂停');assert.equal(h.label('开始计时 暂停的重点',panel).disabled,true);
   await h.click(h.label('任务'));await h.click(focusNav(h));assert.ok(row(h,id));
   h.clock.advance(10*60*60*1000);await h.action(()=>new Promise(resolve=>setTimeout(resolve,1150)));
   assert.ok(document.querySelector(`[data-outline-id="${id}"]`));assert.equal(focusNav(h).querySelector('small').textContent,'1');
@@ -63,6 +68,6 @@ test('removed or completed focus retains its date without rejoining, and past re
  const h=await appDom();try{
  const id=h.add('持续推进但可移除',null);h.service.execute({type:'item.focus',payload:{id,date:'2026-10-19'}});await h.mount();await h.click(h.label('移出当前重点 持续推进但可移除',h.label('当前重点清单')));assert.equal(h.get(id).focusDate,'2026-10-19');assert.equal(document.querySelector(`[data-focus-id="${id}"]`),null);
  await h.click(h.label('任务'));await h.click(focusNav(h));assert.equal(focusNav(h).querySelector('small').textContent,'0');await h.click(h.label('今日'));assert.equal(document.querySelector(`[data-focus-id="${id}"]`),null);
- await h.command({type:'item.focus',payload:{id,date:'2026-10-19'}});await h.input(h.label('查看日期'),'2026-10-18');assert.equal(document.querySelector('[aria-label="当前重点清单"]'),null);await h.input(h.label('查看日期'),'2026-10-19');assert.ok(h.query(`[data-focus-id="${id}"]`));await h.command({type:'task.status',payload:{id,status:'done'}});await h.command({type:'task.status',payload:{id,status:'open'}});assert.equal(document.querySelector(`[data-focus-id="${id}"]`),null);assert.equal(h.get(id).focusDate,'2026-10-19');
+ await h.command({type:'item.focus',payload:{id,date:'2026-10-19'}});await h.input(h.label('查看日期'),'2026-10-18');assert.equal(document.querySelector('[aria-label="当前重点清单"]'),null);assert.equal(document.querySelector('.today-next'),null);assert.ok(h.query('.today-history'));await h.input(h.label('查看日期'),'2026-10-19');assert.ok(h.query(`[data-focus-id="${id}"]`));await h.command({type:'task.status',payload:{id,status:'done'}});await h.command({type:'task.status',payload:{id,status:'open'}});assert.equal(document.querySelector(`[data-focus-id="${id}"]`),null);assert.equal(h.get(id).focusDate,'2026-10-19');
  }finally{await h.close();}
 });
