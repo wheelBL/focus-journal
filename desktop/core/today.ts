@@ -4,7 +4,7 @@ import {blockedReason} from './item-state';
 import {itemSorter} from './item-order';
 import {outlineIndex} from './outline';
 import {isDeadlineOverdue} from './deadlines';
-import {localDate,sessionMsOnDate,type JournalState,type Session,type Task} from './types';
+import {latestEndedSession,localDate,sessionMsOnDate,type JournalState,type Session,type Task} from './types';
 
 export function todayCandidates(state:JournalState,now:string){
  const index=outlineIndex(state),date=localDate(now);
@@ -16,25 +16,18 @@ export function todayCandidates(state:JournalState,now:string){
   &&(!task.plannedDate||task.plannedDate<=date)
   &&!task.dependencyPlan?.predecessors.some(edge=>(index.nodes.get(edge.id)?.record as Task|undefined)?.status!=='done'));
  const available=executable.filter(task=>!(index.children.get(task.id)??[]).some(({record})=>!(record as Task).deletedAt&&!record.archived));
- const result=(next?:Task,nextReason?:string)=>({index,eligible,available,next,nextReason});
+ const result=(next?:Task,nextReason?:string,previousSession?:Session)=>({index,eligible,available,next,nextReason,previousSession});
 
  if(activeTasks.size)return result();
+ const previousWork=(task:Task)=>latestEndedSession(state.sessions,s=>s.taskId===task.id&&s.durationMs>0);
  const focus=executable.find(task=>isCurrentFocus(task,date));
- if(focus)return result(focus,'当前重点');
+ if(focus)return result(focus,'当前重点',previousWork(focus));
  const scheduled=available.find(task=>task.plannedDate===date||isDeadlineOverdue(task.dueAt,now));
- if(scheduled)return result(scheduled,isDeadlineOverdue(scheduled.dueAt,now)?'截止已过':'今天计划');
+ if(scheduled)return result(scheduled,isDeadlineOverdue(scheduled.dueAt,now)?'截止已过':'今天计划',previousWork(scheduled));
 
  const availableById=new Map(available.map(task=>[task.id,task]));
- let recentTask:Task|undefined,lastWorkAt=-Infinity;
- for(const session of state.sessions){
-  if(!session.taskId||session.durationMs<=0)continue;
-  const task=availableById.get(session.taskId);
-  if(!task)continue;
-  const lastSegment=session.segments.findLast(segment=>segment.durationMs>0);
-  const workAt=Date.parse(lastSegment?.end??session.end??session.start??`${session.date}T00:00:00`);
-  if(workAt>lastWorkAt){recentTask=task;lastWorkAt=workAt;}
- }
- if(recentTask)return result(recentTask,'继续之前的事项');
+ const previous=latestEndedSession(state.sessions,s=>s.taskId!==null&&availableById.has(s.taskId)&&s.durationMs>0);
+ if(previous?.taskId)return result(availableById.get(previous.taskId),'继续之前的事项',previous);
  const leaf=available.find(task=>!task.isProject);
  return leaf?result(leaf,'可开始的事项'):result();
 }

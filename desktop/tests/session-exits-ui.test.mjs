@@ -97,6 +97,60 @@ test('named session summary retains edits on defer and survives external session
  }finally{await h.close();}
 });
 
+test('a saved next step is visible the next day and one click continues the right task',async()=>{
+ const h=await appDom();try{
+  const quote=h.add('核对供应商报价'),mail=h.add('回邮件');
+  h.service.execute({type:'item.focus',payload:{id:quote}});
+  await h.mount();
+  await h.click(h.button('开始 25 分钟',h.query('.today-next')));h.clock.advance(120000);
+  await h.click(h.button('结束本次',h.query('.today-timer')));
+  await h.input(h.label('本次推进了什么'),'前两条报价已核对');
+  await h.input(h.label('下次从哪开始'),'先核对第 3 条报价');
+  await h.click(h.button('保存进展，稍后填写'));
+  const lastQuote=h.service.snapshot().state.sessions.at(-1);
+  await h.command({type:'focus.start',payload:{taskId:mail,skipEstimate:true}});h.clock.advance(60000);
+  await h.click(h.button('结束本次',h.query('.today-timer')));
+  await h.input(h.label('本次推进了什么'),'邮件已发');
+  await h.click(h.button('保存并休息 5 分钟'));
+  assert.equal(h.label('休息剩余时间').textContent,'05:00');
+  h.clock.advance(24*60*60000);await h.command({type:'task.select',payload:{id:mail}});
+  assert.equal(h.label('查看日期').value,'2026-10-20');
+  const card=h.query('.today-next');
+  assert.equal(h.query('.task-title',card).textContent,'核对供应商报价');
+  assert.equal(h.query('.resume-summary',card).textContent,'前两条报价已核对');
+  assert.equal(h.query('.resume-next-action',card).textContent,'先核对第 3 条报价');
+  assert.doesNotMatch(card.textContent,/邮件已发/);
+  await h.click(h.button('继续 25 分钟',card));
+  const [timer]=h.service.snapshot().timers;assert.equal(timer.taskId,quote);assert.notEqual(timer.sessionId,lastQuote.id);
+  assert.equal(document.querySelector('dialog'),null);
+ }finally{await h.close();}
+});
+
+test('next step survives blank or historical summaries and remains usable without a summary',async()=>{
+ const h=await appDom();try{
+  const taskId=h.add('报价复核','inbox',{nextAction:'已有下一步'});
+  for(const date of ['2026-10-18','2026-10-19'])h.service.execute({type:'session.manual',payload:{taskId,date,minutes:12}});
+  await h.mount();
+  const nextCard=()=>h.query('.today-next');
+  assert.equal(nextCard().querySelector('.resume-summary'),null);
+  assert.equal(h.query('.resume-next-action',nextCard()).textContent,'已有下一步');
+  await h.click(h.button('补充本次推进了什么',h.query('.today-history')));
+  assert.equal(h.label('下次从哪开始').value,'已有下一步');
+  await h.input(h.label('下次从哪开始'),'   ');
+  await h.input(h.label('本次推进了什么'),'看完第二份');
+  await h.click(h.button('保存小结'));
+  assert.equal(h.get(taskId).nextAction,'已有下一步');
+  await h.input(h.label('查看日期'),'2026-10-18');
+  await h.click(h.button('补充本次推进了什么',h.query('.today-history')));
+  assert.equal(document.querySelector('[aria-label="下次从哪开始"]'),null);
+  await h.input(h.label('本次推进了什么'),'较早的复核');await escape(h);
+  await h.click(h.button('今天'));
+  assert.equal(h.query('.resume-next-action',nextCard()).textContent,'已有下一步');
+  await h.click(h.button('看完第二份',nextCard()));
+  const record=h.label('本次记录');assert.match(record.textContent,/2026-10-19/);assert.match(record.textContent,/看完第二份/);
+ }finally{await h.close();}
+});
+
 test('ordinary stop defaults to saving, then the receipt opens that exact session from another day or page',async()=>{
  const h=await appDom();try{
   const task=h.add('审阅文稿');await h.mount();

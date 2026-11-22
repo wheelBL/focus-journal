@@ -112,3 +112,27 @@ test('progress groups sessions by item, includes completion without time, and re
  let rows=dayProgress(h.service.snapshot().state,'2026-10-19');assert.equal(rows.length,1);assert.equal(rows[0].minutesMs,38*60000);assert.equal(rows[0].summary,'最新推进');
  h.service.execute({type:'task.status',payload:{id:b,status:'done'}});rows=dayProgress(h.service.snapshot().state,'2026-10-21');assert.equal(rows[0].task!.id,b);assert.equal(rows[0].minutesMs,0);assert.equal(rows[0].completed,true);
 });
+
+test('Today pairs the suggested task with its own last work, including date-only historical records',()=>{
+ const h=setup(),quote=h.add('核对报价'),mail=h.add('回邮件');
+ const record=(taskId:string,summary:string,date:string)=>h.service.execute({type:'session.manual',payload:{taskId,date,minutes:10,summary}}).state.sessions.at(-1)!;
+ const model=()=>{const {state,now}=h.service.snapshot();return todayCandidates(state,now);};
+ const old=record(quote,'先读合同','2026-10-18');
+ record(quote,'第一段报价','2026-10-19');
+ const latest=record(quote,'第二段报价','2026-10-19');
+ const recentOther=record(mail,'已回邮件','2026-10-20');
+ assert.equal(model().previousSession?.id,recentOther.id);
+ h.service.execute({type:'task.plan',payload:{id:quote,date:'2026-10-21'}});
+ assert.equal(model().nextReason,'今天计划');assert.equal(model().previousSession?.id,latest.id);
+ h.service.execute({type:'item.focus',payload:{id:quote}});
+ h.service.execute({type:'session.summary',payload:{id:latest.id,summary:'第二段报价',nextAction:'核对第 3 条报价'}});
+ h.clock.time+=60000;
+ const revised=h.service.execute({type:'session.summary',payload:{id:old.id,summary:'补上合同页码',nextAction:'过时的下一步'}});
+ assert.equal(revised.state.sessions.find(s=>s.id===old.id)?.summary,'补上合同页码');
+ assert.equal(model().nextReason,'当前重点');
+ assert.equal(model().previousSession?.summary,'第二段报价');assert.equal(model().next?.nextAction,'核对第 3 条报价');
+ h.service.execute({type:'session.summary',payload:{id:latest.id,summary:'',nextAction:'  '}});
+ assert.equal(model().previousSession?.summary,'');assert.equal(model().next?.nextAction,'核对第 3 条报价');
+ h.service.execute({type:'session.delete',payload:{id:latest.id}});
+ assert.equal(model().previousSession?.summary,'第一段报价');
+});

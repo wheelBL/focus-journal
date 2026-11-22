@@ -37,7 +37,7 @@ export function Today(){
    <div className="today-execution-grid">
     <section className="today-now" aria-label="当前执行"><div className="today-section-heading"><h2>{timers.length?'正在推进':next?'建议接下来':'从一件事开始'}</h2>{next&&<span className="today-next-reason">{model.nextReason}</span>}</div>
      {timers.map(timer=>{const task=state.tasks.find(t=>t.id===timer.taskId);return <div className="today-timer" key={timer.sessionId}>{task?<TaskCard task={task} index={model.index}/>:<UnassignedTimerCard timer={timer}/>}</div>;})}
-     {next&&<div className="today-next"><TaskCard task={next} index={model.index}/></div>}
+     {next&&<div className="today-next"><TaskCard task={next} index={model.index} previousSession={model.previousSession}/></div>}
      {!next&&!timers.length&&<Empty title="选一件事，开始就好" text="从右侧选择当前重点，或先计时，结束后再补充事项。"><Button primary onClick={()=>void run({type:'focus.start-unassigned'}).catch(()=>{})}>先计时，稍后补充事项</Button><Button onClick={()=>setChoosing(true)}>选择当前重点</Button></Empty>}
     </section>
     <section className="today-plan" aria-label="安排当前重点"><div className="today-section-heading"><h2>当前重点</h2><Button subtle aria-expanded={choosing} onClick={()=>setChoosing(!choosing)}>{choosing?'收起选择':'选择重点'}</Button></div>

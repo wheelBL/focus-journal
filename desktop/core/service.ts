@@ -32,7 +32,7 @@ import { performance } from 'node:perf_hooks';
 import {attachTag,renameTag,deleteTag,tagName} from './organizing';
 import {historyLabel,makeHistoryEntry,type HistoryEntry} from './history';
 import {validateFilter,tagKey} from './filters';
-import { emptyState, localDate, taskMs, type Command, type JournalState, type JournalStore, type Session, type Snapshot, type WorkClock } from './types';
+import { emptyState, latestEndedSession, localDate, taskMs, type Command, type JournalState, type JournalStore, type Session, type Snapshot, type WorkClock } from './types';
 import {assertOutline,assertParentAvailable,branchIds,ensureOutlineFields,inheritedProjects,migrateOutline,moveBranch,moveRelative,openDescendants,outlineIndex,syncProjectOwnership} from './outline';
 
 const realClock: WorkClock={now:()=>Date.now(),monotonic:()=>performance.now()};
@@ -339,7 +339,10 @@ export class JournalService {
         case 'session.summary': {
           const session=s.sessions.find(x=>x.id===p.id);if(!session)throw new Error('记录不存在。');
           session.summary=text(p.summary??'');session.updatedAt=now;if(p.rest===true)startBreak(s,now,p.id);if(session.taskId===null){if(p.nextAction!==undefined||p.remainingMinutes!=null)throw new Error('请先补充事项，再调整估计。');break;}const task=this.task(s,session.taskId);
-          if(p.nextAction!==undefined)task.nextAction=text(p.nextAction);
+          if(p.nextAction!==undefined){
+            const nextAction=text(p.nextAction);
+            if(nextAction&&latestEndedSession(s.sessions,record=>record.taskId===task.id)?.id===session.id)task.nextAction=nextAction;
+          }
           if(p.remainingMinutes!=null)s.estimates.push({id:randomUUID(),taskId:task.id,remainingMinutes:number(p.remainingMinutes,0),spentMinutes:taskMs(s,task.id)/60000,reason:session.summary,createdAt:now});break;
         }
         case 'estimate.add': {

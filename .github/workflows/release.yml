@@ -18,6 +18,13 @@ jobs:
             if (!/^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)$/.test(version) || process.env.GITHUB_REF_NAME !== `v${version}`) {
               throw new Error(`Expected stable tag v${version}`);
             }'
+      - name: Check the three README installer links for this release
+        run: |
+          version=${GITHUB_REF_NAME#v}
+          for installer in Windows-x64-Setup.exe macOS-arm64.dmg macOS-x64.dmg; do
+            url="$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/releases/download/$GITHUB_REF_NAME/FocusJournal-$version-$installer"
+            grep -Fq "($url)" README.md || { echo "::error file=README.md::Missing installer link for $installer"; exit 1; }
+          done
   macos:
     needs: version
     uses: ./.github/workflows/macos.yml

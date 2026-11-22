@@ -96,6 +96,24 @@ export function localDate(value: Date | string | number = new Date()): string {
 }
 export function shiftDate(date: string, days: number): string { const d = new Date(`${date}T12:00:00`); d.setDate(d.getDate()+days); return localDate(d); }
 export function taskMs(state: JournalState, taskId: string): number { return state.sessions.filter(s=>s.taskId===taskId).reduce((n,s)=>n+s.durationMs,0); }
+
+/** A paused timer can be closed days after the last segment of actual work. */
+export function latestEndedSession(sessions: readonly Session[], matches: (session: Session) => boolean): Session | undefined {
+  let latest: Session | undefined;
+  let latestAt = -Infinity;
+  for (const session of sessions) {
+    if (session.status !== 'ended' || !matches(session)) continue;
+    const segment = session.segments.findLast(part => part.durationMs > 0);
+    const workAt = Date.parse(segment?.end ?? session.end ?? session.start ?? `${session.date}T00:00:00`);
+    // Date-only entries can tie. Use the last entry for that task and keep the existing order between tasks.
+    if (workAt > latestAt || (workAt === latestAt && session.taskId === latest?.taskId)) {
+      latest = session;
+      latestAt = workAt;
+    }
+  }
+  return latest;
+}
+
 export function sessionMsOnDate(session: Session, date: string): number {
   if (!session.segments.length) return session.date === date ? session.durationMs : 0;
   const start = new Date(`${date}T00:00:00`).getTime(); const end = new Date(`${shiftDate(date,1)}T00:00:00`).getTime();

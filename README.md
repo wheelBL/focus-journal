@@ -2,6 +2,20 @@
 
 Windows 11 与 macOS 上的本地工作日志，把 **估计 → 实践 → 复盘 → 调整** 串成每天的工作流程。
 
+## 下载安装
+
+| 我的电脑 | 专注记 0.41.4 | 安装方式 |
+| --- | --- | --- |
+| Windows 11，64 位 x64 | [下载 Windows 安装程序（EXE）](https://github.com/wheelBL/focus-journal/releases/download/v0.41.4/FocusJournal-0.41.4-Windows-x64-Setup.exe) | 双击安装程序 |
+| Mac，Apple 芯片（M 系列） | [下载 Mac 苹果芯片版（DMG）](https://github.com/wheelBL/focus-journal/releases/download/v0.41.4/FocusJournal-0.41.4-macOS-arm64.dmg) | 打开 DMG，将「专注记」拖到「应用程序」 |
+| Mac，Intel 处理器 | [下载 Mac Intel 版（DMG）](https://github.com/wheelBL/focus-journal/releases/download/v0.41.4/FocusJournal-0.41.4-macOS-x64.dmg) | 打开 DMG，将「专注记」拖到「应用程序」 |
+
+在 Mac 左上角打开 ** → 关于本机**。「芯片」显示 Apple M 系列时选苹果芯片版，「处理器」显示 Intel 时选 Intel 版。Mac 需要 macOS 14 或更新版本。
+
+[ZIP 便携包与校验文件](https://github.com/wheelBL/focus-journal/releases/latest) · [0.41.4 更新说明](docs/releases/0.41.4.md)
+
+## 使用专注记
+
 任务树负责理清事情，番茄计时帮助开始，日历记录真实投入，今日与回顾回答“今天推进了什么”。界面为中文，采用 TypeScript + React + Electron + SQLite。
 
 界面采用 Things 风格的紧凑列表与右侧详情，支持跟随系统、浅色和深色。侧栏底部可以快速切换外观，在“设置 → 外观与动效”调整过渡效果；计时、提醒和快速记录窗口保持一致。外观偏好仅保存在本机，不改变工作记录。
@@ -16,21 +30,11 @@ AI 助手使用可调整宽度、可展开的侧栏，直接连续对话，无�
 
 AI 设置支持从所填服务获取模型列表，搜索选择后保存，仍可手动输入自定义模型；无需先填模型或保存新配置才能查询。日期建议发生冲突时会把具体校验反馈交回 AI，最多自动修正两次；计划与截止可作为一条建议确认，失败原因会保留到后续对话。
 
-## 下载与运行
-
 确认失效且可撤销的截止可由 AI 建议移除，同时设置回顾日；外部承诺或来源不明时先澄清。回顾日只提示重新判断，不充当截止期限，今日页可直接打开待回顾事项。
 
-当前源码版本为 **0.41.3**。[GitHub Releases](https://github.com/wheelBL/focus-journal/releases) 提供正式版下载，无需登录。也可从对应平台的 Actions 成功运行中下载尚未发布的构建。参见 [0.41.3 更新说明](docs/releases/0.41.3.md)。
+## 运行与更新
 
-| 设备 | 下载 |
-| --- | --- |
-| Windows 11 x64 | [Windows Actions](https://github.com/wheelBL/focus-journal/actions/workflows/windows.yml)：`FocusJournal-Windows-x64-zip` |
-| Mac，M 系列芯片 | [macOS Actions](https://github.com/wheelBL/focus-journal/actions/workflows/macos.yml)：`FocusJournal-macOS-arm64-dmg` 或 `FocusJournal-macOS-arm64-zip` |
-| Mac，Intel 芯片 | [macOS Actions](https://github.com/wheelBL/focus-journal/actions/workflows/macos.yml)：`FocusJournal-macOS-x64-dmg` 或 `FocusJournal-macOS-x64-zip` |
-
-Windows 可以运行 `Windows-x64-Setup.exe`，也可以解压整个 ZIP 后双击 **专注记.exe**；Mac 安装说明见下文。无需安装 Node.js。
-
-维护者推送与 `desktop/package.json` 版本一致的 `vX.Y.Z` 标签后，发布流程构建并验证 Windows x64、macOS arm64 和 macOS x64 的安装包，校验 SHA-256，并将全部下载包上传到同一个 GitHub Release。
+使用 Windows 便携版时，先解压整个 ZIP，再双击 **专注记.exe**。正式版可直接运行，无需安装 Node.js。
 
 - 系统：Windows 11 x64；macOS 14 或更新系统，提供 Apple Silicon 与 Intel 两种包。macOS 原生启动测试使用 macOS 15。
 - macOS 0.41.2 起，将应用放入 `/Applications` 或 `~/Applications` 即可启用自动更新。应用在后台检查 GitHub Releases，验证并下载新版，在系统通知和应用菜单中提示，并在完全退出时安装。可从「专注记 → 检查更新…」手动检查，也可点击提示立即重启更新。
@@ -83,7 +87,8 @@ macOS 使用原生菜单、窗口红黄绿按钮、菜单栏图标和 Dock 恢�
 2. 添加过程中按 `Tab` 缩进，`Shift+Tab` 提升一级，`Enter` 保存并继续，`Ctrl+Enter` 保存结束（Mac 为 `⌘Enter`）。
 3. 将今天要推进的事情加入“今日重点”，从今日或事项行开始计时；也可以先计时，结束后再命名。
 4. 到时自行选择继续、稍后提醒或结束并休息。结束本次计时不会自动完成事项。
-5. 在日历补记遗漏投入，在回顾中比较估计与实际，记录下次如何调整。
+5. 结束后写下本次小结，还可以留一句「下次从哪开始」。下次打开「今日」，推荐任务会显示它上次的小结和下一步，点击「继续」即可开始新一段计时。
+6. 在日历补记遗漏投入，在回顾中比较估计与实际，记录下次如何调整。
 
 **日期语义**：“计划开始”是打算开始的日期，不会覆盖真实开始时间。“10 月 23 日前”不包含当天，表示在 10 月 23 日 00:00 前完成；也支持精确到分钟的截止时间。
 
@@ -110,6 +115,8 @@ npx electron . --demo --data-dir ./qa-data/development
 浏览器预览需要两个终端，在 `desktop` 下分别执行 `npm run preview:api` 和 `npm run dev`。预览只使用 `qa-data` 中的示例数据；原生托盘、全局快捷键和窗口提醒需在 Electron 中验证。
 
 ## 测试与打包
+
+推送与 `desktop/package.json` 版本一致的 `vX.Y.Z` 标签后，发布流程核对首页的三个下载链接，构建并校验各平台安装包，随后上传到同一个 GitHub Release。
 
 在 `desktop` 下执行：
 

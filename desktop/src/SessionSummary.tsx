@@ -1,18 +1,24 @@
-import React,{useState} from 'react';
-import {localDate} from '../core/types';
+import React,{useMemo,useState} from 'react';
+import {latestEndedSession,localDate} from '../core/types';
 import {sessionTitle} from '../core/session-label';
 import {CheckmarkCircle20Filled} from '@fluentui/react-icons';
 import {useItemActions} from './useItemActions';
 import {useDialogAction} from './useDialogAction';
 import {restUnavailableReason} from './rest-availability';
-import {Button,Field,Modal,minuteText,timeText,useJournal} from './ui';
+import {Button,Field,Modal,minuteText,timeText,useJournal,useWorkspaceJournal} from './ui';
 
 export function SummaryForm({id}:{id:string}){
  const {data,run,dialog,notify}=useJournal(),requestState=useItemActions();
  const session=data.state.sessions.find(s=>s.id===id),task=data.state.tasks.find(t=>t.id===session?.taskId);
+ const sessions=useWorkspaceJournal().data.state.sessions,taskId=task?.id;
+ const canSetNext=useMemo(()=>!!taskId&&task?.status==='open'&&latestEndedSession(sessions,s=>s.taskId===taskId)?.id===id,[sessions,taskId,task?.status,id]);
  const [summary,setSummary]=useState(session?.summary??''),[remaining,setRemaining]=useState('');
+ const [nextDraft,setNextDraft]=useState<string>();
+ const currentNext=task?.nextAction??'';
+ const nextAction=nextDraft?.trim();
+ const changedNext=canSetNext&&!!nextAction&&nextAction!==currentNext;
  const {perform,dismiss,saving,error}=useDialogAction();
- const persist=(rest=false)=>run({type:'session.summary',payload:{id,summary,remainingMinutes:remaining===''?null:Number(remaining),rest}});
+ const persist=(rest=false)=>run({type:'session.summary',payload:{id,summary,remainingMinutes:remaining===''?null:Number(remaining),rest,...(changedNext?{nextAction}:{})}});
  const save=async(rest=false)=>{if(await perform(()=>persist(rest))){dialog(null);notify('小结已保存',id);}};
  const complete=()=>perform(async()=>{
   await persist();
@@ -20,14 +26,15 @@ export function SummaryForm({id}:{id:string}){
   if(completed)dialog(null);
   notify(completed?'小结已保存，事项已完成':'小结已保存',id);
  });
- const dirty=!!session&&(summary!==session.summary||remaining!=='');
+ const dirty=!!session&&(summary!==session.summary||remaining!==''||changedNext);
  const restReason=restUnavailableReason(data);
  const close=()=>{if(dirty)void save();else dismiss(()=>dialog(null));};
  if(!session||!task)return <Modal title="结束本次后" onClose={()=>dialog(null)}><p>这段投入已更新，请返回查看。</p><Button onClick={()=>dialog(null)}>返回</Button></Modal>;
  return <Modal title="结束本次后" onClose={close} busy={saving}><form onSubmit={e=>{e.preventDefault();void save();}}><fieldset disabled={saving} className="dialog-fields">
   <div className="saved-heading"><CheckmarkCircle20Filled/><div><h3>已记录 {minuteText(session.durationMs)}</h3><p>{timeText(session.start)}–{timeText(session.end)} · {task.status==='done'?'任务已完成':'任务继续进行'}</p></div></div>
-  <p className="muted">时间已经保存。稍后填写会保留已输入的小结和剩余估计。</p>
+  <p className="muted">时间已经保存。选择「稍后填写」也会保存已填的内容。</p>
   <Field label="本次推进了什么"><textarea autoFocus aria-label="本次推进了什么" rows={3} maxLength={2000} value={summary} onChange={e=>setSummary(e.target.value)} placeholder="留下可回顾的结果，而不只是一个时长"/></Field>
+  {canSetNext&&<Field label="下次从哪开始（可选）" hint={currentNext?'留空会保留现有的下一步。':undefined}><input aria-label="下次从哪开始" maxLength={2000} value={nextDraft??currentNext} onChange={e=>setNextDraft(e.target.value)} placeholder="例如，先核对第 3 条报价"/></Field>}
   <Field label="估计还需要多少分钟（可选）" hint={`原估计 ${task.estimateMinutes??'未填写'} 分钟将继续保留。`}><input type="number" min={0} max={1440} value={remaining} onChange={e=>setRemaining(e.target.value)}/></Field>
   {error&&<p role="alert" className="form-error">{error}</p>}
   {restReason&&<p className="muted" role="status">{restReason}</p>}
