@@ -50,7 +50,7 @@ jobs:
             notes_args=(--notes-file "$PWD/$notes")
           fi
           cd release-assets
-          packages=("FocusJournal-$version-Windows-x64.zip"
+          packages=("FocusJournal-$version-Windows-x64.zip" "FocusJournal-$version-Windows-x64-Setup.exe"
             "FocusJournal-$version-macOS-arm64.zip" "FocusJournal-$version-macOS-arm64.dmg"
             "FocusJournal-$version-macOS-x64.zip" "FocusJournal-$version-macOS-x64.dmg")
           sums=(SHA256SUMS-Windows-x64.txt SHA256SUMS-macOS-arm64.txt SHA256SUMS-macOS-x64.txt)

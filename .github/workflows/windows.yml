@@ -51,11 +51,17 @@ jobs:
         run: node scripts/verify-release.mjs
       - name: Archive and verify download
         run: ./scripts/archive-windows.ps1
+      - name: Build and exercise the Windows update installer
+        run: |
+          ./scripts/build-windows-installer.ps1
+          node --import tsx scripts/check-windows-update.ts
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
         with:
           name: FocusJournal-Windows-x64-zip
           path: |
             desktop/release/FocusJournal-*-Windows-x64.zip
+            desktop/release/FocusJournal-*-Windows-x64-Setup.exe
             desktop/release/SHA256SUMS-Windows-x64.txt
             desktop/release/build-provenance-Windows-x64.json
           if-no-files-found: error

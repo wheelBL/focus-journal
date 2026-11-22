@@ -3,7 +3,8 @@ import assert from 'node:assert/strict';
 import {primaryModifier,defaultCaptureShortcut,shortcutLabel} from '../core/desktop-platform';
 import {mainWindowChrome,applicationMenu,configureCompanionWindow} from '../electron/desktop-platform';
 import {CaptureShortcut} from '../electron/capture-shortcut';
-import {MacUpdates, replaceMacApp, selectMacUpdate} from '../electron/mac-updates';
+import {MacUpdates, replaceMacApp} from '../electron/mac-updates';
+import {selectUpdate} from '../electron/release-updates';
 import {macosConfig} from '../scripts/macos-config.mjs';
 import {mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync} from 'node:fs';
 import {tmpdir} from 'node:os';
@@ -35,12 +36,12 @@ const updateAsset = {name:updateName,browser_download_url:updateUrl,size:3,diges
 const updateRelease = {tag_name:'v0.41.10',draft:false,prerelease:false,assets:[updateAsset]};
 
 test('macOS update selection requires a newer stable release and the verified asset for the current architecture',()=>{
- assert.deepEqual(selectMacUpdate(updateRelease,'0.41.9','arm64'),{version:'0.41.10',url:updateUrl,size:3,digest:'a'.repeat(64)});
- assert.deepEqual(selectMacUpdate(updateRelease,'0.41.10','arm64'),{state:'current'});
- assert.deepEqual(selectMacUpdate(updateRelease,'0.42.0','arm64'),{state:'current'});
- assert.deepEqual(selectMacUpdate(updateRelease,'0.41.9','x64'),{state:'unavailable'});
- assert.deepEqual(selectMacUpdate({...updateRelease,prerelease:true},'0.41.9','arm64'),{state:'unavailable'});
- assert.deepEqual(selectMacUpdate({...updateRelease,assets:[{...updateAsset,digest:undefined}]},'0.41.9','arm64'),{state:'unavailable'});
+ assert.deepEqual(selectUpdate(updateRelease,'0.41.9','darwin','arm64'),{version:'0.41.10',url:updateUrl,size:3,digest:'a'.repeat(64)});
+ assert.deepEqual(selectUpdate(updateRelease,'0.41.10','darwin','arm64'),{state:'current'});
+ assert.deepEqual(selectUpdate(updateRelease,'0.42.0','darwin','arm64'),{state:'current'});
+ assert.deepEqual(selectUpdate(updateRelease,'0.41.9','darwin','x64'),{state:'unavailable'});
+ assert.deepEqual(selectUpdate({...updateRelease,prerelease:true},'0.41.9','darwin','arm64'),{state:'unavailable'});
+ assert.deepEqual(selectUpdate({...updateRelease,assets:[{...updateAsset,digest:undefined}]},'0.41.9','darwin','arm64'),{state:'unavailable'});
 });
 
 test('the macOS menu keeps a downloaded update visible and opens its update action',()=>{

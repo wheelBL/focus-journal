@@ -68,6 +68,7 @@ export interface JournalStore {
 }
 export interface Command { type: string; payload?: Record<string, unknown>;meta?:{source?:'user'|'ai'|'api'|'sync'|'system';entry?:string;version?:string;aiRunId?:string} }
 export interface JournalApi {
+  windowsUpdates?:import('./update-types').WindowsUpdateBridge;
   onEditAction?(callback:(action:import('./desktop-platform').DesktopEditAction)=>void):()=>void;
   editText?(action:import('./desktop-platform').DesktopEditAction):Promise<void>;
   usage?:import('./usage-types').UsageBridge;

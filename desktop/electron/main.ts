@@ -1,6 +1,7 @@
 import {mainWindowChrome,applicationMenu} from './desktop-platform';
 import {shutdownJournal} from './shutdown';
 import {prepareWorkspace,finishWorkspaceStartup} from './workspace-startup';
+import {windowsUpdateUI} from './windows-update-ui';
 import {MacUpdates} from './mac-updates';
 import type {DesktopEditAction} from '../core/desktop-platform';
 import {UsageStore} from './usage-store';
@@ -116,10 +117,11 @@ else if(workspace) {
       if(result.focusReminder&&Notification.isSupported())new Notification({title:'专注提醒',body:result.focusReminder,icon}).show();
       if(command.type==='focus.stop'&&command.payload?.rest!==true){const record=result.state.sessions.find(r=>r.id===command.payload?.sessionId);if(record)openSession(record.id);else show();}else if(command.type==='focus.start-unassigned'||command.type.startsWith('break.')||command.payload?.rest===true)show();
     }catch(e){report(e);}};
+    let windowsUpdates:ReturnType<typeof windowsUpdateUI>|undefined;
     const refreshTray=()=>tray?.setContextMenu(Menu.buildFromTemplate([
       {label:'打开工作日志',click:show},{label:'显示屏边计时签',enabled:!!service.floatingTimerSnapshot().timers.length||!!service.floatingTimerSnapshot().rest,click:()=>floating.open()},{label:'快速记录',click:()=>capture.open()},{label:'先计时，结束后补充事项',click:()=>performTimer({type:'focus.start-unassigned'})},
       ...timerMenu(service.snapshot(),performTimer),...breakMenu(service.snapshot(),performTimer),
-      {type:'separator'},{label:'退出专注记',click:()=>app.quit()}
+      {type:'separator'},...(windowsUpdates?[windowsUpdates.menuItem()]:[]),{label:'退出专注记',click:()=>app.quit()}
     ]));
     const reminders=new ReminderWindow(service,()=>changed(),icon,log,id=>{show();win?.webContents.send('journal:open-item',id);},openSession,reveal=>{if(reveal||win?.isVisible()&&!win.isMinimized())show();},()=>floating?.sync(),()=>{show();win?.webContents.send('journal:open-inbox');});
     const floating=new FloatingTimerWindow(service,win,()=>changed(),()=>reminders.isPresenting(),icon,path.join(dataDir,'floating-timer-position.json'),show,openSession,log);
@@ -178,12 +180,15 @@ else if(workspace) {
     powerMonitor.on('suspend',()=>{try{service.suspend();changed();}catch(e){report(e);}});
     powerMonitor.on('resume',changed);
     const interval=setInterval(()=>{try{if(service.tick().length)changed();reminders.sync();floating.sync();tray?.setToolTip(floating.tooltip());}catch(e){report(e);}},1000);
+    if(process.platform==='win32'&&process.arch==='x64'&&app.isPackaged&&!demo&&!treePrototype&&!workspace.explicit){
+      windowsUpdates=windowsUpdateUI(win,refreshTray,()=>closed,log);
+    }
     refreshTray();
     const shutdown=()=>shutdownJournal(()=>service.shutdown(),()=>{closed=true;quitting=true;},[
       ['interval',()=>clearInterval(interval)],['ai',()=>ai.dispose()],['usage',()=>usage.dispose()],
       ['localApi',()=>localApi.dispose()],['sync',()=>sync.dispose()],['floating',()=>floating.dispose()],
       ['reminders',()=>reminders.dispose()],['capture',()=>capture.dispose()],['appearance',()=>appearance.dispose()],
-      ['tray',()=>tray?.destroy()]
+      ['windowsUpdates',()=>windowsUpdates?.dispose()],['tray',()=>tray?.destroy()]
     ],(name,error)=>log('shutdown-cleanup-error',{name,message:error instanceof Error?error.message:String(error)}));
     app.on('before-quit',event=>{
       if(closed)return;

@@ -5,6 +5,13 @@ async function invoke(channel:string,...args:unknown[]){
   catch(error){const message=error instanceof Error?error.message:String(error);throw new Error(message.replace(/^Error invoking remote method '[^']+': (?:Error: )?/,''));}
 }
 contextBridge.exposeInMainWorld('journal',{
+  ...(process.platform==='win32'?{windowsUpdates:{
+    status:()=>invoke('windows-update:status'),install:()=>invoke('windows-update:install'),
+    subscribe:(changed:(state:import('../core/update-types').WindowsUpdateState)=>void)=>{
+      const receive=(_event:unknown,state:import('../core/update-types').WindowsUpdateState)=>changed(state);
+      ipcRenderer.on('windows-update:changed',receive);return()=>ipcRenderer.removeListener('windows-update:changed',receive);
+    },
+  }}:{}),
   editText:(action:string)=>invoke('journal:text-edit',action),
   onEditAction:(callback:(action:DesktopEditAction)=>void)=>{const receive=(_event:unknown,action:string)=>{if(action==='undo'||action==='redo'||action==='selectAll')callback(action);};ipcRenderer.on('journal:edit-action',receive);return()=>ipcRenderer.removeListener('journal:edit-action',receive);},
   usage:{record:(value:unknown)=>invoke('usage:record',value),snapshot:()=>invoke('usage:snapshot'),configure:(enabled:boolean)=>invoke('usage:configure',enabled),clear:(kind:string)=>invoke('usage:clear',kind),feedback:(id:string,rating:string,note:string)=>invoke('usage:feedback',id,rating,note),export:()=>invoke('usage:export')},
