@@ -13,6 +13,7 @@ Compression=lzma2/fast
 SolidCompression=yes
 UninstallDisplayIcon={app}\专注记.exe
 WizardStyle=modern
+SetupMutex=FocusJournalDesktopSetup
 CloseApplications=no
 RestartApplications=no
 DisableProgramGroupPage=yes
@@ -24,7 +25,8 @@ Source: "{#PackagePath}\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdir
 Name: "{userprograms}\专注记"; Filename: "{app}\专注记.exe"; AppUserModelID: "local.focusjournal.desktop"
 
 [Run]
-Filename: "{app}\专注记.exe"; Description: "启动专注记"; Flags: nowait postinstall; Check: ShouldLaunch
+Filename: "{app}\专注记.exe"; Description: "启动专注记"; Flags: nowait postinstall skipifsilent
+Filename: "{app}\专注记.exe"; Flags: nowait skipifnotsilent
 
 [Code]
 function OpenProcess(Access: LongWord; Inherit: Boolean; Pid: LongWord): THandle;
@@ -33,11 +35,6 @@ function WaitForSingleObject(Handle: THandle; Timeout: LongWord): LongWord;
   external 'WaitForSingleObject@kernel32.dll stdcall';
 function CloseHandle(Handle: THandle): Boolean;
   external 'CloseHandle@kernel32.dll stdcall';
-
-function ShouldLaunch(): Boolean;
-begin
-  Result := ExpandConstant('{param:FocusNoLaunch|0}') <> '1';
-end;
 
 function PrepareToInstall(var NeedsRestart: Boolean): String;
 var ParentId: Integer; Handle: THandle;
