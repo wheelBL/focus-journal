@@ -6,9 +6,9 @@ export function configureCompanionWindow(window:Pick<BrowserWindow,'setVisibleOn
 export function mainWindowChrome(platform:NodeJS.Platform):BrowserWindowConstructorOptions{
  return platform==='darwin'?{titleBarStyle:'hidden',trafficLightPosition:{x:14,y:14}}:{titleBarStyle:'hidden',titleBarOverlay:{color:'#2C323B',symbolColor:'#E4E9F1',height:44}};
 }
-export function applicationMenu(platform:NodeJS.Platform,name:string,edit:(action:DesktopEditAction)=>void=()=>{}):MenuItemConstructorOptions[]|null{
+export function applicationMenu(platform:NodeJS.Platform,name:string,edit:(action:DesktopEditAction)=>void=()=>{},update?:{check:()=>void;version?:string}):MenuItemConstructorOptions[]|null{
  if(platform!=='darwin')return null;
- return [{label:name,submenu:[{role:'about'},{type:'separator'},{role:'hide'},{role:'hideOthers'},{role:'unhide'},{type:'separator'},{role:'quit'}]},
+ return [{label:name,submenu:[{role:'about'},...(update?[{label:update.version?`新版 ${update.version} 已就绪…`:'检查更新…',click:update.check}]:[]),{type:'separator'},{role:'hide'},{role:'hideOthers'},{role:'unhide'},{type:'separator'},{role:'quit'}]},
   {label:'文件',submenu:[{role:'close'}]},
   // Undo/redo bindings are device-configurable in the renderer. Menu clicks use
   // the same dispatcher; fixed native accelerators would bypass those settings.

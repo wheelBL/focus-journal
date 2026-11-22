@@ -1,0 +1,60 @@
+name: Publish desktop releases
+on:
+  push:
+    tags: ['v*']
+permissions:
+  contents: read
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+jobs:
+  version:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+      - name: Match the stable tag to the app version
+        run: |
+          node -e 'const version = require("./desktop/package.json").version;
+            if (!/^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)$/.test(version) || process.env.GITHUB_REF_NAME !== `v${version}`) {
+              throw new Error(`Expected stable tag v${version}`);
+            }'
+  macos:
+    needs: version
+    uses: ./.github/workflows/macos.yml
+  windows:
+    needs: version
+    uses: ./.github/workflows/windows.yml
+  publish:
+    needs: [macos, windows]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
+      - uses: actions/download-artifact@37930b1c2abaa49bbe596cd826c3c89aef350131 # v7
+        with:
+          pattern: FocusJournal-*
+          path: release-assets
+          merge-multiple: true
+      - name: Verify and publish all platform downloads
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          version=${GITHUB_REF_NAME#v}
+          notes="docs/releases/$version.md"
+          notes_args=(--generate-notes)
+          if [[ -f "$notes" ]]; then
+            notes_args=(--notes-file "$PWD/$notes")
+          fi
+          cd release-assets
+          packages=("FocusJournal-$version-Windows-x64.zip"
+            "FocusJournal-$version-macOS-arm64.zip" "FocusJournal-$version-macOS-arm64.dmg"
+            "FocusJournal-$version-macOS-x64.zip" "FocusJournal-$version-macOS-x64.dmg")
+          sums=(SHA256SUMS-Windows-x64.txt SHA256SUMS-macOS-arm64.txt SHA256SUMS-macOS-x64.txt)
+          sha256sum "${packages[@]}" | sort > "$RUNNER_TEMP/focus-journal-sha256.txt"
+          cat "${sums[@]}" | sort | diff - "$RUNNER_TEMP/focus-journal-sha256.txt"
+          gh release create "$GITHUB_REF_NAME" "${packages[@]}" "${sums[@]}" build-provenance-Windows-x64.json \
+            --repo "$GITHUB_REPOSITORY" --verify-tag --title "专注记 $version" "${notes_args[@]}"

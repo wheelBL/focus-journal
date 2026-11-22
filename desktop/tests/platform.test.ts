@@ -3,8 +3,11 @@ import assert from 'node:assert/strict';
 import {primaryModifier,defaultCaptureShortcut,shortcutLabel} from '../core/desktop-platform';
 import {mainWindowChrome,applicationMenu,configureCompanionWindow} from '../electron/desktop-platform';
 import {CaptureShortcut} from '../electron/capture-shortcut';
+import {MacUpdates, replaceMacApp, selectMacUpdate} from '../electron/mac-updates';
 import {macosConfig} from '../scripts/macos-config.mjs';
-import {readFileSync} from 'node:fs';
+import {mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync} from 'node:fs';
+import {tmpdir} from 'node:os';
+import path from 'node:path';
 import {Script} from 'node:vm';
 import ts from 'typescript';
 test('platform conventions retain Windows control and isolate native macOS window chrome',()=>{
@@ -24,6 +27,65 @@ test('macOS production package has explicit ad-hoc signing and excludes QA entri
  const pkg={build:{appId:'local.focusjournal.desktop',productName:'专注记'},devDependencies:{electron:'44.9.0'},version:'0.30.0'};
  const config=macosConfig(pkg,{root:process.cwd(),stage:'/stage',output:'/output'});assert.equal(config.mac.identity,'-');assert.equal(config.mac.notarize,false);assert.equal(config.asar,true);assert.equal(config.files.some((f:string)=>f.includes('qa-')),false);
  assert.equal(macosConfig(pkg,{root:process.cwd(),stage:'/stage',output:'/output',qa:true}).files.includes('qa-start.cjs'),true);
+});
+
+const updateName = 'FocusJournal-0.41.10-macOS-arm64.zip';
+const updateUrl = `https://github.com/wheelBL/focus-journal/releases/download/v0.41.10/${updateName}`;
+const updateAsset = {name:updateName,browser_download_url:updateUrl,size:3,digest:`sha256:${'a'.repeat(64)}`,state:'uploaded'};
+const updateRelease = {tag_name:'v0.41.10',draft:false,prerelease:false,assets:[updateAsset]};
+
+test('macOS update selection requires a newer stable release and the verified asset for the current architecture',()=>{
+ assert.deepEqual(selectMacUpdate(updateRelease,'0.41.9','arm64'),{version:'0.41.10',url:updateUrl,size:3,digest:'a'.repeat(64)});
+ assert.deepEqual(selectMacUpdate(updateRelease,'0.41.10','arm64'),{state:'current'});
+ assert.deepEqual(selectMacUpdate(updateRelease,'0.42.0','arm64'),{state:'current'});
+ assert.deepEqual(selectMacUpdate(updateRelease,'0.41.9','x64'),{state:'unavailable'});
+ assert.deepEqual(selectMacUpdate({...updateRelease,prerelease:true},'0.41.9','arm64'),{state:'unavailable'});
+ assert.deepEqual(selectMacUpdate({...updateRelease,assets:[{...updateAsset,digest:undefined}]},'0.41.9','arm64'),{state:'unavailable'});
+});
+
+test('the macOS menu keeps a downloaded update visible and opens its update action',()=>{
+ let clicks=0;
+ const check=()=>{clicks++;};
+ const items=(version?:string)=>applicationMenu('darwin','专注记',undefined,{check,version})![0].submenu as import('electron').MenuItemConstructorOptions[];
+ assert.ok(items().some(item=>item.label==='检查更新…'));
+ const ready=items('0.41.10').find(item=>item.label==='新版 0.41.10 已就绪…');
+ assert.ok(ready);
+ (ready.click as ()=>void)();
+ assert.equal(clicks,1);
+});
+
+test('a failed update download leaves the current app intact and can be retried',async()=>{
+ const root=mkdtempSync(path.join(tmpdir(),'focus-update-test-'));
+ try{
+  const target=path.join(root,'current.app');
+  writeFileSync(target,'current');
+  let checks=0;
+  const fetchUpdate:typeof fetch=async url=>{
+   if(url===updateUrl)return new Response('bad');
+   checks++;
+   return Response.json(updateRelease);
+  };
+  const updates=new MacUpdates({target,version:'0.41.9',arch:'arm64',fetch:fetchUpdate});
+  const first=updates.check();
+  assert.equal(updates.check(),first);
+  await assert.rejects(first,/SHA-256/);
+  await assert.rejects(updates.check(),/SHA-256/);
+  assert.equal(checks,2);
+  assert.equal(updates.install(),false);
+  assert.equal(readFileSync(target,'utf8'),'current');
+  assert.deepEqual(readdirSync(root),['current.app']);
+ }finally{rmSync(root,{recursive:true,force:true});}
+});
+
+test('macOS replacement restores the original app when the staged bundle cannot be moved',()=>{
+ const root=mkdtempSync(path.join(tmpdir(),'focus-replace-test-'));
+ try{
+  const current=path.join(root,'current.app'), staged=path.join(root,'staged.app'), backup=path.join(root,'backup.app');
+  writeFileSync(current,'current');
+  assert.throws(()=>replaceMacApp(current,staged,backup),{code:'ENOENT'});
+  assert.equal(readFileSync(current,'utf8'),'current');
+  assert.deepEqual(readdirSync(root),['current.app']);
+ }finally{rmSync(root,{recursive:true,force:true});}
 });
 
 test('native QA renderer expressions parse before remote packaging',()=>{

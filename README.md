@@ -20,7 +20,7 @@ AI 设置支持从所填服务获取模型列表，搜索选择后保存，仍�
 
 确认失效且可撤销的截止可由 AI 建议移除，同时设置回顾日；外部承诺或来源不明时先澄清。回顾日只提示重新判断，不充当截止期限，今日页可直接打开待回顾事项。
 
-当前源码版本为 **0.41.1**，下载包由 GitHub Actions 构建。选择对应平台的成功运行，在 Artifacts 中下载；[0.41.1 更新说明](docs/releases/0.41.1.md)。
+当前源码版本为 **0.41.2**。[GitHub Releases](https://github.com/wheelBL/focus-journal/releases) 提供正式版下载，无需登录。也可从对应平台的 Actions 成功运行中下载尚未发布的构建。参见 [0.41.2 更新说明](docs/releases/0.41.2.md)。
 
 | 设备 | 下载 |
 | --- | --- |
@@ -30,10 +30,11 @@ AI 设置支持从所填服务获取模型列表，搜索选择后保存，仍�
 
 Windows 解压整个文件夹，双击 **专注记.exe**；Mac 安装说明见下文。无需安装 Node.js。
 
-下载 Actions 产物需登录 GitHub，产物有保留期限。此前 [0.31.0 Release](https://github.com/wheelBL/focus-journal/releases/tag/v0.31.0) 的下载包继续保留；后续包无需从本机重复上传。
+维护者推送与 `desktop/package.json` 版本一致的 `vX.Y.Z` 标签后，发布流程构建并验证 Windows x64、macOS arm64 和 macOS x64 的安装包，校验 SHA-256，并将全部下载包上传到同一个 GitHub Release。
 
 - 系统：Windows 11 x64；macOS 14 或更新系统，提供 Apple Silicon 与 Intel 两种包。macOS 原生启动测试使用 macOS 15。
-- 更新：先在旧版托盘中选择“退出专注记”，再运行新版。数据保存在用户数据目录中，升级数据结构前自动备份。
+- macOS 0.41.2 起，将应用放入 `/Applications` 或 `~/Applications` 即可启用自动更新。应用在后台检查 GitHub Releases，验证并下载新版，在系统通知和应用菜单中提示，并在完全退出时安装。可从「专注记 → 检查更新…」手动检查，也可点击提示立即重启更新。
+- Windows 与更早的 macOS 版可先从托盘中退出旧版，再运行新版。数据保存在用户数据目录中，升级数据结构前自动备份。
 - Windows 0.30.1 起使用固定的 `%USERPROFILE%\.focus-journal`，不随启动入口改变。首次升级保留原目录并校验迁移；发现不同的旧工作区时明确选择。详见[统一工作区规则](desktop/docs/workspace-location.md)。
 - 关闭主窗口后继续在托盘运行；完全退出请使用侧栏底部或托盘菜单中的“退出专注记”。已提交的操作自动保存，退出时保存并暂停计时；未提交的表单不会自动提交。
 - 发布包目前未做 Windows 代码签名。校验值随下载包的 `SHA256SUMS-*.txt` 提供；历史 Release 使用 `SHA256SUMS.txt`。

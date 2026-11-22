@@ -6,6 +6,7 @@ on:
   pull_request:
     paths: ['desktop/**', '.github/workflows/windows.yml', 'THIRD_PARTY_NOTICES.txt']
   workflow_dispatch:
+  workflow_call:
 permissions:
   contents: read
 concurrency:

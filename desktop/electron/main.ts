@@ -1,6 +1,7 @@
 import {mainWindowChrome,applicationMenu} from './desktop-platform';
 import {shutdownJournal} from './shutdown';
 import {prepareWorkspace,finishWorkspaceStartup} from './workspace-startup';
+import {MacUpdates} from './mac-updates';
 import type {DesktopEditAction} from '../core/desktop-platform';
 import {UsageStore} from './usage-store';
 import {AiController} from './ai-controller';
@@ -8,7 +9,7 @@ import {LocalApiController} from './local-api-controller';
 import {AppearanceController} from './appearance';
 import {CaptureWindow} from './capture-window';
 import {FloatingTimerWindow} from './floating-timer-window';
-import { app, BrowserWindow, ipcMain, Menu, Tray, nativeImage, Notification, dialog, shell, powerMonitor, safeStorage } from 'electron';
+import { app, BrowserWindow, ipcMain, Menu, Tray, nativeImage, Notification, dialog, shell, powerMonitor, safeStorage, net } from 'electron';
 import {createHash,randomUUID} from 'node:crypto';
 import {SyncController} from './sync-controller';
 import {GitCodeRemote} from './gitcode-remote';
@@ -47,8 +48,53 @@ else if(workspace) {
     const dailyBackup=path.join(backups,`${localDate()}.json`);
     if(!existsSync(dailyBackup))writeFileSync(dailyBackup,service.exportJson(),'utf8');
     const nativeEdit=(action:DesktopEditAction)=>{const focused=BrowserWindow.getFocusedWindow();if(focused&&focused!==win)focused.webContents[action]();else win?.webContents.send('journal:edit-action',action);};
-    const menu=applicationMenu(process.platform,app.getName(),nativeEdit);Menu.setApplicationMenu(menu?Menu.buildFromTemplate(menu):null);
+    const target=path.resolve(path.dirname(process.execPath),'../..');
+    const updates=process.platform==='darwin'&&app.isPackaged&&!demo&&!workspace.explicit&&path.basename(target)==='专注记.app'&&
+      ['/Applications',path.join(app.getPath('home'),'Applications')].includes(path.dirname(target))
+      ?new MacUpdates({target,version:app.getVersion(),arch:process.arch,fetch:net.fetch}):null;
     const icon=path.join(__dirname,'../assets/icon.png');
+    let manualUpdate=false,restartForUpdate=false;
+    let readyVersion:string|undefined,updateNotification:Notification|undefined;
+    const checkUpdates=async (manual:boolean)=>{
+      if(!updates||closed||(manual&&manualUpdate))return;
+      if(manual)manualUpdate=true;
+      try{
+        const status=await updates.check();
+        if(closed)return;
+        log('update-check',status);
+        if(status.state==='ready'&&readyVersion!==status.version){
+          readyVersion=status.version;
+          refreshMenu();
+          if(!manualUpdate&&Notification.isSupported()){
+            const notice=new Notification({title:`专注记有新版本 ${status.version}`,body:'新版已下载。点击查看，或在下次退出时自动安装。',icon});
+            updateNotification=notice;
+            notice.once('click',()=>{app.focus();void checkUpdates(true);});
+            notice.once('close',()=>{if(updateNotification===notice)updateNotification=undefined;});
+            notice.show();
+          }
+        }
+        if(!manual)return;
+        if(status.state==='ready'){
+          const choice=await dialog.showMessageBox({type:'info',message:`专注记 ${status.version} 已下载`,
+            detail:'退出专注记时会自动安装。也可以现在重启，进行中的计时会保存为暂停。',
+            buttons:['稍后','重启并更新'],defaultId:0,cancelId:0});
+          if(choice.response===1&&!closed){restartForUpdate=true;app.quit();if(!closed)restartForUpdate=false;}
+        }else{
+          await dialog.showMessageBox({type:'info',message:status.state==='current'
+            ?`当前版本为 ${app.getVersion()}，GitHub 暂无更高版本`:'GitHub 暂无适用于这台 Mac 的更新包'});
+        }
+      }catch(error){
+        if(closed)return;
+        const detail=error instanceof Error?error.message:String(error);
+        log('update-check-failed',detail);
+        if(manual)await dialog.showMessageBox({type:'warning',message:'检查更新未完成',detail});
+      }finally{if(manual)manualUpdate=false;}
+    };
+    const refreshMenu=()=>{
+      const menu=applicationMenu(process.platform,app.getName(),nativeEdit,updates?{check:()=>void checkUpdates(true),version:readyVersion}:undefined);
+      Menu.setApplicationMenu(menu?Menu.buildFromTemplate(menu):null);
+    };
+    refreshMenu();
     win=new BrowserWindow({width:demo&&!treePrototype?1060:1440,height:demo&&!treePrototype?640:920,minWidth:900,minHeight:640,show:false,title:treePrototype?'专注记 · 任务树交互稿':'专注记',icon,backgroundColor:'#FFFFFF',...mainWindowChrome(process.platform),webPreferences:{preload:path.join(__dirname,'preload.cjs'),contextIsolation:true,nodeIntegration:false,sandbox:true}});
     appearance.setMain(win);
     if(process.platform==='darwin')win.webContents.on('before-input-event',(event,input)=>{if(input.type==='keyDown'&&input.meta&&!input.alt&&!input.control&&!input.shift&&input.key.toLowerCase()==='a'){event.preventDefault();nativeEdit('selectAll');}});
@@ -143,6 +189,24 @@ else if(workspace) {
       if(closed)return;
       try{shutdown();log('shutdown');}catch(e){event.preventDefault();report(e);}
     });
+    if(updates){
+      const firstCheck=setTimeout(()=>void checkUpdates(false),45_000);
+      const nextCheck=setInterval(()=>void checkUpdates(false),6*60*60_000);
+      app.once('will-quit',()=>{
+        clearTimeout(firstCheck);clearInterval(nextCheck);
+        updateNotification?.close();
+        try{
+          updates.cancel();
+          if(updates.install()){
+            log('update-installed');
+            if(restartForUpdate)app.relaunch();
+          }
+        }catch(error){
+          const message=error instanceof Error?error.message:String(error);
+          log('update-install-failed',message);dialog.showErrorBox('专注记更新安装失败',message);
+        }
+      });
+    }
     win.on('session-end',()=>{if(!closed){try{shutdown();}catch{/* The last durable checkpoint remains recoverable. */}}});
   }).catch(error=>{dialog.showErrorBox('专注记启动失败',String(error));quitting=true;app.quit();});
 }
