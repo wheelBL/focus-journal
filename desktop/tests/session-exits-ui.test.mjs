@@ -96,3 +96,26 @@ test('named session summary retains edits on defer and survives external session
   const id=h.service.snapshot().state.sessions.at(-1).id;await h.command({type:'session.delete',payload:{id}});assert.match(h.query('dialog').textContent,/已更新/);await h.click(h.button('返回'));
  }finally{await h.close();}
 });
+
+test('ordinary stop defaults to saving, then the receipt opens that exact session from another day or page',async()=>{
+ const h=await appDom();try{
+  const task=h.add('审阅文稿');await h.mount();
+  assert.equal(document.querySelector('[aria-label="今日完成归属"]'),null);
+  const start=()=>h.command({type:'focus.start',payload:{taskId:task,skipEstimate:true}});
+  await start();h.clock.advance(120000);await h.click(h.button('结束本次',h.query('.today-timer')));
+  const write=h.label('本次推进了什么');assert.equal(document.activeElement,write);await h.input(write,'保留第一段审阅意见');
+  const primary=h.query('dialog .primary');assert.equal(primary.textContent,'保存小结');assert.equal(primary.type,'submit');
+  const original=window.journal.command;window.journal.command=async c=>{if(c.type==='session.summary')throw Error('写入失败');return original(c);};
+  await h.click(primary);assert.equal(h.label('本次推进了什么').value,'保留第一段审阅意见');assert.equal(h.query('.toast').textContent.includes('查看本次记录'),false);
+  window.journal.command=original;await h.action(()=>h.query('dialog form').requestSubmit());
+  assert.match(h.query('.toast').textContent,/小结已保存/);assert.equal(h.service.snapshot().state.settings.breakUntil,null);
+  const first=h.service.snapshot().state.sessions.at(-1);assert.equal(first.summary,'保留第一段审阅意见');
+  await start();h.clock.advance(60000);await h.click(h.button('结束并休息 5 分钟',h.query('.today-timer')));
+  const later=h.service.snapshot().state.sessions.at(-1);assert.notEqual(later.id,first.id);assert.equal(h.label('休息剩余时间').textContent,'05:00');
+  await h.input(h.label('查看日期'),'2026-10-18');await h.click(h.label('日历'));
+  await h.click(h.button('查看本次记录'));const record=h.label('本次记录');
+  assert.match(record.textContent,/审阅文稿/);assert.match(record.textContent,/2026-10-19/);assert.match(record.textContent,/2 分钟/);assert.match(record.textContent,/保留第一段审阅意见/);
+  await h.click(h.button('关闭',record));await h.click(h.label('今日'));await h.input(h.label('查看日期'),first.date);
+  await h.command({type:'task.status',payload:{id:task,status:'done'}});assert.match(h.label('今日完成归属').textContent,/1 件/);
+ }finally{await h.close();}
+});

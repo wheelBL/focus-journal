@@ -7,6 +7,7 @@ export class BrowserWindow extends EventEmitter {
  constructor(options={}){super();this.options=options;this.top=options.alwaysOnTop;this.bounds={x:0,y:0,width:options.width??1000,height:options.height??700};harness.windows.push(this);this.webContents=new EventEmitter();this.webContents.mainFrame={};this.webContents.setWindowOpenHandler=()=>{};this.webContents.send=(name,state)=>this.messages.push(structuredClone({name,state}));}
  async loadFile(file,options){this.query=options.query;if(harness.gate)await harness.gate;}
  isDestroyed(){return this.destroyed;}isVisible(){return this.visible;}isMinimized(){return this.minimized;}isFocused(){return this.focused;}isAlwaysOnTop(){return this.top;}
+ setVisibleOnAllWorkspaces(visible,options){this.allWorkspaces={visible,...options};}
  setBounds(bounds){this.bounds={...bounds};this.emit('move');}getBounds(){return this.bounds;}
  setAlwaysOnTop(top){this.top=top;}showInactive(){this.visible=true;this.focused=false;}hide(){const was=this.visible;this.visible=false;if(was)this.emit('hide');}
  setBackgroundColor(color){this.backgroundColor=color;}

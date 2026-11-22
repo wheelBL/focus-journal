@@ -29,3 +29,6 @@
 .today-now .task-card:before{display:none}
 
 .today-review-entry{display:flex;align-items:center;flex-wrap:wrap;gap:4px 12px;margin:4px 0 12px;color:var(--muted);font-size:12px}.today-review-entry button{font-size:12px;min-height:28px;padding:3px 6px}
+
+.capture-receipt{border-top:1px solid var(--line);padding-top:10px;margin-top:10px;font-size:13px;overflow-wrap:anywhere}
+.capture-receipt p{margin:0}.capture-receipt .actions{margin-top:8px;flex-wrap:wrap}

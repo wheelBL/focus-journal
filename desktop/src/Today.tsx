@@ -1,10 +1,12 @@
+import {outlinePath,type OutlineIndex} from '../core/outline';
+import {blockedReason} from '../core/item-state';
 import {reviewQueue} from '../core/item-reviews';
 import {isCurrentFocus} from '../core/daily-focus';
 import React,{useMemo,useState} from 'react';
 import {Clock20Regular} from '@fluentui/react-icons';
 import {localDate,sessionMsOnDate,type Session} from '../core/types';
 import {recurringEvents} from '../core/recurrence';
-import {isEvent,isInformation,isGroup} from '../core/item-kind';
+import {isEvent,isInformation,isGroup,isTask} from '../core/item-kind';
 import {todayCandidates} from '../core/today';
 import {useJournal,useWorkspaceJournal,Button,Empty} from './ui';
 import {SemanticCapture} from './SemanticCapture';
@@ -19,7 +21,7 @@ import {timeText} from './ui';
 import './today.css';
 
 export function Today(){
- const {data,date,run,dialog,notify,navigate}=useJournal(),workspace=useWorkspaceJournal();
+ const {data,date,run,dialog,navigate}=useJournal(),workspace=useWorkspaceJournal();
  const {state,timers}=data,isToday=date===localDate(data.now);
  const model=useMemo(()=>todayCandidates(workspace.data.state,data.now),[workspace.data.state,Math.floor(Date.parse(data.now)/60000)]);
  const [choosing,setChoosing]=useState(false),[query,setQuery]=useState('');
@@ -41,7 +43,7 @@ export function Today(){
     <section className="today-plan" aria-label="安排当前重点"><div className="today-section-heading"><h2>当前重点</h2><Button subtle aria-expanded={choosing} onClick={()=>setChoosing(!choosing)}>{choosing?'收起选择':'选择重点'}</Button></div>
      <DailyFocusPanel index={model.index} date={date}/>
      {choosing&&<div className="today-focus-picker"><input aria-label="搜索要加入重点的事项" placeholder="搜索事项，加入当前重点" value={query} onChange={e=>setQuery(e.target.value)}/>{candidates.slice(0,8).map(task=><div className="today-candidate" key={task.id}><button className="task-link" onClick={()=>dialog({type:'detail',id:task.id})}>{task.title}</button><FocusToggle task={task}/></div>)}{!candidates.length&&<p className="muted">没有符合条件的待做事项。</p>}<Button subtle onClick={()=>navigate('projects')}>去事项中选择{candidates.length>8?`（还有 ${candidates.length-8} 件）`:''}</Button></div>}
-     <div className="today-capture"><SemanticCapture data={data} run={run} storageKey={`journal.today-capture.${data.dataPath}`} onSaved={()=>notify('记录已保存')}/></div>
+     <TodayCapture index={model.index}/>
     </section>
    </div>
   </>}
@@ -52,4 +54,25 @@ export function Today(){
    {!history.length&&<p className="muted">还没有时间线记录。结束计时后会自动出现在这里，也可以补记投入。</p>}
   </div></section>
  </section>;
+}
+
+function TodayCapture({index}:{index:OutlineIndex}){
+ const {data,run,dialog,busy}=useWorkspaceJournal();
+ const [savedId,setSavedId]=useState<string>();
+ const saved=savedId?data.state.tasks.find(task=>task.id===savedId):undefined;
+ const timer=data.timers.find(t=>t.taskId===savedId);
+ const available=saved&&isTask(saved)&&!blockedReason(index,saved.id);
+ const parent=saved?.parentId?outlinePath(index,saved.parentId).map(node=>node.title).join(' / '):'不分组';
+ const start=()=>{
+  if(!saved||timer||busy||!available)return;
+  if(data.timers.some(t=>!t.paused))dialog({type:'start',id:saved.id});
+  else void run({type:'focus.start',payload:{taskId:saved.id,skipEstimate:true}}).catch(()=>{});
+ };
+ return <div className="today-capture">
+  <SemanticCapture data={data} run={run} storageKey={`journal.today-capture.${data.dataPath}`} showDefaultDestination={!saved} onSaved={result=>setSavedId(result.commandResult?.createdItemIds[0])}/>
+  {saved&&!saved.deletedAt&&<div className="capture-receipt">
+   <p role="status">「{saved.title}」已保存到{parent}{isEvent(saved)&&' · 可在日历查看'}</p>
+   {available&&<div className="actions"><Button disabled={busy||!!timer} onClick={start}>{timer?(timer.paused?'已暂停':'正在计时'):'开始这项任务'}</Button><FocusToggle task={saved}/></div>}
+  </div>}
+ </div>;
 }

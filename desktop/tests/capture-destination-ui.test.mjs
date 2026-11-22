@@ -55,3 +55,26 @@ test('an existing inbox event stays until explicit organize, saving current edit
   fail=false;await h.click(h.button('保存并结束整理'));const saved=h.get(event.id);assert.equal(saved.parentId,null);assert.equal(saved.itemType,'event');assert.equal(saved.title,'校正后的旧会议');assert.equal(saved.description,'保留这次编辑');assert.equal(saved.eventAt,event.eventAt);assert.equal(saved.eventEnd,event.eventEnd);assert.equal(h.get(child).parentId,event.id);assert.match(h.label('收件箱内容').textContent,/没有待澄清内容/);
  }finally{await h.close();}
 });
+
+test('today capture confirms the destination and binds both next actions to the last successful task',async()=>{
+ const h=await appDom();try{
+  const parent=group(h,'本周计划');await h.mount();
+  assert.match(h.query('.today-capture').textContent,/新任务默认保存到收件箱/);
+  const receipt=()=>h.query('.capture-receipt');
+  await h.input(input(h),'准备提纲');await h.key(input(h),'Enter');const first=last(h).id;
+  assert.match(receipt().textContent,/「准备提纲」已保存到收件箱/);
+  await h.input(input(h),'准备提纲 #本周计划');await h.key(input(h),'Enter');const second=last(h).id;
+  assert.notEqual(first,second);assert.equal(last(h).parentId,parent);
+  assert.match(receipt().textContent,/「准备提纲」已保存到本周计划/);assert.equal(document.activeElement,input(h));
+  assert.equal(h.service.snapshot().timers.length,0);
+  await h.click(h.button('加入当前重点',receipt()));assert.equal(h.get(second).focusActive,true);assert.ok(!h.get(first).focusActive);
+  await h.click(h.button('开始这项任务',receipt()));assert.deepEqual(h.service.snapshot().timers.map(t=>t.taskId),[second]);
+  assert.equal(h.button('正在计时',receipt()).disabled,true);
+  await h.input(input(h),'审阅文稿');await h.input(h.label('保存去向'),'unfiled');await h.key(input(h),'Enter');
+  assert.match(receipt().textContent,/已保存到不分组/);await h.click(h.button('开始这项任务',receipt()));
+  assert.ok(h.button('切换到这件事'));await h.click(h.button('返回',h.query('dialog')));assert.equal(h.service.snapshot().timer.taskId,second);
+  for(const text of ['- 审阅意见','o 明天 讨论会']){
+   await h.input(input(h),text);await h.key(input(h),'Enter');assert.equal(receipt().querySelector('button'),null);
+  }
+ }finally{await h.close();}
+});

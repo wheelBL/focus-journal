@@ -7,6 +7,7 @@ export class BrowserWindow extends EventEmitter{
  constructor(options){super();this.options=options;this.top=options.alwaysOnTop;harness.windows.push(this);this.webContents=new EventEmitter();this.webContents.mainFrame={};this.webContents.setWindowOpenHandler=()=>{};this.webContents.send=(name,state)=>{this.messages.push(structuredClone({name,state}));if(state?.cue&&harness.autoAudio)harness.events.get('reminder:audio-result')?.({sender:this.webContents,senderFrame:this.webContents.mainFrame},state.cue.id);};}
  async loadFile(file,options){this.file=file;this.query=options.query;this.emit('ready-to-show');}
  isDestroyed(){return this.destroyed;}isVisible(){return this.visible;}isFocused(){return this.focused;}isAlwaysOnTop(){return this.top;}
+ setVisibleOnAllWorkspaces(visible,options){this.allWorkspaces={visible,...options};}
  setBounds(bounds){this.bounds=bounds;}getBounds(){return this.bounds;}setAlwaysOnTop(top,level){this.top=top;this.level=level;}
  show(){this.visible=true;}focus(){this.focused=true;}
  showInactive(){this.visible=true;this.focused=false;this.top=false;}hide(){this.visible=false;}

@@ -7,7 +7,7 @@ import {SessionStartDialog} from './SessionStart';
 import {DiscardEffortDialog,DeletedEffortDialog} from './EffortTrash';
 import {useDialogAction} from './useDialogAction';
 import {ManualForm} from './ManualEffortDialog';
-import {SummaryForm} from './SessionSummary';
+import {SessionRecord,SummaryForm} from './SessionSummary';
 import {CalendarCreateDialog} from './CalendarCreateDialog';
 import {ParentSelect} from './ParentSelect';
 import {parentOptions} from '../core/outline-options';
@@ -40,6 +40,7 @@ export default function Dialogs({spec}:{spec:DialogSpec}){
  if(spec.type==='timer-start')return <SessionStartDialog id={spec.id!}/>;
  if(spec.type==='discard-effort')return <DiscardEffortDialog id={spec.id!}/>;
  if(spec.type==='deleted-effort')return <DeletedEffortDialog close={()=>dialog(null)}/>;
+ if(spec.type==='session-record')return <SessionRecord id={spec.id!}/>;
  if(spec.type==='assign'||(['summary','manual'].includes(spec.type)&&spec.id&&data.state.sessions.find(r=>r.id===spec.id)?.taskId===null))return <SessionAssignment id={spec.id!}/>;
  if(spec.type==='calendar')return <CalendarCreateDialog start={spec.start!} end={spec.end!} initialMode={spec.calendarMode}/>;
  if(spec.type==='shortcuts')return <KeyboardHelp/>;

@@ -37,7 +37,7 @@ test('unavailable local draft storage never turns a committed capture into a sav
  try{
   await h.mount();const input=h.label('快速添加事项名称');await h.input(input,'数据库已经保存的事项');let calls=0;const real=window.journal.command;window.journal.command=command=>{if(command.type==='capture.create')calls++;return real(command);};
   storage.removeItem=()=>{throw Error('草稿缓存不可删除');};storage.setItem=()=>{throw Error('草稿缓存不可写入');};
-  await h.key(input,'Enter');assert.equal(calls,1);assert.equal(h.service.snapshot().state.tasks.at(-1).title,'数据库已经保存的事项');assert.equal(input.value,'');assert.equal(input.readOnly,false);assert.equal(document.querySelector('.semantic-capture [role=alert]'),null);assert.match(h.query('.toast').textContent,/记录已保存/);
+  await h.key(input,'Enter');assert.equal(calls,1);assert.equal(h.service.snapshot().state.tasks.at(-1).title,'数据库已经保存的事项');assert.equal(input.value,'');assert.equal(input.readOnly,false);assert.equal(document.querySelector('.semantic-capture [role=alert]'),null);assert.match(h.query('.capture-receipt').textContent,/已保存到收件箱/);
   await h.key(input,'Enter');assert.equal(calls,1);assert.equal(h.service.snapshot().state.tasks.filter(item=>item.title==='数据库已经保存的事项').length,1);
  }finally{storage.removeItem=remove;storage.setItem=set;await h.close();}
 });

@@ -39,7 +39,7 @@ export default function App(){
  const aiSequence=useRef(0);
  const [locationRevision,setLocationRevision]=useState(0);
  const [initialLocation]=useState(()=>{const location=restoreLocation(readLocal('journal.location',null),localDate(),modules.map(m=>m.id));try{if(window.sessionStorage.getItem('journal-open-inbox')==='1'){window.sessionStorage.removeItem('journal-open-inbox');window.sessionStorage.removeItem('journal-locate');return {...location,view:'inbox'};}}catch{}return location;});
- const [data,setData]=useState<Snapshot|null>(null),[view,setView]=useState(treePrototype?'projects':initialLocation.view),[daySelection,setDaySelection]=useState({date:initialLocation.date,followToday:initialLocation.followToday}),[dialog,setDialog]=useState<DialogSpec|null>(null),[query,setQuery]=useState(''),[toast,setToast]=useState(''),[error,setError]=useState(''),[busy,setBusy]=useState(false);
+ const [data,setData]=useState<Snapshot|null>(null),[view,setView]=useState(treePrototype?'projects':initialLocation.view),[daySelection,setDaySelection]=useState({date:initialLocation.date,followToday:initialLocation.followToday}),[dialog,setDialog]=useState<DialogSpec|null>(null),[query,setQuery]=useState(''),[toast,setToast]=useState<{text:string;sessionId?:string}|null>(null),[error,setError]=useState(''),[busy,setBusy]=useState(false);
  const today=localDate(data?.now),date=daySelection.followToday?today:daySelection.date;
  const [previewId,setPreviewId]=useState<string|null>(null),[previewIds,setPreviewIds]=useState<string[]>([]);
  const previewOrigin=useRef<HTMLElement|null>(null);
@@ -56,7 +56,11 @@ export default function App(){
  };
  useLayoutEffect(()=>{if(query||!returnFromSearch.current)return;returnFromSearch.current=false;for(const {element,top,left} of searchScroll.current){if(element.isConnected){element.scrollTop=top;element.scrollLeft=left;}}const target=searchOrigin.current;const frame=requestAnimationFrame(()=>{if(document.querySelector('dialog[open]'))return;if(target?.isConnected&&!target.closest('[hidden],[inert]'))target.focus({preventScroll:true});else mainRef.current?.focus({preventScroll:true});});return()=>cancelAnimationFrame(frame);},[!!query]);
  const setDate=useCallback((value:string)=>{if(validWorkspaceDate(value))setDaySelection({date:value,followToday:value===localDate(dataRef.current?.now)});},[]);
- const notify=useCallback((text:string)=>{setToast(text);if(toastTimer.current)clearTimeout(toastTimer.current);toastTimer.current=setTimeout(()=>setToast(''),6000);},[]);
+ const notify=useCallback((text:string,sessionId?:string)=>{
+  if(toastTimer.current)clearTimeout(toastTimer.current);
+  setToast({text,sessionId});
+  if(!sessionId)toastTimer.current=setTimeout(()=>setToast(null),6000);
+ },[]);
  const refresh=useCallback(async()=>{if(busyRef.current)return;const n=++seq.current;try{const result=await api.snapshot();if(n===seq.current){dataRef.current=result;setData(result);setError('');}}catch(e){if(n===seq.current)setError(e instanceof Error?e.message:String(e));}},[]);
  useEffect(()=>{void refresh();const off=api.onChanged?.(()=>void refresh());return()=>off?.();},[refresh]);
  useEffect(()=>{if(data)writeLocal('journal.location',{view,date,followToday:daySelection.followToday,lastSeenDay:today});},[view,date,daySelection.followToday,today,!!data]);
@@ -106,7 +110,7 @@ export default function App(){
   </div>
 
 
-  {toast&&<div className="toast" role="status">{toast}<button aria-label="关闭提示" onClick={()=>setToast('')}><Dismiss20Regular/></button></div>}
+  {toast&&<div className="toast" role="status"><span>{toast.text}</span>{toast.sessionId&&<button className="toast-action" onClick={()=>{openDialog({type:'session-record',id:toast.sessionId});setToast(null);}}>查看本次记录</button>}<button aria-label="关闭提示" onClick={()=>setToast(null)}><Dismiss20Regular/></button></div>}
  </div>;
 }
 

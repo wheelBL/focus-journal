@@ -54,11 +54,11 @@ export function SessionAssignment({id}:{id:string}){
  const summaryChanged=!!record&&summary!==record.summary;
  const restReason=restUnavailableReason(data),canRest=!restReason;
  const defer=async()=>{
-  if(summaryChanged){if(await perform(()=>run({type:'session.summary',payload:{id,summary}}))){dialog(null);notify('进展已保存，事项可以稍后补充');}}
+  if(summaryChanged){if(await perform(()=>run({type:'session.summary',payload:{id,summary}}))){dialog(null);notify('进展已保存，事项可以稍后补充',id);}}
   else dismiss(()=>dialog(null));
  };
  const close=()=>{if(busy)return;if(discard)setDiscard(false);else void defer();};
- const save=async()=>{if(await perform(()=>run({type:'session.assign',payload:{id,summary,rest:restAfter&&canRest,...mode==='new'?{title,parentId:parent==='__root__'?null:parent}:{taskId}}}))){clearAssignmentDraft(data.dataPath,id);dialog(null);notify('已关联事项，原始计时时段和投入已保留');}};
+ const save=async()=>{if(await perform(()=>run({type:'session.assign',payload:{id,summary,rest:restAfter&&canRest,...mode==='new'?{title,parentId:parent==='__root__'?null:parent}:{taskId}}}))){clearAssignmentDraft(data.dataPath,id);dialog(null);notify('已关联事项，原始计时时段和投入已保留',id);}};
  if(!record||record.taskId!==null||record.status!=='ended')return <Modal title="补充事项" onClose={close}><p>这段记录已更新，请返回查看。</p><Button onClick={close}>返回</Button></Modal>;
  return <Modal title={discard?'放弃这段投入':'补充这段时间的事项'} onClose={close} busy={saving||busy}>{discard?<DiscardEffortConfirmation record={record} summary={summary} onCancel={()=>setDiscard(false)} onDiscard={()=>dialog(null)}/>:<form onSubmit={e=>{e.preventDefault();void save();}}><fieldset disabled={saving} className="dialog-fields">
   <div className="assignment-evidence"><Timer20Regular/><div><strong>{minuteText(record.durationMs)} · 时间已保存</strong><span>{record.date} {timeText(record.start)}–{record.end&&localDate(record.end)!==record.date?`${localDate(record.end)} `:''}{timeText(record.end)}{record.segments.length>1?' · 已扣除暂停':''}</span></div></div>

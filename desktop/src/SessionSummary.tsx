@@ -1,4 +1,6 @@
 import React,{useState} from 'react';
+import {localDate} from '../core/types';
+import {sessionTitle} from '../core/session-label';
 import {CheckmarkCircle20Filled} from '@fluentui/react-icons';
 import {useItemActions} from './useItemActions';
 import {useDialogAction} from './useDialogAction';
@@ -6,12 +8,18 @@ import {restUnavailableReason} from './rest-availability';
 import {Button,Field,Modal,minuteText,timeText,useJournal} from './ui';
 
 export function SummaryForm({id}:{id:string}){
- const {data,run,dialog}=useJournal(),requestState=useItemActions();
+ const {data,run,dialog,notify}=useJournal(),requestState=useItemActions();
  const session=data.state.sessions.find(s=>s.id===id),task=data.state.tasks.find(t=>t.id===session?.taskId);
  const [summary,setSummary]=useState(session?.summary??''),[remaining,setRemaining]=useState('');
  const {perform,dismiss,saving,error}=useDialogAction();
  const persist=(rest=false)=>run({type:'session.summary',payload:{id,summary,remainingMinutes:remaining===''?null:Number(remaining),rest}});
- const save=async(rest=false)=>{if(await perform(()=>persist(rest)))dialog(null);};
+ const save=async(rest=false)=>{if(await perform(()=>persist(rest))){dialog(null);notify('小结已保存',id);}};
+ const complete=()=>perform(async()=>{
+  await persist();
+  const completed=await requestState(task!.id,'done');
+  if(completed)dialog(null);
+  notify(completed?'小结已保存，事项已完成':'小结已保存',id);
+ });
  const dirty=!!session&&(summary!==session.summary||remaining!=='');
  const restReason=restUnavailableReason(data);
  const close=()=>{if(dirty)void save();else dismiss(()=>dialog(null));};
@@ -23,6 +31,18 @@ export function SummaryForm({id}:{id:string}){
   <Field label="估计还需要多少分钟（可选）" hint={`原估计 ${task.estimateMinutes??'未填写'} 分钟将继续保留。`}><input type="number" min={0} max={1440} value={remaining} onChange={e=>setRemaining(e.target.value)}/></Field>
   {error&&<p role="alert" className="form-error">{error}</p>}
   {restReason&&<p className="muted" role="status">{restReason}</p>}
-  <footer className="modal-actions"><Button subtle type="button" disabled={saving} onClick={close}>{dirty?'保存进展，稍后填写':'稍后填写'}</Button><Button type="submit" disabled={saving}>保存小结</Button>{task.status==='open'&&<Button type="button" disabled={saving} onClick={()=>void perform(async()=>{await persist();if(await requestState(task.id,'done'))dialog(null);})}>完成事项…</Button>}<Button primary type="button" disabled={saving||!!restReason} title={restReason??undefined} onClick={()=>void save(true)}>保存并休息 {data.state.settings.breakMinutes} 分钟</Button></footer>
+  <footer className="modal-actions"><Button subtle type="button" disabled={saving} onClick={close}>{dirty?'保存进展，稍后填写':'稍后填写'}</Button>{task.status==='open'&&<Button type="button" disabled={saving} onClick={()=>void complete()}>完成事项…</Button>}<Button type="button" disabled={saving||!!restReason} title={restReason??undefined} onClick={()=>void save(true)}>保存并休息 {data.state.settings.breakMinutes} 分钟</Button><Button primary type="submit" disabled={saving}>保存小结</Button></footer>
  </fieldset></form></Modal>;
+}
+
+export function SessionRecord({id}:{id:string}){
+ const {data,dialog}=useJournal(),record=data.state.sessions.find(s=>s.id===id);
+ const endDate=record?.end?localDate(record.end):null;
+ return <Modal title="本次记录" onClose={()=>dialog(null)}>
+  {record?<><h3>{sessionTitle(data.state,record.taskId)}</h3>
+   <p className="muted">{record.date} · {record.start?`${timeText(record.start)}–${endDate&&endDate!==record.date?`${endDate} `:''}${timeText(record.end)}`:'具体时间未指定'} · {minuteText(record.durationMs)}</p>
+   <p className="record-summary">{record.summary||'尚未填写小结。'}</p>
+  </>:<p>这段投入记录已移除。</p>}
+  <footer className="modal-actions"><Button primary onClick={()=>dialog(null)}>关闭</Button></footer>
+ </Modal>;
 }

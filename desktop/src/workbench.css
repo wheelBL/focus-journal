@@ -154,3 +154,6 @@ h1{font-size:24px;letter-spacing:0;line-height:1.4;font-weight:650}h2{font-size:
 .workbench .estimate-exhausted{font-size:12px;color:var(--warning);line-height:1.7}.workbench .estimate-exhausted .subtle{font-size:12px;color:var(--accent);padding:2px 5px;min-height:26px}
 .workbench .estimate-facts{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));font-size:13px}.workbench .estimate-facts>small,.workbench .estimate-facts>button{grid-column:1/-1}.workbench .estimate-facts>small{color:var(--muted);font-size:11px}.workbench .estimate-facts .estimate-exhausted{grid-column:1/-1}
 .workbench .view-scope-title{font-size:15px;font-weight:500;color:var(--muted)}.workbench .view-dirty{font-size:11px;color:var(--warning);padding:0 4px}
+
+.toast .toast-action{color:inherit;text-decoration:underline;text-underline-offset:3px;white-space:nowrap;min-height:28px}
+.record-summary{white-space:pre-wrap;overflow-wrap:anywhere}
